@@ -10,7 +10,6 @@ first atemp
 - [ ] train the model and get some samples 
 - [ ] find out a way to evaluate the model, see whether this is indeed promising.
 
-
 enhancement
 - [ ] extend the code to multiple atom species
 - [ ] train for MP20 and evaluate the model again
@@ -41,8 +40,11 @@ The autoregressive model will be a causal transformer (what else ?).
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/sampler.py
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
+For P(L) we will use a 6-dimensional flow model. 
 
-Since the number of atoms can vary, we will sample a special `EOF` token along with `A` and `X` to indicate whether this is the last atom. 
+For space group other than P1, we will sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
+
+Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have a special type `X`.
 
 
 ## optimization 
