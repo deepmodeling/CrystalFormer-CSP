@@ -4,9 +4,12 @@ let's code a crystal gpt together, with the help of GPT!
 
 # todo 
 
+
 first atemp 
-- [ ] for data start with carbon_24, write data parse to get LAX 
-- [ ] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
+see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3JgKRFKUaOgQfFk6?usp=sharing)
+
+- [X] for data start with carbon_24, write data parse to get LXA
+- [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
 - [ ] train the model and get some samples 
 - [ ] find out a way to evaluate the model, see whether this is indeed promising.
 
