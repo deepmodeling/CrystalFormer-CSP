@@ -12,10 +12,6 @@ def make_loss_fn(atom_types, model):
         outputs = model(params, L, X, A)
         mu, kappa, logit = jnp.split(outputs, [dim, 2*dim], axis=-1) 
 
-        #logp_x = jax.scipy.stats.norm.logpdf(X[1:, :], 
-        #                                    loc=mu[:-1], 
-        #                                    scale=kappa[:-1])
-
         logp_x = von_mises_logpdf(X[1:]*2*jnp.pi, mu[:-1], kappa[:-1])
 
         logp_x = jnp.sum(jnp.where((A[1:]>0)[:, None], logp_x, jnp.zeros_like(logp_x)))

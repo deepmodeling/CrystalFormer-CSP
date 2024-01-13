@@ -7,10 +7,7 @@ import os
 from utils import shuffle
 import checkpoint
 
-def train(key, loss_fn, params, epoch_finished, epochs, lr, batchsize, train_data, path):
-
-    L, X, A = train_data
-    assert len(L)%batchsize==0
+def train(key, loss_fn, params, epoch_finished, epochs, lr, batchsize, train_data, valid_data, path):
 
     optimizer = optax.adam(lr)
     opt_state = optimizer.init(params)
@@ -27,21 +24,35 @@ def train(key, loss_fn, params, epoch_finished, epochs, lr, batchsize, train_dat
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
-        L, X, A = shuffle(subkey, L, X, A)
-        total_loss = 0.0 
+        train_data = shuffle(subkey, train_data)
+
+        train_L, train_X, train_A = train_data 
+        train_loss = 0.0 
         counter = 0 
-        for batch_index in range(0, len(L), batchsize):
-            data = L[batch_index:batch_index+batchsize], \
-                   X[batch_index:batch_index+batchsize], \
-                   A[batch_index:batch_index+batchsize]
-
+        for batch_index in range(0, len(train_L), batchsize):
+            data = train_L[batch_index:batch_index+batchsize], \
+                   train_X[batch_index:batch_index+batchsize], \
+                   train_A[batch_index:batch_index+batchsize]
             params, opt_state, loss = update(params, opt_state, data)
-
-            total_loss += loss 
+            train_loss += loss 
             counter += 1
+        train_loss = train_loss/counter
 
-        f.write( ("%6d" + "  %.6f" + "\n") % (epoch, total_loss/counter) )
-        if epoch % 1000 == 0:
+        if epoch % 100 == 0:
+            valid_L, valid_X, valid_A = valid_data 
+            valid_loss = 0.0 
+            counter = 0 
+            for batch_index in range(0, len(valid_L), batchsize):
+                L, X, A = valid_L[batch_index:batch_index+batchsize], \
+                          valid_X[batch_index:batch_index+batchsize], \
+                          valid_A[batch_index:batch_index+batchsize]
+                loss = loss_fn(params, L, X, A)
+                valid_loss += loss 
+                counter += 1
+            valid_loss = valid_loss/counter
+
+            f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, train_loss, valid_loss) )
+
             ckpt = {"params": params,
                    }
             ckpt_filename = os.path.join(path, "epoch_%06d.pkl" %(epoch))

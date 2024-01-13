@@ -3,7 +3,8 @@ import jax.numpy as jnp
 import pandas as pd
 from pymatgen.core import Structure
 
-def shuffle(key, L, X, A):
+def shuffle(key, data):
+    L, X, A = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return L[idx], X[idx], A[idx]
 
@@ -23,7 +24,9 @@ def LXA_from_structures(structures, atom_types, n_max, dim):
     L = jnp.array(L).reshape(-1, 6)
     X = jnp.array(X).reshape(-1, n_max, dim)
     A = jnp.array(A).reshape(-1, n_max)
-
+    
+    print ("shift the first atom to 000")
+    X -= X[:, 0, None] # shift the first atom to 000
     return L, X, A
     
 def LXA_from_file(csv_file, atom_types, n_max, dim):
@@ -38,12 +41,14 @@ if __name__=='__main__':
     n_max = 24 
     dim = 3
 
-    csv_file = '/home/wanglei/cdvae/data/carbon_24/train.csv'
+    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     L, X, A = LXA_from_file(csv_file, atom_types, n_max, dim)
 
     print (L.shape)
     print (X.shape)
     print (A.shape)
+    print (X[:5])
+    print (A[:5])
 
 
 

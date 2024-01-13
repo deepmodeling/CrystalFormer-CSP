@@ -24,6 +24,7 @@ group.add_argument("--restore_path", default=None, help="checkpoint path or file
 
 group = parser.add_argument_group('dataset')
 group.add_argument('--train_path', default='/home/wanglei/cdvae/data/carbon_24/train.csv', help='')
+group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/carbon_24/val.csv', help='')
 
 group = parser.add_argument_group('network parameters')
 group.add_argument('--num_layers', type=int, default=4, help='The number of layers')
@@ -43,7 +44,7 @@ key = jax.random.PRNGKey(42)
 
 ################### Data #############################
 train_data = LXA_from_file(args.train_path, args.atom_types, args.n_max, args.dim)
-
+valid_data = LXA_from_file(args.valid_path, args.atom_types, args.n_max, args.dim)
 
 ################### Model #############################
 
@@ -59,6 +60,7 @@ modelname = 'l_%d_h_%d_k_%d_m_%d'%(args.num_layers, args.num_heads, args.key_siz
 loss_fn = make_loss_fn(args.atom_types, model)
 
 train_data = jax.tree_map(lambda x : x[:6000], train_data)
+valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + "bs_%d_lr_%g" % (args.batchsize, args.lr) \
@@ -77,7 +79,7 @@ else:
 
 if args.lr > 0:
     print("\n========== Start training ==========")
-    params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, path)
+    params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, valid_data, path)
 else:
     print("\n========== Start sampling ==========")
     L, X, A = sample_crystal(key, model, params, args.n_max, args.dim, args.atom_types, args.batchsize, train_data)

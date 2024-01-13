@@ -11,14 +11,15 @@ def inference(model, params, L, X, A):
     mu, kappa, logit = jnp.split(outputs[-1], [dim, 2*dim], axis=-1) # only use the last one
     return mu, kappa, logit
 
-@partial(jax.jit, static_argnums=1)
+@partial(jax.jit, static_argnums=(1, 3, 4, 6))
 def sample_crystal(key, model, params, n_max, dim, atom_types, batchsize, train_data):
     
     L, _, _ = train_data
     L = L[:batchsize] # TODO: replace with a flow model sampling
     X = jnp.zeros((batchsize, 1, dim))
     A = jnp.ones((batchsize, 1))
-
+    
+    #TODO replace this with a lax.scan
     for i in range(1, n_max):
         mu, kappa, logit = inference(model, params, L, X[:, :i], A[:, :i])
         key, key_x, key_a = jax.random.split(key, 3)
