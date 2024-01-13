@@ -4,7 +4,7 @@ from functools import partial
 import os
 import optax
 
-from utils import shuffle
+from utils import shuffle, random_permute_atoms
 import checkpoint
 
 def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
@@ -26,12 +26,17 @@ def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, tr
         train_data = shuffle(subkey, train_data)
 
         train_L, train_X, train_A = train_data 
+
+        key, subkey = jax.random.split(key)
+        train_X, train_A = random_permute_atoms(subkey, train_X, train_A)
+
         train_loss = 0.0 
         counter = 0 
         for batch_index in range(0, len(train_L), batchsize):
             data = train_L[batch_index:batch_index+batchsize], \
                    train_X[batch_index:batch_index+batchsize], \
                    train_A[batch_index:batch_index+batchsize]
+
             params, opt_state, loss = update(params, opt_state, data)
             train_loss += loss 
             counter += 1

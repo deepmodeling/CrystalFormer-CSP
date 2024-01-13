@@ -23,6 +23,9 @@ def random_permute_atoms(key, X, A):
     return X, A
 
 def shuffle(key, data):
+    '''
+    shuffle data along batch dimension
+    '''
     L, X, A = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return L[idx], X[idx], A[idx]
