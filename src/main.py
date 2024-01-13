@@ -8,12 +8,13 @@ from utils import LXA_from_file
 from model import make_transformer  
 from train import train
 from loss import make_loss_fn
+import checkpoint
 
 import argparse
 parser = argparse.ArgumentParser(description='')
 
 group = parser.add_argument_group('training parameters')
-group.add_argument('--epochs', type=int, default=10000, help='')
+group.add_argument('--epochs', type=int, default=100000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
 group.add_argument('--lr', type=float, default=1e-3, help='learning rate')
 
@@ -64,4 +65,14 @@ path = args.folder + "bs_%d_lr_%g" % (args.batchsize, args.lr) \
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
 
-params = train(key, loss_fn, params, args.epochs, args.lr, args.batchsize, train_data, path)
+print("\n========== Load checkpoint==========")
+ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or path) 
+if ckpt_filename is not None:
+    print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
+    ckpt = checkpoint.load_data(ckpt_filename)
+    params = ckpt["params"]
+else:
+    print("No checkpoint file found. Start from scratch.")
+
+print("\n========== Start training ==========")
+params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, path)

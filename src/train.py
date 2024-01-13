@@ -7,7 +7,7 @@ import os
 from utils import shuffle
 import checkpoint
 
-def train(key, loss_fn, params, epochs, lr, batchsize, train_data, path):
+def train(key, loss_fn, params, epoch_finished, epochs, lr, batchsize, train_data, path):
 
     L, X, A = train_data
     assert len(L)%batchsize==0
@@ -24,8 +24,8 @@ def train(key, loss_fn, params, epochs, lr, batchsize, train_data, path):
         return params, opt_state, value
 
     log_filename = os.path.join(path, "data.txt")
-    f = open(log_filename, "w", buffering=1, newline="\n")
-    for epoch in range(epochs):
+    f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
+    for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
         L, X, A = shuffle(subkey, L, X, A)
         total_loss = 0.0 

@@ -38,12 +38,12 @@ if __name__=='__main__':
                 args = {'n_max':n_max, 
                         'atom_types': atom_types, 
                         'folder':resfolder,
-                        'num_nlayers':num_nlayers, 
+                        'num_layers':num_layers, 
                         'num_heads':num_heads, 
                         'key_size':key_size,
                         'model_size':model_size, 
                         'lr':lr, 
-                        'batchsize': batchsize
+                        'batchsize': batchsize,
                         'epochs': epochs
                         }
 

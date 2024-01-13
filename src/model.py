@@ -1,8 +1,11 @@
+'''
+https://github.com/google-deepmind/dm-haiku/blob/main/examples/transformer/model.py
+'''
 import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_types):
+def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
@@ -27,21 +30,24 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
         h = hk.Linear(model_size, w_init=initializer)(h)
         
         for _ in range(num_layers):
-            # https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/attention.py
             attn_block = hk.MultiHeadAttention(num_heads=num_heads,
                                                key_size=key_size,
                                                model_size=model_size,
                                                w_init =initializer
                                               )
-            
-            h = attn_block(h, h, h, mask) + h
-            
-            dense_block = hk.Sequential([hk.Linear(4 * model_size, w_init=initializer),
+            h_norm = _layer_norm(h)
+            h_attn = attn_block(h_norm, h_norm, h_norm, mask=mask)
+            h = h + h_attn
+
+            dense_block = hk.Sequential([hk.Linear(widening_factor * model_size, w_init=initializer),
                                          jax.nn.gelu,
                                          hk.Linear(model_size, w_init=initializer)]
                                          )
+            h_norm = _layer_norm(h)
+            h_dense = dense_block(h_norm)
+            h = h + h_dense
 
-            h = dense_block(h) + h
+        h = _layer_norm(h)
 
         h = hk.Linear(2*dim+atom_types, w_init=initializer)(h)
 
@@ -66,4 +72,7 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
     params = network.init(key, L, X, A)
     return params, network.apply
 
-
+def _layer_norm(x: jax.Array) -> jax.Array:
+    """Applies a unique LayerNorm to `x` with default settings."""
+    ln = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
+    return ln(x)

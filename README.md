@@ -10,7 +10,7 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 
 - [X] for data start with carbon_24, write data parse to get LXA
 - [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
-- [ ] move code from notebook to script 
+- [X] move code from notebook to script 
 - [ ] write tests 
 - [ ] implement flow model for `L`
 - [ ] train the model and get some samples 

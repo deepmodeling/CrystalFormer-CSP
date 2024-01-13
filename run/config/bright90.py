@@ -8,13 +8,14 @@ nickname = 'firsttry'
 n_max = 24
 atom_types = 2
 
-num_nlayers = 4
+num_layers = 4
 num_heads = 8
 key_size = 16
 model_size = 32
 
 lr = 1e-3
 batchsize = 100
+epochs = 100000
 
 ###############################
 prog = '../src/main.py'
