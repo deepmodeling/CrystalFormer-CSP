@@ -13,10 +13,10 @@ def make_loss_fn(n_max, model):
         outputs = model(params, L, X, A)
         mu, kappa, logit = jnp.split(outputs, [dim, 2*dim], axis=-1) 
 
-        logp_x = von_mises_logpdf(X[1:]*2*jnp.pi, mu[:-1], kappa[:-1])
+        logp_x = von_mises_logpdf(X[1:]*2*jnp.pi, mu[:-1], kappa[:-1]) # (n-1, dim)
 
         logp_x = jnp.sum(jnp.where((A[1:]>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
-        logp_a = jnp.sum(logit[:-1][jnp.arange(n_max-1), A[1:].astype(int)])   
+        logp_a = jnp.sum(logit[:-1][jnp.arange(n_max-1), A[1:].astype(int)])  #TODO: currently the first atom always has type 1 so we do not consider it 
 
         return logp_x + logp_a
 

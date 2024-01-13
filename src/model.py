@@ -53,19 +53,11 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
 
         mu, kappa, logit = jnp.split(h, [dim, 2*dim], axis=-1)
         kappa = jax.nn.softplus(kappa) # to ensure positivity
-        
-        def has_zero_case(_):
-            first_zero_index = jnp.nonzero(A == 0, size=1)[0][0]
-            mask = jnp.concatenate(
-                    [ jnp.where(jnp.arange(n) >= first_zero_index, 1, 0).reshape(n, 1), 
-                      jnp.zeros((n, atom_types-1))
-                    ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
-            return mask
 
-        def no_zero_case(_):
-            return jnp.zeros((n, atom_types))
-
-        mask = jax.lax.cond(jnp.any(A == 0), has_zero_case, no_zero_case, None)
+        mask = jnp.concatenate(
+                [ jnp.where(A==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                  jnp.zeros((n, atom_types-1))
+                ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
         logit = logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
 
         logit -= jax.scipy.special.logsumexp(logit, axis=1)[:, None] # normalization
