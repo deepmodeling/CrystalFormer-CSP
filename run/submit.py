@@ -43,8 +43,10 @@ if __name__=='__main__':
                         'key_size':key_size,
                         'model_size':model_size, 
                         'lr':lr, 
+                        'weight_decay': weight_decay, 
                         'batchsize': batchsize,
-                        'epochs': epochs
+                        'epochs': epochs, 
+                        'optimizer': optimizer
                         }
 
                 logname = jobdir

@@ -2,6 +2,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp 
 from jax.flatten_util import ravel_pytree
+import optax
 import os
 
 from utils import LXA_from_file
@@ -18,9 +19,12 @@ group = parser.add_argument_group('training parameters')
 group.add_argument('--epochs', type=int, default=100000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
 group.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+group.add_argument('--weight_decay', type=float, default=1e-3, help='weight decay')
+parser.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
 
 group.add_argument("--folder", default="../data/", help="the folder to save data")
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
+
 
 group = parser.add_argument_group('dataset')
 group.add_argument('--train_path', default='/home/wanglei/cdvae/data/carbon_24/train.csv', help='')
@@ -63,7 +67,8 @@ train_data = jax.tree_map(lambda x : x[:6000], train_data)
 valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
 
 print("\n========== Prepare logs ==========")
-path = args.folder + "bs_%d_lr_%g" % (args.batchsize, args.lr) \
+path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
+                   + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    + "_" + modelname
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
@@ -77,15 +82,22 @@ if ckpt_filename is not None:
 else:
     print("No checkpoint file found. Start from scratch.")
 
-if args.lr > 0:
+if args.optimizer != "none":
+
+    if args.optimizer == 'adam':
+        optimizer = optax.adam(args.lr)
+    elif args.optimizer == 'adamw':
+        optimizer = optax.adamw(args.lr, weight_decay=args.weight_decay)
+ 
     print("\n========== Start training ==========")
-    params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, valid_data, path)
+    params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
+
 else:
-    L, X, A = valid_data
-    outputs = model(params, L[0], X[0], A[0])
+    L, X, A = train_data
+    outputs = jax.vmap(model, (None, 0, 0, 0), 0)(params, L[:5], X[:5], A[:5])
     mu, kappa, logit = jnp.split(outputs, [args.dim, 2*args.dim], axis=-1) 
-    print (A[0])
-    print (logit)
+    print (A[:5])
+    print (jnp.exp(logit))
 
     print("\n========== Start sampling ==========")
     L, X, A = sample_crystal(key, model, params, args.n_max, args.dim, args.atom_types, args.batchsize, train_data)

@@ -41,12 +41,13 @@ if __name__=='__main__':
     n_max = 24 
     dim = 3
 
-    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    csv_file = '/home/wanglei/cdvae/data/carbon_24/train.csv'
     L, X, A = LXA_from_file(csv_file, atom_types, n_max, dim)
 
     print (L.shape)
     print (X.shape)
     print (A.shape)
+    print (L[:5])
     print (X[:5])
     print (A[:5])
 

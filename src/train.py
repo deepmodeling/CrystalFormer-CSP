@@ -1,22 +1,21 @@
 import jax 
 import jax.numpy as jnp
-import optax
 from functools import partial
 import os
+import optax
 
 from utils import shuffle
 import checkpoint
 
-def train(key, loss_fn, params, epoch_finished, epochs, lr, batchsize, train_data, valid_data, path):
-
-    optimizer = optax.adam(lr)
+def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
+           
     opt_state = optimizer.init(params)
 
     @jax.jit
     def update(params, opt_state, data):
         L, X, A = data
         value, grad = jax.value_and_grad(loss_fn)(params, L, X, A)
-        updates, opt_state = optimizer.update(grad, opt_state)
+        updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
 

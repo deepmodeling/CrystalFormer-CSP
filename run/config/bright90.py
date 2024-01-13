@@ -2,20 +2,23 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'firsttry'
+nickname = 'where'
 
 ###############################
 n_max = 24
 atom_types = 2
 
-num_layers = 4
-num_heads = 8
-key_size = 16
-model_size = 32
+num_layers = 2
+num_heads = 4
+key_size = 8
+model_size = 16
 
-lr = 1e-3
+lr = 1e-4
+weight_decay = 1e-3 
 batchsize = 100
 epochs = 100000
+
+optimizer = 'adamw'
 
 ###############################
 prog = '../src/main.py'
