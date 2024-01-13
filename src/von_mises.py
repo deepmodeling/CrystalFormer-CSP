@@ -11,11 +11,10 @@ def sample_von_mises(key, loc, concentration, shape):
     :param sample_shape: shape of samples
     :return: samples from von Mises
     """
-    assert is_prng_key(key)
     samples = von_mises_centered(
         key, concentration, shape
     )
-    samples = samples + self.loc  # VM(0, concentration) -> VM(loc,concentration)
+    samples = samples + loc  # VM(0, concentration) -> VM(loc,concentration)
     samples = (samples + jnp.pi) % (2.0 * jnp.pi) - jnp.pi
 
     return samples

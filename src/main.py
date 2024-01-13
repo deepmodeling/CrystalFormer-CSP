@@ -7,6 +7,7 @@ import os
 from utils import LXA_from_file
 from model import make_transformer  
 from train import train
+from sample import sample_crystal
 from loss import make_loss_fn
 import checkpoint
 
@@ -74,5 +75,11 @@ if ckpt_filename is not None:
 else:
     print("No checkpoint file found. Start from scratch.")
 
-print("\n========== Start training ==========")
-params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, path)
+if args.lr > 0:
+    print("\n========== Start training ==========")
+    params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, path)
+else:
+    print("\n========== Start sampling ==========")
+    L, X, A = sample_crystal(key, model, params, args.n_max, args.dim, args.atom_types, args.batchsize, train_data)
+    print (A)
+    print (X)
