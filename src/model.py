@@ -53,16 +53,18 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
 
         mu, kappa, logit = jnp.split(h, [dim, 2*dim], axis=-1)
         kappa = jax.nn.softplus(kappa) # to ensure positivity
-        
+       
         '''
+        need to debug this to find the location of first zero
         natoms = jnp.sum(A != 0)
         mask = jnp.concatenate(
-                [ jnp.where(jnp.arange(n) < natoms, 0, 1).reshape(n, 1), 
+                [ jnp.where(jnp.arange(n) < natoms-1, 0, 1).reshape(n, 1), 
                   jnp.zeros((n, atom_types-1))
                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
 
         logit = logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
         '''
+
         logit -= jax.scipy.special.logsumexp(logit, axis=1)[:, None] # normalization
  
         return jnp.concatenate([mu, kappa, logit], axis=-1) 

@@ -18,7 +18,7 @@ def make_loss_fn(n_max, model):
         logp_x = jnp.sum(jnp.where((A[1:]>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
         logp_a = jnp.sum(logit[:-1][jnp.arange(n_max-1), A[1:].astype(int)])   
 
-        return logp_a #+ logp_a
+        return logp_x + logp_a
 
     def loss_fn(params, L, X, A):
         logp = logp_fn(params, L, X, A)

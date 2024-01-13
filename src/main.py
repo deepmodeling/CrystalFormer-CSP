@@ -81,7 +81,7 @@ if args.lr > 0:
     print("\n========== Start training ==========")
     params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, valid_data, path)
 else:
-    L, X, A = train_data
+    L, X, A = valid_data
     outputs = model(params, L[0], X[0], A[0])
     mu, kappa, logit = jnp.split(outputs, [args.dim, 2*args.dim], axis=-1) 
     print (A[0])
