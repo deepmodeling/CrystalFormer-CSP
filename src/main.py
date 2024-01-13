@@ -2,6 +2,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp 
 from jax.flatten_util import ravel_pytree
+import os
 
 from utils import LXA_from_file
 from model import make_transformer  
@@ -48,10 +49,19 @@ params, model = make_transformer(key, args.num_layers, args.num_heads,
                                       args.key_size, args.model_size, 
                                       args.atom_types)
 print ("# of params", ravel_pytree(params)[0].size) # number of parameters in the model
+modelname = 'l_%d_h_%d_k_%d_m_%d'%(args.num_layers, args.num_heads, args.key_size, args.model_size)
+
 
 ################### Train #############################
 
 loss_fn = make_loss_fn(args.atom_types, model)
 
 train_data = jax.tree_map(lambda x : x[:6000], train_data)
-params = train(key, loss_fn, params, args.epochs, args.lr, args.batchsize, train_data)
+
+print("\n========== Prepare logs ==========")
+path = args.folder + "bs_%d_lr_%g" % (args.batchsize, args.lr) \
+                   + "_" + modelname
+os.makedirs(path, exist_ok=True)
+print("Create directory: %s" % path)
+
+params = train(key, loss_fn, params, args.epochs, args.lr, args.batchsize, train_data, path)

@@ -2,10 +2,12 @@ import jax
 import jax.numpy as jnp
 import optax
 from functools import partial
+import os
 
 from utils import shuffle
+import checkpoint
 
-def train(key, loss_fn, params, epochs, lr, batchsize, train_data):
+def train(key, loss_fn, params, epochs, lr, batchsize, train_data, path):
 
     L, X, A = train_data
     assert len(L)%batchsize==0
@@ -21,6 +23,8 @@ def train(key, loss_fn, params, epochs, lr, batchsize, train_data):
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
 
+    log_filename = os.path.join(path, "data.txt")
+    f = open(log_filename, "w", buffering=1, newline="\n")
     for epoch in range(epochs):
         key, subkey = jax.random.split(key)
         L, X, A = shuffle(subkey, L, X, A)
@@ -36,5 +40,13 @@ def train(key, loss_fn, params, epochs, lr, batchsize, train_data):
             total_loss += loss 
             counter += 1
 
-        print(epoch, total_loss/counter) 
+        f.write( ("%6d" + "  %.6f" + "\n") % (epoch, total_loss/counter) )
+        if epoch % 1000 == 0:
+            ckpt = {"params": params,
+                   }
+            ckpt_filename = os.path.join(path, "epoch_%06d.pkl" %(epoch))
+            checkpoint.save_data(ckpt, ckpt_filename)
+            print("Save checkpoint file: %s" % ckpt_filename)
+
+    f.close()
     return params

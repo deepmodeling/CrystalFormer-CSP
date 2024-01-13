@@ -36,7 +36,7 @@ if __name__=='__main__':
     n_max = 24 
     dim = 3
 
-    csv_file = 'mini.csv'
+    csv_file = '../data/mini.csv'
     L, X, A = LXA_from_file(csv_file, atom_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)
