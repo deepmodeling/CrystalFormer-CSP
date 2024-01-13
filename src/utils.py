@@ -3,6 +3,25 @@ import jax.numpy as jnp
 import pandas as pd
 from pymatgen.core import Structure
 
+from functools import partial
+
+@partial(jax.vmap, in_axes=(None, 0, 0), out_axes=(0,0))
+def random_permute_atoms(key, X, A):
+    '''
+    randomly permute atoms 
+    '''
+    idx = jax.random.permutation(key, jnp.arange(len(A)))
+    A = A[idx]
+    X = X[idx]
+    
+    #move nonzero elements to the front 
+    non_zero_mask = (A!= 0)
+    idx = jnp.argsort(non_zero_mask)[::-1]
+    X, A = X[idx], A[idx]
+
+    X -= X[0, None] # shift the first atom to 000
+    return X, A
+
 def shuffle(key, data):
     L, X, A = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
@@ -51,5 +70,9 @@ if __name__=='__main__':
     print (X[:5])
     print (A[:5])
 
+    
+    key = jax.random.PRNGKey(42)
+    X, A = random_permute_atoms(key, X[:5], A[:5])
 
-
+    print (X)
+    print (A)

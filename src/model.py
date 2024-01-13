@@ -22,7 +22,8 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
         initializer = hk.initializers.TruncatedNormal(0.01)
 
         h = jnp.concatenate([L.reshape([1, 6]).repeat(n, axis=0), 
-                             X.reshape([n, dim]),
+                             jnp.cos(2*jnp.pi*X).reshape([n, dim]),
+                             jnp.sin(2*jnp.pi*X).reshape([n, dim]),
                              A.reshape([n, 1]), 
                              ], 
                              axis=1) # (n, 10)

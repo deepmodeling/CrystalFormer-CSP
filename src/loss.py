@@ -49,5 +49,8 @@ if __name__=='__main__':
     
     value, grad = jax.value_and_grad(loss_fn)(params, L[:1], X[:1], A[:1])
     print (value)
+
+    value, grad = jax.value_and_grad(loss_fn)(params, L[:1], X[:1]-1.0, A[:1])
+    print (value)
     
 
