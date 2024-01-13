@@ -1,10 +1,11 @@
 import jax
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from functools import partial
 
 from von_mises import von_mises_logpdf
 
-def make_loss_fn(atom_types, model):
+def make_loss_fn(n_max, model):
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0), out_axes=0)
     def logp_fn(params, L, X, A):
@@ -15,9 +16,9 @@ def make_loss_fn(atom_types, model):
         logp_x = von_mises_logpdf(X[1:]*2*jnp.pi, mu[:-1], kappa[:-1])
 
         logp_x = jnp.sum(jnp.where((A[1:]>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
-        logp_a = jnp.sum(logit[A.astype(int)[:, None], jnp.arange(atom_types)])
+        logp_a = jnp.sum(logit[:-1][jnp.arange(n_max-1), A[1:].astype(int)])   
 
-        return logp_x + logp_a
+        return logp_a #+ logp_a
 
     def loss_fn(params, L, X, A):
         logp = logp_fn(params, L, X, A)
@@ -41,13 +42,12 @@ if __name__=='__main__':
     outputs = jax.vmap(model, in_axes=(None, 0, 0, 0), out_axes=0)(params, L[:1], X[:1], A[:1])
     mu, kappa, logit = jnp.split(outputs, [dim, 2*dim], axis=-1) 
 
-    print (kappa)
+    print (logit)
     print (A[:1])
-    print (X[:1])
-
-    loss_fn = make_loss_fn(atom_types, model)
-    value, grad = jax.value_and_grad(loss_fn)(params, L[:100], X[:100], A[:100])
     
+    loss_fn = make_loss_fn(n_max, model)
+    
+    value, grad = jax.value_and_grad(loss_fn)(params, L[:1], X[:1], A[:1])
     print (value)
-    print (grad)
+    
 

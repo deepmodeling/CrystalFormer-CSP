@@ -26,8 +26,8 @@ def sample_crystal(key, model, params, n_max, dim, atom_types, batchsize, train_
 
         x = sample_von_mises(key_x, mu, kappa, (batchsize, dim))
         x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into 0-1
-        X = jnp.concatenate([X, x[:, None, :]], axis = 1)
-
+        X = jnp.concatenate([X, x[:, None, :]], axis=1)
+            
         a = jax.random.categorical(key_a, logit, axis=1)
         A = jnp.concatenate([A, a[:, None]], axis = 1)
 

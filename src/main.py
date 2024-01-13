@@ -57,7 +57,7 @@ modelname = 'l_%d_h_%d_k_%d_m_%d'%(args.num_layers, args.num_heads, args.key_siz
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.atom_types, model)
+loss_fn = make_loss_fn(args.n_max, model)
 
 train_data = jax.tree_map(lambda x : x[:6000], train_data)
 valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
@@ -81,6 +81,12 @@ if args.lr > 0:
     print("\n========== Start training ==========")
     params = train(key, loss_fn, params, epoch_finished, args.epochs, args.lr, args.batchsize, train_data, valid_data, path)
 else:
+    L, X, A = train_data
+    outputs = model(params, L[0], X[0], A[0])
+    mu, kappa, logit = jnp.split(outputs, [args.dim, 2*args.dim], axis=-1) 
+    print (A[0])
+    print (logit)
+
     print("\n========== Start sampling ==========")
     L, X, A = sample_crystal(key, model, params, args.n_max, args.dim, args.atom_types, args.batchsize, train_data)
     print (A)
