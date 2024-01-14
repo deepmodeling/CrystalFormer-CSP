@@ -79,3 +79,4 @@ if __name__=='__main__':
 
     print (X)
     print (A)
+    print (L)

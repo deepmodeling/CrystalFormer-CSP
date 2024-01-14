@@ -6,7 +6,8 @@ import optax
 import os
 
 from utils import LXA_from_file
-from model import make_transformer  
+from realnvp import make_flow
+from transformer import make_transformer  
 from train import train
 from sample import sample_crystal
 from loss import make_loss_fn
@@ -25,13 +26,16 @@ parser.add_argument("--optimizer", type=str, default="adamw", choices=["none", "
 group.add_argument("--folder", default="../data/", help="the folder to save data")
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
-
 group = parser.add_argument_group('dataset')
 group.add_argument('--train_path', default='/home/wanglei/cdvae/data/carbon_24/train.csv', help='')
 group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/carbon_24/val.csv', help='')
 
-group = parser.add_argument_group('network parameters')
-group.add_argument('--num_layers', type=int, default=4, help='The number of layers')
+group = parser.add_argument_group('flow parameters')
+group.add_argument('--flow_layers', type=int, default=4, help='The number of layers in flow')
+group.add_argument('--hidden_size', type=int, default=64, help='The number of hidden size')
+
+group = parser.add_argument_group('transformer parameters')
+group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=16, help='The key size')
 group.add_argument('--model_size', type=int, default=32, help='The model size')
@@ -51,17 +55,22 @@ train_data = LXA_from_file(args.train_path, args.atom_types, args.n_max, args.di
 valid_data = LXA_from_file(args.valid_path, args.atom_types, args.n_max, args.dim)
 
 ################### Model #############################
+flow_params, flow, flow_sample_fn = make_flow(key, 6, args.hidden_size, args.flow_layers)
 
-params, model = make_transformer(key, args.num_layers, args.num_heads, 
+flow_name = 'f_%d_h_%d'%(args.flow_layers, args.hidden_size)
+print ("# of flow params", ravel_pytree(flow_params)[0].size) 
+
+transformer_params, transformer = make_transformer(key, args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types)
-print ("# of params", ravel_pytree(params)[0].size) # number of parameters in the model
-modelname = 'l_%d_h_%d_k_%d_m_%d'%(args.num_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'l_%d_h_%d_k_%d_m_%d'%(args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
+print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
 
+params = flow_params, transformer_params
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, model)
+loss_fn = make_loss_fn(args.n_max, flow, transformer)
 
 train_data = jax.tree_map(lambda x : x[:6000], train_data)
 valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
@@ -69,7 +78,7 @@ valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
-                   + "_" + modelname
+                   + "_" + flow_name + "_" + transformer_name
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
 
@@ -93,13 +102,15 @@ if args.optimizer != "none":
     params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
-    L, X, A = train_data
-    outputs = jax.vmap(model, (None, 0, 0, 0), 0)(params, L[:5], X[:5], A[:5])
+    L, X, A = valid_data
+    flow_params, transformer_params = params
+    outputs = jax.vmap(transformer, (None, 0, 0, 0), 0)(transformer_params, L[:5], X[:5], A[:5])
     mu, kappa, logit = jnp.split(outputs, [args.dim, 2*args.dim], axis=-1) 
     print (A[:5])
     print (jnp.exp(logit))
 
     print("\n========== Start sampling ==========")
-    L, X, A = sample_crystal(key, model, params, args.n_max, args.dim, args.atom_types, args.batchsize, train_data)
+    L, X, A = sample_crystal(key, flow_sample_fn, transformer, params, args.n_max, args.dim, args.batchsize)
+    print (L)
     print (A)
     print (X)

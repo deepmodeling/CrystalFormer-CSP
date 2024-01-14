@@ -12,9 +12,10 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
 - [X] move code from notebook to script 
 - [ ] write tests 
-- [ ] implement flow model for `L`
+- [X] implement flow model for `L`
 - [ ] train the model and get some samples 
 - [ ] find out a way to evaluate the model, see whether this is indeed promising.
+- [ ] write samples back to CIF file
 
 enhancement
 - [ ] extend the code to multiple atom species
@@ -62,8 +63,14 @@ SGD
 MLE 
 
 
-# 
+# how to run
 
+train
+```bash 
+python ../src/main.py --n_max 24 --atom_types 2 --folder /data/wanglei/crystalgpt/realnvp/ --flow_layers 4 --hidden_size 64 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+```
 
-
-
+sample
+```bash 
+python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/realnvp/adamw_bs_100_lr_0.0001_wd_0.001_f_4_h_64_l_4_h_8_k_16_m_32/  --batchsize 10  
+```

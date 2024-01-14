@@ -26,7 +26,7 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
                              jnp.sin(2*jnp.pi*X).reshape([n, dim]),
                              A.reshape([n, 1]), 
                              ], 
-                             axis=1) # (n, 10)
+                             axis=1) # (n, 13)
        
         h = hk.Linear(model_size, w_init=initializer)(h)
         

@@ -2,16 +2,18 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'where'
+nickname = 'realnvp'
 
 ###############################
 n_max = 24
 atom_types = 2
 
-num_layers = 2
-num_heads = 4
-key_size = 8
-model_size = 16
+flow_layers = 4 
+hidden_size = 64
+transformer_layers = 4
+num_heads = 8
+key_size = 16
+model_size = 32
 
 lr = 1e-4
 weight_decay = 1e-3 

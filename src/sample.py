@@ -11,21 +11,22 @@ def inference(model, params, L, X, A):
     mu, kappa, logit = jnp.split(outputs[-1], [dim, 2*dim], axis=-1) # only use the last one
     return mu, kappa, logit
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 6))
-def sample_crystal(key, model, params, n_max, dim, atom_types, batchsize, train_data):
+@partial(jax.jit, static_argnums=(1, 2, 4, 5, 6))
+def sample_crystal(key, flow_sample_fn, transformer, params, n_max, dim, batchsize):
     
-    L, _, _ = train_data
-    L = L[:batchsize] # TODO: replace with a flow model sampling
+    flow_params, transformer_params = params
+    key, key_l = jax.random.split(key)
+    L, _ = flow_sample_fn(key_l, flow_params, batchsize) # (batchsize, 6)
     X = jnp.zeros((batchsize, 1, dim))
     A = jnp.ones((batchsize, 1))
     
     #TODO replace this with a lax.scan
     for i in range(1, n_max):
-        mu, kappa, logit = inference(model, params, L, X[:, :i], A[:, :i])
+        mu, kappa, logit = inference(transformer, transformer_params, L, X[:, :i], A[:, :i])
         key, key_x, key_a = jax.random.split(key, 3)
 
-        x = sample_von_mises(key_x, mu, kappa, (batchsize, dim))
-        x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into 0-1
+        x = sample_von_mises(key_x, mu, kappa, (batchsize, dim)) # [-pi, pi]
+        x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
         X = jnp.concatenate([X, x[:, None, :]], axis=1)
             
         a = jax.random.categorical(key_a, logit, axis=1)
