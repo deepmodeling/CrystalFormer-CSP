@@ -17,9 +17,8 @@ class LatticeMLP(hk.Module):
             hk.Linear(self.hdim), jax.nn.elu,
             hk.Linear(self.dim*2), jax.nn.softplus # lattice should be positive
         ])
-        output = mlp(G)
+        output = mlp(G) #TODO conditioned on G output truely independent ones 
         mu, sigma = jnp.split(output, 2)
-        sigma = jnp.clip(sigma, a_min = 0.01) # clip to avoid fitting exact angle
         return mu, sigma
 
 def make_lattice_mlp(rng, dim, hdim):

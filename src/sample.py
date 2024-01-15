@@ -4,7 +4,7 @@ from functools import partial
 
 from von_mises import sample_von_mises
 
-@partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, 0), out_axes=(0, 0, 0, 0, 0))
+@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0, 0), out_axes=(0, 0, 0, 0, 0))
 def inference(model, params, K, G, L, X, A, M):
     dim = X.shape[-1]
     atom_types = A.shape[-1]
@@ -19,12 +19,16 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
     mlp_params, transformer_params = params
     
     # L ~ p(L|G)
-    G = jnp.array([G]*batchsize).reshape(batchsize, 1)
-    G = jax.nn.one_hot(G, 230).reshape(batchsize, 230)
-    mu, sigma = jax.vmap(lattice_mlp, (None, 0), (0, 0))(mlp_params, G) # (batchsize, 6)
+    G = jax.nn.one_hot(G, 230)
+    mu, sigma = lattice_mlp(mlp_params, G) # (6, )
 
     key, key_l = jax.random.split(key)
-    L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
+
+    #TODO: now this is only for cubic, do this generally for any crystal system
+    l = jax.random.normal(key_l, (batchsize, 1)) * sigma[0] + mu[0] # (batchsize, 1)
+    L = jnp.concatenate([l, l, l, 
+                        jnp.full((batchsize, 3), 90.0) # put in angles by hand for cubic system
+                        ], axis=1) # (batchsize, 6)
 
     X = jnp.zeros((batchsize, 0, dim))
     A = jnp.zeros((batchsize, 0, atom_types))
@@ -50,7 +54,8 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
 
         a = jax.random.categorical(key_a, atom_logit, axis=1)  # atom_logit.shape : (batchsize, atom_types)
         a = jax.nn.one_hot(a, atom_types) # (batchsize, atom_types)
-
+            
+        #print (mult_logit)
         m = jax.random.categorical(key_m, mult_logit, axis=1)  # mult_logit.shape: (batchsize, mult_types)
         m = jax.nn.one_hot(m, mult_types) # (batchsize, mult_types)
 
