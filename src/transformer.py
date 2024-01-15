@@ -29,6 +29,8 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
                             jax.nn.gelu,
                             hk.Linear(output_size, w_init=initializer)]
                             )(GL)
+        #h0 = hk.get_parameter("h0", [output_size,], init=initializer)
+
         x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(h0, [K, K+K*dim, K+2*K*dim, 
                                                                     K+2*K*dim+atom_types])
         kappa = jax.nn.softplus(kappa) # to ensure positivity
@@ -78,15 +80,17 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
         kappa = jax.nn.softplus(kappa) # to ensure positivity
         
         A_flat = jnp.argmax(A, axis=-1) #(n,)
+        M_flat = jnp.argmax(M, axis=-1) #(n,)
+        stop_cond = jnp.logical_or(A_flat==0, M_flat==0)
         mask = jnp.concatenate(
-                [ jnp.where(A_flat==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(stop_cond, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, atom_types-1))
                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
         atom_logit = atom_logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
         atom_logit -= jax.scipy.special.logsumexp(atom_logit, axis=1)[:, None] # normalization
 
         mask = jnp.concatenate(
-                [ jnp.where(A_flat==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(stop_cond, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, mult_types-1))
                 ], axis = 1 )  # (n, mult_types) mask = 1 for those locations to place pad atoms of type 0
         mult_logit = mult_logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
