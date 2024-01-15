@@ -13,8 +13,8 @@ def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, tr
 
     @jax.jit
     def update(params, opt_state, data):
-        L, X, A = data
-        value, grad = jax.value_and_grad(loss_fn)(params, L, X, A)
+        L, X, A, M = data
+        value, grad = jax.value_and_grad(loss_fn)(params, L, X, A, M)
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
@@ -25,17 +25,15 @@ def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, tr
         key, subkey = jax.random.split(key)
         train_data = shuffle(subkey, train_data)
 
-        train_L, train_X, train_A = train_data 
-
-        key, subkey = jax.random.split(key)
-        train_X, train_A = random_permute_atoms(subkey, train_X, train_A)
+        train_L, train_X, train_A, train_M = train_data 
 
         train_loss = 0.0 
         counter = 0 
         for batch_index in range(0, len(train_L), batchsize):
             data = train_L[batch_index:batch_index+batchsize], \
                    train_X[batch_index:batch_index+batchsize], \
-                   train_A[batch_index:batch_index+batchsize]
+                   train_A[batch_index:batch_index+batchsize], \
+                   train_M[batch_index:batch_index+batchsize], \
 
             params, opt_state, loss = update(params, opt_state, data)
             train_loss += loss 
@@ -43,14 +41,15 @@ def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, tr
         train_loss = train_loss/counter
 
         if epoch % 100 == 0:
-            valid_L, valid_X, valid_A = valid_data 
+            valid_L, valid_X, valid_A, valid_M = valid_data 
             valid_loss = 0.0 
             counter = 0 
             for batch_index in range(0, len(valid_L), batchsize):
-                L, X, A = valid_L[batch_index:batch_index+batchsize], \
-                          valid_X[batch_index:batch_index+batchsize], \
-                          valid_A[batch_index:batch_index+batchsize]
-                loss = loss_fn(params, L, X, A)
+                L, X, A, M = valid_L[batch_index:batch_index+batchsize], \
+                             valid_X[batch_index:batch_index+batchsize], \
+                             valid_A[batch_index:batch_index+batchsize]
+                             valid_M[batch_index:batch_index+batchsize]
+                loss = loss_fn(params, L, X, A, M)
                 valid_loss += loss 
                 counter += 1
             valid_loss = valid_loss/counter

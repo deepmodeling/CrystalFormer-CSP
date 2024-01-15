@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import pandas as pd
 from pymatgen.core import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from functools import partial
 
@@ -26,57 +27,77 @@ def shuffle(key, data):
     '''
     shuffle data along batch dimension
     '''
-    L, X, A = data
+    L, X, A, M = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
-    return L[idx], X[idx], A[idx]
+    return L[idx], X[idx], A[idx], M[idx]
 
-def LXA_from_structures(structures, atom_types, n_max, dim):
+def LXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
+    G = [] 
     L = [] # abc alpha beta gamma
     X = [] # 
-    A = [] # 1: C atom 0: placeholder
+    A = [] # atom 0 for placeholder
+    M = []
     for i, structure in enumerate(structures):
-        L.append (structure.lattice.abc+ structure.lattice.angles)
-        frac_coords = jnp.array([site.frac_coords for site in structure]).reshape(structure.num_sites, dim)
-        frac_coords = jnp.concatenate([frac_coords, 
-                                       jnp.full((n_max - structure.num_sites, dim), 1e10)], 
-                                  axis = 0)
-        X.append (frac_coords)  
-        A.append ([1.]*structure.num_sites + [0.] * (n_max - structure.num_sites))
+        analyzer = SpacegroupAnalyzer(structure)
+        symmetrized_structure = analyzer.get_symmetrized_structure()
+        #print (analyzer.get_space_group_number(), symmetrized_structure)
 
+        G.append ([analyzer.get_space_group_number()])
+        L.append (structure.lattice.abc+ structure.lattice.angles)
+        num_sites = len(symmetrized_structure.equivalent_sites)
+        frac_coords = jnp.array([site[0].frac_coords for site in 
+                                symmetrized_structure.equivalent_sites]).reshape(num_sites, dim)
+        frac_coords = jnp.concatenate([frac_coords, 
+                                       jnp.full((n_max - num_sites, dim), 1e10)], 
+                                       axis = 0)
+        X.append (frac_coords)  
+
+        A.append ([site[0].specie.number for site in symmetrized_structure.equivalent_sites] 
+                 + [0] * (n_max - num_sites))
+        M.append ([len(site) for site in symmetrized_structure.equivalent_sites] 
+                  +[0] * (n_max - num_sites))
+    
+    G = jnp.array(G)
+    G = jax.nn.one_hot(G, 230).reshape(-1, 230)
     L = jnp.array(L).reshape(-1, 6)
+    L = jnp.concatenate([G, L], axis=-1) # (-1, 236)
+
     X = jnp.array(X).reshape(-1, n_max, dim)
     A = jnp.array(A).reshape(-1, n_max)
+    assert (atom_types > jnp.max(A))
+    A = jax.nn.one_hot(A, atom_types) # (-1, n_max, atom_types)
+    M = jnp.array(M).reshape(-1, n_max)
+    assert (mult_types > jnp.max(M))
+    M = jax.nn.one_hot(M, mult_types) # (-1, n_max, mult_types)
+
+    return L, X, A, M
     
-    print ("shift the first atom to 000")
-    X -= X[:, 0, None] # shift the first atom to 000
-    return L, X, A
-    
-def LXA_from_file(csv_file, atom_types, n_max, dim):
+def LXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
     structures = [Structure.from_str(cif, fmt="cif") for cif in cif_strings]
-    L, X, A = LXA_from_structures(structures, atom_types, n_max, dim)
-    return L, X, A
+    L, X, A, M = LXAM_from_structures(structures, atom_types, mult_types, n_max, dim)
+    return L, X, A, M
 
 if __name__=='__main__':
-    atom_types = 2 
-    n_max = 24 
+    atom_types = 118
+    mult_types = 5
+    n_max = 5
     dim = 3
 
-    csv_file = '/home/wanglei/cdvae/data/carbon_24/train.csv'
-    L, X, A = LXA_from_file(csv_file, atom_types, n_max, dim)
+    csv_file = '/home/wanglei/cdvae/data/perov_5/train.csv'
+    #csv_file = 'mini.csv'
+    L, X, A, M = LXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
 
     print (L.shape)
     print (X.shape)
     print (A.shape)
-    print (L[:5])
-    print (X[:5])
-    print (A[:5])
+    print (M.shape)
 
-    
-    key = jax.random.PRNGKey(42)
-    X, A = random_permute_atoms(key, X[:5], A[:5])
-
-    print (X)
-    print (A)
     print (L)
+    print (X)
+    print (jnp.argmax(A, axis=2))
+
+    print (jnp.count_nonzero(jnp.argmax(A, axis=2), axis=1)) # number of inequavlent atoms 
+    print (jnp.argmax(M, axis=2)) # total number of atoms
+

@@ -4,9 +4,8 @@ let's code a crystal gpt together, with the help of GPT!
 
 # todo 
 
-
-first atemp 
-see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3JgKRFKUaOgQfFk6?usp=sharing)
+~~sketch
+see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3JgKRFKUaOgQfFk6?usp=sharing)~~
 
 - [X] for data start with carbon_24, write data parse to get LXA
 - [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
@@ -19,9 +18,12 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 
 enhancement
 - [ ] extend the code to multiple atom species
-- [ ] train for MP20 and evaluate the model again
+- [ ] only treat inequavalent atoms
+- [ ] consider perov_5 dataset
+- [ ] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
-- [ ] consider space group other than P1, only treat inequavalent atoms in the given group
+- [ ] train for MP20 and evaluate the model again
+- [ ] consider condition everying on the number of atoms 
 
 production
 - [ ] high pressure dataset 
@@ -67,10 +69,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 24 --atom_types 2 --folder /data/wanglei/crystalgpt/realnvp/ --flow_layers 4 --hidden_size 64 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+python ../src/main.py --n_max 24 --atom_types 2 --folder /data/wanglei/crystalgpt/perov/ --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
 ```
 
 sample
 ```bash 
-python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/realnvp/adamw_bs_100_lr_0.0001_wd_0.001_f_4_h_64_l_4_h_8_k_16_m_32/  --batchsize 10  
+python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/perov/adamw_bs_100_lr_0.0001_wd_0.001_l_4_h_8_k_16_m_32/  --batchsize 10  
 ```
