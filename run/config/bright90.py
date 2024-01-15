@@ -2,19 +2,20 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'perov'
+nickname = 'perov-mixture'
 
 ###############################
 n_max = 5
 atom_types = 118
 mult_types = 5
 
+K = 8
 mlp_size = 16
-h0_size = 512
+h0_size = 128
 transformer_layers = 4
 num_heads = 8
-key_size = 32
-model_size = 64
+key_size = 16
+model_size = 32
 
 lr = 1e-4
 weight_decay = 1e-3 

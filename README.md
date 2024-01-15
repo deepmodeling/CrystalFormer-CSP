@@ -69,10 +69,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov/ --mlp_size 16 --h0_size 512 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov-mixture/ --K 4 --mlp_size 16 --h0_size 128 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
 ```
 
 sample
 ```bash 
-python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/perov/adamw_bs_100_lr_0.0001_a_118_m_5_wd_0.001_mlp_16_h0_512_l_4_H_8_k_32_m_64/  --batchsize 5
+python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov-mixture/ --mlp_size 16 --h0_size 128 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 5 --epochs 100000 --optimizer none --K 4 --restore_path /data/wanglei/crystalgpt/perov-mixture/adamw_bs_100_lr_0.0001_a_118_m_5_wd_0.001_mlp_16_K_4_h0_128_l_4_H_8_k_16_m_32/
 ```

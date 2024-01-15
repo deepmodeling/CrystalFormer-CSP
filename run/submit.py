@@ -39,6 +39,7 @@ if __name__=='__main__':
                         'atom_types': atom_types, 
                         'mult_types': mult_types, 
                         'folder':resfolder,
+                        'K':K,
                         'mlp_size': mlp_size, 
                         'h0_size': h0_size, 
                         'transformer_layers':transformer_layers, 

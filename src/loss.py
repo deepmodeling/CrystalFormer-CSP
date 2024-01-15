@@ -5,7 +5,7 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 
-def make_loss_fn(n_max, lattice_mlp, transformer):
+def make_loss_fn(n_max, K, lattice_mlp, transformer):
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0, 0), out_axes=0)
     def logp_fn(params, G, L, X, A, M):
@@ -27,11 +27,15 @@ def make_loss_fn(n_max, lattice_mlp, transformer):
         mult_types = M.shape[-1]
 
         outputs = transformer(transformer_params, G, L, X, A, M)
-        mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:-1], [dim, 2*dim, 2*dim+atom_types], axis=-1) 
+        x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:-1], [K, K+K*dim, K+2*K*dim, 
+                                                                              K+2*K*dim+atom_types], axis=-1) 
 
-        logp_x = von_mises_logpdf(X*2*jnp.pi, mu, kappa) # (n_max, dim)
-        #logp_x = jax.scipy.stats.norm.logpdf(X, mu, kappa)
+        mu = mu.reshape(n_max, K, dim)
+        kappa = kappa.reshape(n_max, K, dim)
 
+        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, mu, kappa) # (n_max, K, dim)
+        logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
+    
         A_flat = jnp.argmax(A, axis=-1) #(n_max, ) 
         M_flat = jnp.argmax(M, axis=-1) #(n_max, )
         logp_x = jnp.sum(jnp.where((A_flat>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
@@ -54,6 +58,7 @@ if __name__=='__main__':
     atom_types = 118 
     mult_types = 5
     n_max = 5
+    K = 8 
     dim = 3
 
     csv_file = './mini.csv'
@@ -62,18 +67,20 @@ if __name__=='__main__':
     key = jax.random.PRNGKey(42)
     
     mlp_params, lattice_mlp = make_lattice_mlp(key, 6, 32)
-    transformer_params, transformer = make_transformer(key, 128, 4, 4, 8, 16, atom_types, mult_types) 
+    transformer_params, transformer = make_transformer(key, K, 128, 4, 4, 8, 16, atom_types, mult_types) 
 
     params = mlp_params, transformer_params 
 
     outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0, 0, 0), out_axes=0)(transformer_params, G, L, X, A, M)
-    mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [dim, 2*dim, 2*dim+atom_types], axis=-1) 
+    x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [K, K+K*dim, K+2*K*dim, 
+                                                                             K+2*K*dim+atom_types], axis=-1) 
 
+    print ('x_logit.shape', x_logit.shape)
     print ('atom_logit.shape', atom_logit.shape)
     print ('mult_logit.shape', mult_logit.shape)
     print ('A_flat.shape', jnp.argmax(A, axis=-1).shape)
     
-    loss_fn = make_loss_fn(n_max, lattice_mlp, transformer)
+    loss_fn = make_loss_fn(n_max, K, lattice_mlp, transformer)
     
     value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], A[:1], M[:1])
     print (value)

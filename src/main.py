@@ -34,6 +34,7 @@ group = parser.add_argument_group('mlp parameters')
 group.add_argument('--mlp_size', type=int, default=32, help='The number of hidden neurons in lattice mlp')
 
 group = parser.add_argument_group('transformer parameters')
+group.add_argument('--K', type=int, default=8, help='number of modes in von-mises')
 group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
@@ -66,18 +67,18 @@ mlp_params, lattice_mlp = make_lattice_mlp(key, 6, args.mlp_size)
 mlp_name = 'mlp_%d'%(args.mlp_size)
 print ("# of mlp params", ravel_pytree(mlp_params)[0].size) 
 
-transformer_params, transformer = make_transformer(key, args.h0_size, 
+transformer_params, transformer = make_transformer(key, args.K, args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.mult_types)
-transformer_name = 'h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
 
 params = mlp_params, transformer_params
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, lattice_mlp, transformer)
+loss_fn = make_loss_fn(args.n_max, args.K, lattice_mlp, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
@@ -111,11 +112,13 @@ else:
     G, L, X, A, M = valid_data
     mlp_params, transformer_params = params
     outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
-    mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.dim, 2*args.dim, 2*args.dim+args.atom_types], axis=-1) 
-
+    x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim, 
+                                                                             args.K+2*args.K*args.dim+args.atom_types], axis=-1) 
+ 
     print (X[:5])
+    print (jnp.exp(x_logit[:5]))
+    mu = mu.reshape(5, args.n_max, args.K, args.dim)
     print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
-    print (kappa[:5])
 
     print (jnp.argmax(A[:5], axis=2))
     print (jnp.argmax(jnp.exp(atom_logit), axis=2))
@@ -123,7 +126,7 @@ else:
     print (jnp.argmax(jnp.exp(mult_logit), axis=2))
     
     print("\n========== Start sampling ==========")
-    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.G)
+    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, args.G)
     print (L)
     print (X)
     print (jnp.argmax(A, axis=2))  # atom type
