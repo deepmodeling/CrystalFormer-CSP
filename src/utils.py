@@ -68,7 +68,7 @@ if __name__=='__main__':
     n_max = 5
     dim = 3
 
-    #csv_file = '/home/wanglei/cdvae/data/perov_5/train.csv'
+    #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = 'mini.csv'
     G, L, X, A, M = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
 
@@ -84,6 +84,7 @@ if __name__=='__main__':
 
     print (X)
     print (jnp.argmax(A, axis=2))
+    print (jnp.max(jnp.argmax(A, axis=2)))
 
     print (jnp.count_nonzero(jnp.argmax(A, axis=2), axis=1)) # number of inequavlent atoms 
     print (jnp.argmax(M, axis=2)) # multplicities  

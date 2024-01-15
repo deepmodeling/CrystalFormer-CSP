@@ -19,6 +19,7 @@ class LatticeMLP(hk.Module):
         ])
         output = mlp(G)
         mu, sigma = jnp.split(output, 2)
+        sigma = jnp.clip(sigma, a_min = 0.01) # clip to avoid fitting exact angle
         return mu, sigma
 
 def make_lattice_mlp(rng, dim, hdim):

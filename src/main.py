@@ -31,9 +31,10 @@ group.add_argument('--train_path', default='/home/wanglei/cdvae/data/perov_5/tra
 group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val.csv', help='')
 
 group = parser.add_argument_group('mlp parameters')
-group.add_argument('--hidden_size', type=int, default=32, help='The number mlp hidden size')
+group.add_argument('--mlp_size', type=int, default=32, help='The number of hidden neurons in lattice mlp')
 
 group = parser.add_argument_group('transformer parameters')
+group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=16, help='The key size')
@@ -61,14 +62,15 @@ valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
 
 ################### Model #############################
 
-mlp_params, lattice_mlp = make_lattice_mlp(key, 6, args.hidden_size)
-mlp_name = 'h_%d'%(args.hidden_size)
+mlp_params, lattice_mlp = make_lattice_mlp(key, 6, args.mlp_size)
+mlp_name = 'mlp_%d'%(args.mlp_size)
 print ("# of mlp params", ravel_pytree(mlp_params)[0].size) 
 
-transformer_params, transformer = make_transformer(key, args.transformer_layers, args.num_heads, 
+transformer_params, transformer = make_transformer(key, args.h0_size, 
+                                      args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.mult_types)
-transformer_name = 'l_%d_h_%d_k_%d_m_%d'%(args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
 
@@ -79,6 +81,7 @@ loss_fn = make_loss_fn(args.n_max, lattice_mlp, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
+                   + '_a_%g_m_%g'%(args.atom_types, args.mult_types) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    +  "_"+ mlp_name + "_" + transformer_name 
 os.makedirs(path, exist_ok=True)
@@ -109,6 +112,11 @@ else:
     mlp_params, transformer_params = params
     outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
     mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.dim, 2*args.dim, 2*args.dim+args.atom_types], axis=-1) 
+
+    print (X[:5])
+    print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
+    print (kappa[:5])
+
     print (jnp.argmax(A[:5], axis=2))
     print (jnp.argmax(jnp.exp(atom_logit), axis=2))
     print (jnp.argmax(M[:5], axis=2))

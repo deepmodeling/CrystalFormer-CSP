@@ -69,10 +69,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov/ --hidden_size 32 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov/ --mlp_size 16 --h0_size 512 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
 ```
 
 sample
 ```bash 
-python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/perov/adamw_bs_100_lr_0.0001_wd_0.001_l_4_h_8_k_16_m_32/  --batchsize 10  
+python main.py --optimizer none --restore_path /data/wanglei/crystalgpt/perov/adamw_bs_100_lr_0.0001_a_118_m_5_wd_0.001_mlp_16_h0_512_l_4_H_8_k_32_m_64/  --batchsize 5
 ```

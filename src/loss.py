@@ -30,6 +30,7 @@ def make_loss_fn(n_max, lattice_mlp, transformer):
         mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:-1], [dim, 2*dim, 2*dim+atom_types], axis=-1) 
 
         logp_x = von_mises_logpdf(X*2*jnp.pi, mu, kappa) # (n_max, dim)
+        #logp_x = jax.scipy.stats.norm.logpdf(X, mu, kappa)
 
         A_flat = jnp.argmax(A, axis=-1) #(n_max, ) 
         M_flat = jnp.argmax(M, axis=-1) #(n_max, )
@@ -61,7 +62,7 @@ if __name__=='__main__':
     key = jax.random.PRNGKey(42)
     
     mlp_params, lattice_mlp = make_lattice_mlp(key, 6, 32)
-    transformer_params, transformer = make_transformer(key, 4, 4, 8, 16, atom_types, mult_types) 
+    transformer_params, transformer = make_transformer(key, 128, 4, 4, 8, 16, atom_types, mult_types) 
 
     params = mlp_params, transformer_params 
 

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
+def make_transformer(key, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
@@ -24,10 +24,11 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
         initializer = hk.initializers.TruncatedNormal(0.01)
 
         # the first atom
-        h0 = hk.Sequential([hk.Linear(widening_factor * model_size, w_init=initializer),
+        GL = jnp.concatenate([G,L]) #(236,)
+        h0 = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                             jax.nn.gelu,
                             hk.Linear(output_size, w_init=initializer)]
-                            )(L)
+                            )(GL)
         mu, kappa, atom_logit, mult_logit = jnp.split(h0, [dim, 2*dim, 2*dim+atom_types])
         kappa = jax.nn.softplus(kappa) # to ensure positivity
         # normalization

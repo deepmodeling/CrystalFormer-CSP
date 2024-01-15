@@ -36,6 +36,7 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
 
         x = sample_von_mises(key_x, mu, kappa, (batchsize, dim)) # [-pi, pi]
         x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
+        #x = jnp.random.norml(key_x, (batchsize, dim)) * kappa + mu
 
         a = jax.random.categorical(key_a, atom_logit, axis=1)  # atom_logit.shape : (batchsize, atom_types)
         a = jax.nn.one_hot(a, atom_types) # (batchsize, atom_types)
