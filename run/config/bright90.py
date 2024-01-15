@@ -2,14 +2,15 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'realnvp'
+nickname = 'perov'
 
 ###############################
-n_max = 24
-atom_types = 2
+n_max = 5
+atom_types = 118
+mult_types = 5
 
-flow_layers = 4 
-hidden_size = 64
+hidden_size = 32
+
 transformer_layers = 4
 num_heads = 8
 key_size = 16

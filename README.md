@@ -17,10 +17,10 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [ ] write samples back to CIF file
 
 enhancement
-- [ ] extend the code to multiple atom species
-- [ ] only treat inequavalent atoms
-- [ ] consider perov_5 dataset
-- [ ] consider space group as a pre-condition 
+- [X] extend the code to multiple atom species
+- [X] only treat inequavalent atoms
+- [X] consider perov_5 dataset
+- [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
@@ -69,7 +69,7 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 24 --atom_types 2 --folder /data/wanglei/crystalgpt/perov/ --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov/ --hidden_size 32 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
 ```
 
 sample
