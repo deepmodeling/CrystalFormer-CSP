@@ -40,11 +40,11 @@ group.add_argument('--key_size', type=int, default=16, help='The key size')
 group.add_argument('--model_size', type=int, default=32, help='The model size')
 
 group = parser.add_argument_group('physics parameters')
-group.add_argument('--n_max', type=int, default=24, help='The maximum number of atoms in the cell')
+group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
 group.add_argument('--mult_types', type=int, default=5, help='Multiplicity types')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
-group.add_argument('--G', type=int, default=221, help='The space group to be sampled')
+group.add_argument('--G', type=int, default=221, help='The space group id to be sampled')
 
 args = parser.parse_args()
 
@@ -54,10 +54,10 @@ key = jax.random.PRNGKey(42)
 ################### Data #############################
 if args.optimizer != "none":
     train_data = GLXAM_from_file(args.train_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-
     train_data = jax.tree_map(lambda x : x[:10000], train_data)
-    valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
+
+valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
 
 ################### Model #############################
 
@@ -104,18 +104,20 @@ if args.optimizer != "none":
     params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
-    '''
+    print("\n========== Inference on validation data ==========")
     G, L, X, A, M = valid_data
     mlp_params, transformer_params = params
-    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), 0)(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
-    mu, kappa, atom_logit, mult_logit = jnp.split(outputs, [args.dim, 2*args.dim, 2*args.dim+args.atom_types], axis=-1) 
-    print (jnp.exp(atom_logit))
-    print (jnp.exp(mult_logit))
-    '''
-
+    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
+    mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.dim, 2*args.dim, 2*args.dim+args.atom_types], axis=-1) 
+    print (jnp.argmax(A[:5], axis=2))
+    print (jnp.argmax(jnp.exp(atom_logit), axis=2))
+    print (jnp.argmax(M[:5], axis=2))
+    print (jnp.argmax(jnp.exp(mult_logit), axis=2))
+    
     print("\n========== Start sampling ==========")
     L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.G)
     print (L)
-    print (A)
     print (X)
-    print (M)
+    print (jnp.argmax(A, axis=2))  # atom type
+    print (jnp.argmax(M, axis=2))  # mutiplicities 
+

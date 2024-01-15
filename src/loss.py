@@ -27,7 +27,7 @@ def make_loss_fn(n_max, lattice_mlp, transformer):
         mult_types = M.shape[-1]
 
         outputs = transformer(transformer_params, G, L, X, A, M)
-        mu, kappa, atom_logit, mult_logit = jnp.split(outputs, [dim, 2*dim, 2*dim+atom_types], axis=-1) 
+        mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:-1], [dim, 2*dim, 2*dim+atom_types], axis=-1) 
 
         logp_x = von_mises_logpdf(X*2*jnp.pi, mu, kappa) # (n_max, dim)
 
@@ -66,7 +66,7 @@ if __name__=='__main__':
     params = mlp_params, transformer_params 
 
     outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0, 0, 0), out_axes=0)(transformer_params, G, L, X, A, M)
-    mu, kappa, atom_logit, mult_logit = jnp.split(outputs, [dim, 2*dim, 2*dim+atom_types], axis=-1) 
+    mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [dim, 2*dim, 2*dim+atom_types], axis=-1) 
 
     print ('atom_logit.shape', atom_logit.shape)
     print ('mult_logit.shape', mult_logit.shape)

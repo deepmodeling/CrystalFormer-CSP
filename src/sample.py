@@ -25,9 +25,9 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
     key, key_l = jax.random.split(key)
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
 
-    X = jnp.zeros((batchsize, 1, dim))
-    A = jnp.zeros((batchsize, 1, atom_types))
-    M = jnp.zeros((batchsize, 1, mult_types))
+    X = jnp.zeros((batchsize, 0, dim))
+    A = jnp.zeros((batchsize, 0, atom_types))
+    M = jnp.zeros((batchsize, 0, mult_types))
 
     #TODO replace this with a lax.scan
     for i in range(n_max):
@@ -42,13 +42,9 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
 
         m = jax.random.categorical(key_m, mult_logit, axis=1)  # mult_logit.shape: (batchsize, mult_types)
         m = jax.nn.one_hot(m, mult_types) # (batchsize, mult_types)
-        if i == 0:
-            X = x.reshape(batchsize, 1, dim)
-            A = a.reshape(batchsize, 1, atom_types)
-            M = m.reshape(batchsize, 1, mult_types)
-        else:
-            X = jnp.concatenate([X, x[:, None, :]], axis=1)
-            A = jnp.concatenate([A, a[:, None, :]], axis=1)
-            M = jnp.concatenate([M, m[:, None, :]], axis=1)
+
+        X = jnp.concatenate([X, x[:, None, :]], axis=1)
+        A = jnp.concatenate([A, a[:, None, :]], axis=1)
+        M = jnp.concatenate([M, m[:, None, :]], axis=1)
 
     return L, X, A, M

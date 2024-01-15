@@ -82,10 +82,10 @@ if __name__=='__main__':
     print (jnp.argmax(M, axis=2)) 
     print (L)
 
-    sys.exit(0)
     print (X)
     print (jnp.argmax(A, axis=2))
 
     print (jnp.count_nonzero(jnp.argmax(A, axis=2), axis=1)) # number of inequavlent atoms 
-    print (jnp.argmax(M, axis=2)) 
+    print (jnp.argmax(M, axis=2)) # multplicities  
+    print (jnp.sum(jnp.argmax(M, axis=2), axis=1))  # total number of atoms
 
