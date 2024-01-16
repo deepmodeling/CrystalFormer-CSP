@@ -21,7 +21,7 @@ def make_loss_fn(n_max, K, lattice_mlp, transformer):
 
         mu, sigma = lattice_mlp(mlp_params, G)
         #TODO only for these independent variables 
-        logp_l = jnp.sum(jax.scipy.stats.norm.logpdf(L,loc=mu,scale=sigma))
+        logp_l = jnp.sum(jax.scipy.stats.norm.logpdf(L[:1],loc=mu[:1],scale=sigma[:1]))
 
         dim = X.shape[-1]
         atom_types = A.shape[-1]

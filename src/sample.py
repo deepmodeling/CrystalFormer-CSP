@@ -21,6 +21,7 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
     # L ~ p(L|G)
     G = jax.nn.one_hot(G, 230)
     mu, sigma = lattice_mlp(mlp_params, G) # (6, )
+    #print ('mu, sigma for lattice', mu, sigma)
 
     key, key_l = jax.random.split(key)
 
@@ -54,8 +55,10 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
 
         a = jax.random.categorical(key_a, atom_logit, axis=1)  # atom_logit.shape : (batchsize, atom_types)
         a = jax.nn.one_hot(a, atom_types) # (batchsize, atom_types)
-            
-        #print (mult_logit)
+        
+        #print ('atom_logit:\n', atom_logit)
+        #print ('mult_logit:\n', mult_logit)
+
         m = jax.random.categorical(key_m, mult_logit, axis=1)  # mult_logit.shape: (batchsize, mult_types)
         m = jax.nn.one_hot(m, mult_types) # (batchsize, mult_types)
 

@@ -114,7 +114,9 @@ else:
     outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
     x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim, 
                                                                              args.K+2*args.K*args.dim+args.atom_types], axis=-1) 
- 
+    
+    print (jnp.argmax(G[:5], axis=1))
+    print (L[:5])
     print (X[:5])
     print (jnp.exp(x_logit[:5]))
     mu = mu.reshape(5, args.n_max, args.K, args.dim)

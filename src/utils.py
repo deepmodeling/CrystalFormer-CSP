@@ -20,11 +20,20 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
     X = [] # fractional coordinate 
     A = [] # atom type 0 for placeholder
     M = [] # multiplicity
+    Ga = []
     for i, structure in enumerate(structures):
         analyzer = SpacegroupAnalyzer(structure)
         symmetrized_structure = analyzer.get_symmetrized_structure()
         #print (analyzer.get_space_group_number(), symmetrized_structure)
+        
+        #if analyzer.get_space_group_number() in Ga:
+        #    Ga[analyzer.get_space_group_number()].append(structure.lattice.abc[0])
+        #else:
+        #    Ga[analyzer.get_space_group_number()] = [structure.lattice.abc[0]]
 
+        Ga.append(symmetrized_structure.equivalent_sites[0][0].specie.number)
+
+        #print (structure.lattice.abc)
         G.append ([analyzer.get_space_group_number()])
         L.append (structure.lattice.abc+ structure.lattice.angles)
         num_sites = len(symmetrized_structure.equivalent_sites)
@@ -34,7 +43,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
                                        jnp.full((n_max - num_sites, dim), 1e10)], 
                                        axis = 0)
         X.append (frac_coords)  
-
+    
         #print (analyzer.get_space_group_number(), [site[0].specie.number for site in symmetrized_structure.equivalent_sites])
         A.append ([site[0].specie.number for site in symmetrized_structure.equivalent_sites] 
                  + [0] * (n_max - num_sites))
@@ -53,13 +62,13 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
     assert (mult_types > jnp.max(M))
     M = jax.nn.one_hot(M, mult_types) # (-1, n_max, mult_types)
 
-    return G, L, X, A, M
+    return G, L, X, A, M, Ga
     
 def GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
     structures = [Structure.from_str(cif, fmt="cif") for cif in cif_strings]
-    G, L, X, A, M = GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim)
+    G, L, X, A, M, Ga = GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim)
     return G, L, X, A, M
 
 if __name__=='__main__':
@@ -68,10 +77,14 @@ if __name__=='__main__':
     n_max = 5
     dim = 3
 
-    #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = 'mini.csv'
-    G, L, X, A, M = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
-
+    csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
+    #csv_file = 'mini.csv'
+    G, L, X, A, M, Ga = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
+    
+    from collections import Counter
+    print (Counter(Ga))
+    
+    sys.exit(1)
     print (G.shape)
     print (L.shape)
     print (X.shape)
