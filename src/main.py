@@ -43,7 +43,7 @@ group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
-group.add_argument('--G', type=int,  nargs='+', help='The space group id to be sampled, e.g., 24 98 220')
+group.add_argument('--G', type=int, nargs='+', help='The space group id to be sampled, e.g., 24 98 220')
 
 args = parser.parse_args()
 
@@ -100,17 +100,28 @@ if args.optimizer != "none":
 else:
     print("\n========== Inference on test data ==========")
     G, L, X, AM = test_data
+
+    from lattice import make_spacegroup_mask
+    spacegroup_mask = jax.vmap(make_spacegroup_mask)(jnp.argmax(G, axis=-1)) # first convert one-hot to integer rep, then look for mask
+
+    from utils import to_A_M
+    A, M = jax.vmap(to_A_M, (0, None))(AM, args.atom_types)
+    num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
+    print (num_sites)
+    print (num_atoms)
+
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:5], X[:5], AM[:5])
+    print (outputs.shape)
     am_types = (args.atom_types -1)*(mult_types -1) + 1
-    x_logit, loc, kappa, am_logit, mu, sigma = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,
-                                                                           args.K+2*args.K*args.dim, 
-                                                                           args.K+2*args.K*args.dim+am_types, 
-                                                                           args.K+2*args.K*args.dim+am_types + 6
-                                                                         ], axis=-1) 
+    length, angle, sigma = jnp.split(outputs[jnp.arange(5), num_sites[:5]+1, args.K+2*args.K*args.dim+am_types:], [3, 6], axis=-1)
+    length = length*num_atoms[:5, None]**(1/3)
+    mu = jnp.concatenate([length, angle], axis=1) 
     
+    print (spacegroup_mask[:5])
+    print (jnp.argmax(G, axis=-1)[:5])
     print (L[:5])
-    print (mu[:5])
-    print (sigma[:5])
+    print (mu)
+    print (sigma)
 
     print("\n========== Start sampling ==========")
     G = jnp.array(args.G)
@@ -118,8 +129,8 @@ else:
     idx = jax.random.choice(subkey, jnp.arange(len(G)), shape=(args.batchsize,))
     G = G[idx]
     print (G) 
-    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, mult_types, args.K, G)
-    print (L)
+    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, mult_types, args.K, G)
     print (X)
     print (A)  # atom type
-    print (mult_table(M))  # mutiplicities 
+    print (mult_table[M])  # mutiplicities 
+    print (L)
