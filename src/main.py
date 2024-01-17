@@ -6,7 +6,7 @@ import optax
 import os
 
 from utils import GLXAM_from_file
-from lattice import make_lattice_mlp
+from utils import mult_table, mult_types  
 from transformer import make_transformer  
 from train import train
 from sample import sample_crystal
@@ -31,9 +31,6 @@ group.add_argument('--train_path', default='/home/wanglei/cdvae/data/perov_5/tra
 group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val.csv', help='')
 group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
-group = parser.add_argument_group('mlp parameters')
-group.add_argument('--mlp_size', type=int, default=32, help='The number of hidden neurons in lattice mlp')
-
 group = parser.add_argument_group('transformer parameters')
 group.add_argument('--K', type=int, default=8, help='number of modes in von-mises')
 group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
@@ -45,7 +42,6 @@ group.add_argument('--model_size', type=int, default=32, help='The model size')
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
-group.add_argument('--mult_types', type=int, default=5, help='Multiplicity types')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
 group.add_argument('--G', type=int,  nargs='+', help='The space group id to be sampled, e.g., 24 98 220')
 
@@ -56,39 +52,29 @@ key = jax.random.PRNGKey(42)
 
 ################### Data #############################
 if args.optimizer != "none":
-    train_data = GLXAM_from_file(args.train_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-    train_data = jax.tree_map(lambda x : x[:10000], train_data)
-
-    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-    valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
+    train_data = GLXAM_from_file(args.train_path, args.atom_types, mult_types, args.n_max, args.dim)
+    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, mult_types, args.n_max, args.dim)
 else:
-    test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-    test_data = jax.tree_map(lambda x : x[:1000], test_data)
+    test_data = GLXAM_from_file(args.test_path, args.atom_types, mult_types, args.n_max, args.dim)
 
 ################### Model #############################
-
-mlp_params, lattice_mlp = make_lattice_mlp(key, 6, args.mlp_size)
-mlp_name = 'mlp_%d'%(args.mlp_size)
-print ("# of mlp params", ravel_pytree(mlp_params)[0].size) 
-
-transformer_params, transformer = make_transformer(key, args.K, args.h0_size, 
+params, transformer = make_transformer(key, args.K, args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types, args.mult_types)
+                                      args.atom_types, mult_types)
 transformer_name = 'K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
-print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
+print ("# of transformer params", ravel_pytree(params)[0].size) 
 
-params = mlp_params, transformer_params
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.K, lattice_mlp, transformer)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.K, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
-                   + '_a_%g_m_%g'%(args.atom_types, args.mult_types) \
+                   + '_a_%g_m_%g'%(args.atom_types, mult_types) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
-                   +  "_"+ mlp_name + "_" + transformer_name 
+                   +  "_" + transformer_name 
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
 
@@ -114,17 +100,17 @@ if args.optimizer != "none":
 else:
     print("\n========== Inference on test data ==========")
     G, L, X, AM = test_data
-    mlp_params, transformer_params = params
-    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], AM[:5])
-    x_logit, mu, kappa, am_logit  = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim
-                                                                           ], axis=-1) 
+    outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:5], X[:5], AM[:5])
+    am_types = (args.atom_types -1)*(mult_types -1) + 1
+    x_logit, loc, kappa, am_logit, mu, sigma = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,
+                                                                           args.K+2*args.K*args.dim, 
+                                                                           args.K+2*args.K*args.dim+am_types, 
+                                                                           args.K+2*args.K*args.dim+am_types + 6
+                                                                         ], axis=-1) 
     
-    print (jnp.argmax(G[:5], axis=1))
     print (L[:5])
-    print (X[:5])
-    print (jnp.exp(x_logit[:5]))
-    mu = mu.reshape(5, args.n_max, args.K, args.dim)
-    print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
+    print (mu[:5])
+    print (sigma[:5])
 
     print("\n========== Start sampling ==========")
     G = jnp.array(args.G)
@@ -132,8 +118,8 @@ else:
     idx = jax.random.choice(subkey, jnp.arange(len(G)), shape=(args.batchsize,))
     G = G[idx]
     print (G) 
-    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G)
+    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, mult_types, args.K, G)
     print (L)
     print (X)
     print (A)  # atom type
-    print (M)  # mutiplicities 
+    print (mult_table(M))  # mutiplicities 

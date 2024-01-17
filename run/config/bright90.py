@@ -2,12 +2,11 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'perov-mixture-spacegroup'
+#nickname = 'perov-mixture-spacegroup'
+nickname = 'mp'
 
 ###############################
-n_max = 5
 atom_types = 118
-mult_types = 5
 
 K = 8
 mlp_size = 16
@@ -16,6 +15,22 @@ transformer_layers = 4
 num_heads = 8
 key_size = 16
 model_size = 8
+
+dataset = 'mp'
+
+if dataset == 'perov':
+    n_max = 5 
+    train_path = '/home/wanglei/cdvae/data/perov/train.csv'
+    valid_path = '/home/wanglei/cdvae/data/perov/val.csv'
+    test_path = '/home/wanglei/cdvae/data/perov/test.csv'
+
+elif dataset == 'mp':
+    n_max = 20
+    train_path = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    valid_path = '/home/wanglei/cdvae/data/mp_20/val.csv'
+    test_path = '/home/wanglei/cdvae/data/mp_20/test.csv'
+else:
+    print (dataset)
 
 lr = 1e-4
 weight_decay = 1e-3 

@@ -6,7 +6,12 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from functools import partial
 
-@partial(jax.vmap, in_axes=(0, None), out_axes=0) # batch
+mult_list = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] # possible multiplicites 
+mult_dict = {value: index for index, value in enumerate(mult_list)}
+
+mult_table = jnp.array(mult_list)
+mult_types = len(mult_list)
+
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
     AM = jnp.argmax(AM, axis=-1)
@@ -41,8 +46,10 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
 
         #print (structure.lattice.abc)
         G.append ([analyzer.get_space_group_number()])
-        L.append (structure.lattice.abc+ structure.lattice.angles)
+        abc = tuple([l/structure.num_sites**(1./3.) for l in structure.lattice.abc])
+        L.append (abc + structure.lattice.angles)
         num_sites = len(symmetrized_structure.equivalent_sites)
+        assert (n_max >= num_sites)
         frac_coords = jnp.array([site[0].frac_coords for site in 
                                 symmetrized_structure.equivalent_sites]).reshape(num_sites, dim)
         frac_coords = jnp.concatenate([frac_coords, 
@@ -58,7 +65,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
             assert (a < atom_types)
             m = len(site)             # multiplicity
             #print ('xxx', a, m)
-            am.append( (m-1) * (atom_types-1)+ (a-1) )
+            am.append( (mult_dict[m]-1) * (atom_types-1)+ (a-1) )
         AM.append( am + [0] * (n_max - num_sites) )
    
     G = jnp.array(G)
@@ -81,12 +88,12 @@ def GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
 
 if __name__=='__main__':
     atom_types = 118
-    mult_types = 5
-    n_max = 5
+    n_max = 20
     dim = 3
 
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = 'mini.csv'
+    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
     G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
     
     print (G.shape)
@@ -102,6 +109,13 @@ if __name__=='__main__':
     AM_flat = jnp.argmax(AM, axis=-1)
     print (AM_flat)
     
-    A, M = to_A_M(AM, atom_types)
+    A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     print (A)
+    
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
     print (M)
+    print (mult_table[M]) # the actual degeneracy
+    N = mult_table[M].sum(axis=1)
+    print (N)
+

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import sample_von_mises
-from utils import to_A_M
+from utils import to_A_M, mult_table
 from lattice import make_spacegroup_lattice
 
 @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0), out_axes=(0, 0, 0, 0))
@@ -60,5 +60,10 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
         X = jnp.concatenate([X, x[:, None, :]], axis=1)
         AM = jnp.concatenate([AM, am[:, None, :]], axis=1)
 
-    A, M = to_A_M(AM, atom_types)
+    A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
+    
+    #re-normalize lattice constants according to N
+    N = mult_table[M].sum(axis=1)
+    L = jnp.concatenate([L[:, :3]*N[:, None]**(1/3), L[:, 3:]], axis=1)
+
     return L, X, A, M

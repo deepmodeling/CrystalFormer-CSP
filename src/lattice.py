@@ -4,7 +4,7 @@ import haiku as hk
 
 def make_spacegroup_mask(spacegroup):
     '''
-    return mask for those independent lattice params
+    return mask for independent lattice params 
     '''
 
     mask = jnp.array([1, 1, 1, 1, 1, 1])
@@ -18,6 +18,9 @@ def make_spacegroup_mask(spacegroup):
     return mask
 
 def make_spacegroup_lattice(spacegroup, lattice):
+    '''
+    place lattice params into lattice according to the space group 
+    '''
 
     a, b, c, alpha, beta, gamma = lattice
 
@@ -38,7 +41,8 @@ class LatticeMLP(hk.Module):
 
     def __call__(self, G):
         '''
-        G: (230, ) a one hot encoder of the space group number, conditioned on it we will compute the lattice parameters 
+        G: (230, ) a onehot encoding of the space group number
+        the output is the mean and variance of lattice parameters 
         '''
         mlp = hk.Sequential([
             hk.Linear(self.hdim), jax.nn.elu,
@@ -69,6 +73,5 @@ if __name__ == '__main__':
     G = jnp.array([99])
     G = jax.nn.one_hot(G-1, 230).reshape(230,)
     print (G.shape)
-
     print (lattice_mlp(params, G))
 

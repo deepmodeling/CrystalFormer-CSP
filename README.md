@@ -10,8 +10,8 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] for data start with carbon_24, write data parse to get LXA
 - [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
 - [X] move code from notebook to script 
-- [ ] write tests 
-- [X] implement flow model for `L`
+- [ ] write more tests 
+- [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
 - [ ] find out a way to evaluate the model, see whether this is indeed promising.
 - [ ] write samples back to CIF file
@@ -22,6 +22,7 @@ enhancement
 - [X] consider perov_5 dataset
 - [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
+- [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
 
@@ -37,7 +38,7 @@ https://github.com/txie-93/cdvae/tree/main/data
 
 ## model 
 
-We will build an autoregressive model P(G, L, X, AM) = P(L|G) P (X_1, AM_1| G,L) P ( X_2, AM_2 | L, G, X_1, AM_1 ) ... 
+We will build an autoregressive model P(G, L, X, AM) = P (X_1, AM_1| G) P ( X_2, AM_2 | G, X_1, AM_1 ) ... P(L| ...)
 The autoregressive model will be a causal transformer (what else ?).
 
 G: space group
@@ -47,7 +48,6 @@ AM: atom type and multiplicity
 
 Sec. A2 of [MatterGen paper](https://arxiv.org/abs/2312.03687) contains a discussion of the relevant symmetries between them. 
 
-For P(L|G) we use a simple MLP to parametrize gaussian distribution (if needed we can then do a flow afterward)
 For X we consider to use a distributuion with periodic variables (e.g., wrapped Gaussuan, wrapped Cauchy, von Mises, ...). Here are some useful codes. In particular, we use mixture of von Mises distribution as the atom position is multi-modal. 
 
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/sampler.py

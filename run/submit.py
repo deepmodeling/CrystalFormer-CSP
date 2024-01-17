@@ -37,7 +37,6 @@ if __name__=='__main__':
     if True:
                 args = {'n_max':n_max, 
                         'atom_types': atom_types, 
-                        'mult_types': mult_types, 
                         'folder':resfolder,
                         'K':K,
                         'mlp_size': mlp_size, 
@@ -50,12 +49,15 @@ if __name__=='__main__':
                         'weight_decay': weight_decay, 
                         'batchsize': batchsize,
                         'epochs': epochs, 
-                        'optimizer': optimizer
+                        'optimizer': optimizer, 
+                        'train_path' : train_path,  
+                        'valid_path' : valid_path,  
+                        'test_path' : test_path,  
                         }
 
                 logname = jobdir
                 for key, val in args.items():
-                    if key != 'folder':
+                    if not ('_path' in key or 'folder' in key):
                         k = str(key)
                         if '_' in k:
                             k = ''.join([s[0] for s in k.split('_')])
