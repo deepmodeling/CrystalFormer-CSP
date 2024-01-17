@@ -5,28 +5,49 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_types, widening_factor=4):
+def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
-    def network(L, X, A):
+    def network(G, L, X, AM):
         '''
-        L: [a, b, c, alpha, beta, gamma] 
+        G: (230, )
+        L: (6, ) = [a, b, c, alpha, beta, gamma] 
         X: (n, dim)
-        A: (n, )
+        AM: (n, am_types)
         '''
 
         n, dim = X.shape[0], X.shape[1]
-        mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
+        am_types = AM.shape[-1]
+        output_size = K+2*K*dim+am_types
 
         initializer = hk.initializers.TruncatedNormal(0.01)
 
-        h = jnp.concatenate([L.reshape([1, 6]).repeat(n, axis=0), 
+        # the first atom
+        GL = jnp.concatenate([G,L]) #(236,)
+        h0 = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                            jax.nn.gelu,
+                            hk.Linear(output_size, w_init=initializer)]
+                            )(GL)
+        #h0 = hk.get_parameter("h0", [output_size,], init=initializer)
+
+        x_logit, mu, kappa, am_logit = jnp.split(h0, [K, K+K*dim, K+2*K*dim])
+        kappa = jax.nn.softplus(kappa) # to ensure positivity
+        # normalization
+        x_logit -= jax.scipy.special.logsumexp(x_logit)
+        am_logit -= jax.scipy.special.logsumexp(am_logit)
+        h0 = jnp.concatenate([x_logit, mu, kappa, am_logit])  # (output_size,)
+        if n==0: return h0.reshape(1, output_size)
+
+        mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
+
+        h = jnp.concatenate([G.reshape([1, 230]).repeat(n, axis=0), 
+                             L.reshape([1, 6]).repeat(n, axis=0), 
                              jnp.cos(2*jnp.pi*X).reshape([n, dim]),
                              jnp.sin(2*jnp.pi*X).reshape([n, dim]),
-                             A.reshape([n, 1]), 
+                             AM, 
                              ], 
-                             axis=1) # (n, 13)
+                             axis=1) # (n, 230+6+3+3+am_types)
        
         h = hk.Linear(model_size, w_init=initializer)(h)
         
@@ -49,27 +70,34 @@ def make_transformer(key, num_layers, num_heads, key_size, model_size, atom_type
             h = h + h_dense
 
         h = _layer_norm(h)
-
-        h = hk.Linear(2*dim+atom_types, w_init=initializer)(h)
-
-        mu, kappa, logit = jnp.split(h, [dim, 2*dim], axis=-1)
+        h = hk.Linear(output_size, w_init=initializer)(h)
+        x_logit, mu, kappa, am_logit = jnp.split(h, [K, K+K*dim, K+2*K*dim], axis=-1)
+        x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] # normalization
         kappa = jax.nn.softplus(kappa) # to ensure positivity
-
+        
+        AM_flat = jnp.argmax(AM, axis=-1) #(n,)
         mask = jnp.concatenate(
-                [ jnp.where(A==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
-                  jnp.zeros((n, atom_types-1))
-                ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
-        logit = logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
+                [ jnp.where(AM_flat==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                  jnp.zeros((n, am_types-1))
+                ], axis = 1 )  # (n, am_types) mask = 1 for those locations to place pad atoms of type 0
+        am_logit = am_logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
+        am_logit -= jax.scipy.special.logsumexp(am_logit, axis=1)[:, None] # normalization
 
-        logit -= jax.scipy.special.logsumexp(logit, axis=1)[:, None] # normalization
+        h = jnp.concatenate([x_logit, mu, kappa, am_logit], axis=-1) # (n, output_size)
+
+        h = jnp.concatenate( [h0.reshape(1, output_size), 
+                              h
+                           ], axis = 0) # (n+1, output_size)
+        return h
  
-        return jnp.concatenate([mu, kappa, logit], axis=-1) 
 
     n, dim = 24, 3
+    G = jax.random.uniform(key, (230, ))
     L = jax.random.uniform(key, (6,))
     X = jax.random.uniform(key, (n, dim))
-    A = jax.random.uniform(key, (n, )) 
-    params = network.init(key, L, X, A)
+    am_types = (atom_types -1)*(mult_types -1) + 1
+    AM = jax.random.uniform(key, (n, am_types)) 
+    params = network.init(key, G, L, X, AM)
     return params, network.apply
 
 def _layer_norm(x: jax.Array) -> jax.Array:

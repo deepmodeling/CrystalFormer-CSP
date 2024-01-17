@@ -5,8 +5,8 @@ from jax.flatten_util import ravel_pytree
 import optax
 import os
 
-from utils import LXA_from_file
-from realnvp import make_flow
+from utils import GLXAM_from_file
+from mlp import make_lattice_mlp
 from transformer import make_transformer  
 from train import train
 from sample import sample_crystal
@@ -27,23 +27,27 @@ group.add_argument("--folder", default="../data/", help="the folder to save data
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
 group = parser.add_argument_group('dataset')
-group.add_argument('--train_path', default='/home/wanglei/cdvae/data/carbon_24/train.csv', help='')
-group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/carbon_24/val.csv', help='')
+group.add_argument('--train_path', default='/home/wanglei/cdvae/data/perov_5/train.csv', help='')
+group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val.csv', help='')
+group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
-group = parser.add_argument_group('flow parameters')
-group.add_argument('--flow_layers', type=int, default=4, help='The number of layers in flow')
-group.add_argument('--hidden_size', type=int, default=64, help='The number of hidden size')
+group = parser.add_argument_group('mlp parameters')
+group.add_argument('--mlp_size', type=int, default=32, help='The number of hidden neurons in lattice mlp')
 
 group = parser.add_argument_group('transformer parameters')
+group.add_argument('--K', type=int, default=8, help='number of modes in von-mises')
+group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=16, help='The key size')
 group.add_argument('--model_size', type=int, default=32, help='The model size')
 
 group = parser.add_argument_group('physics parameters')
-group.add_argument('--n_max', type=int, default=24, help='The maximum number of atoms in the cell')
-group.add_argument('--atom_types', type=int, default=2, help='Atom types including the padded atoms')
+group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
+group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
+group.add_argument('--mult_types', type=int, default=5, help='Multiplicity types')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
+group.add_argument('--G', type=int, default=221, help='The space group id to be sampled')
 
 args = parser.parse_args()
 
@@ -51,34 +55,41 @@ key = jax.random.PRNGKey(42)
 
 
 ################### Data #############################
-train_data = LXA_from_file(args.train_path, args.atom_types, args.n_max, args.dim)
-valid_data = LXA_from_file(args.valid_path, args.atom_types, args.n_max, args.dim)
+if args.optimizer != "none":
+    train_data = GLXAM_from_file(args.train_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    train_data = jax.tree_map(lambda x : x[:10000], train_data)
+
+    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
+
+else:
+    test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    test_data = jax.tree_map(lambda x : x[:1000], test_data)
 
 ################### Model #############################
-flow_params, flow, flow_sample_fn = make_flow(key, 6, args.hidden_size, args.flow_layers)
 
-flow_name = 'f_%d_h_%d'%(args.flow_layers, args.hidden_size)
-print ("# of flow params", ravel_pytree(flow_params)[0].size) 
+mlp_params, lattice_mlp = make_lattice_mlp(key, 6, args.mlp_size)
+mlp_name = 'mlp_%d'%(args.mlp_size)
+print ("# of mlp params", ravel_pytree(mlp_params)[0].size) 
 
-transformer_params, transformer = make_transformer(key, args.transformer_layers, args.num_heads, 
+transformer_params, transformer = make_transformer(key, args.K, args.h0_size, 
+                                      args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types)
-transformer_name = 'l_%d_h_%d_k_%d_m_%d'%(args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+                                      args.atom_types, args.mult_types)
+transformer_name = 'K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
 
-params = flow_params, transformer_params
+params = mlp_params, transformer_params
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, flow, transformer)
-
-train_data = jax.tree_map(lambda x : x[:6000], train_data)
-valid_data = jax.tree_map(lambda x : x[:2000], valid_data)
+loss_fn = make_loss_fn(args.n_max, args.K, lattice_mlp, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
+                   + '_a_%g_m_%g'%(args.atom_types, args.mult_types) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
-                   + "_" + flow_name + "_" + transformer_name
+                   +  "_"+ mlp_name + "_" + transformer_name 
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
 
@@ -102,15 +113,23 @@ if args.optimizer != "none":
     params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
-    L, X, A = valid_data
-    flow_params, transformer_params = params
-    outputs = jax.vmap(transformer, (None, 0, 0, 0), 0)(transformer_params, L[:5], X[:5], A[:5])
-    mu, kappa, logit = jnp.split(outputs, [args.dim, 2*args.dim], axis=-1) 
-    print (A[:5])
-    print (jnp.exp(logit))
+    print("\n========== Inference on test data ==========")
+    G, L, X, AM = test_data
+    mlp_params, transformer_params = params
+    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], AM[:5])
+    x_logit, mu, kappa, am_logit  = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim
+                                                                           ], axis=-1) 
+    
+    print (jnp.argmax(G[:5], axis=1))
+    print (L[:5])
+    print (X[:5])
+    print (jnp.exp(x_logit[:5]))
+    mu = mu.reshape(5, args.n_max, args.K, args.dim)
+    print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
 
     print("\n========== Start sampling ==========")
-    L, X, A = sample_crystal(key, flow_sample_fn, transformer, params, args.n_max, args.dim, args.batchsize)
+    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, args.G)
     print (L)
-    print (A)
     print (X)
+    print (A)  # atom type
+    print (M)  # mutiplicities 

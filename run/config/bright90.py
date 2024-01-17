@@ -2,14 +2,16 @@ import subprocess
 import numpy as np 
 import time 
 
-nickname = 'realnvp'
+nickname = 'perov-mixture'
 
 ###############################
-n_max = 24
-atom_types = 2
+n_max = 5
+atom_types = 118
+mult_types = 5
 
-flow_layers = 4 
-hidden_size = 64
+K = 8
+mlp_size = 16
+h0_size = 128
 transformer_layers = 4
 num_heads = 8
 key_size = 16
@@ -30,7 +32,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a800
+#SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=10:00:00
