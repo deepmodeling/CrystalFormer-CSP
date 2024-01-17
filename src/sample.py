@@ -4,8 +4,9 @@ from functools import partial
 
 from von_mises import sample_von_mises
 from utils import to_A_M
+from lattice import make_spacegroup_lattice
 
-@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=(0, 0, 0, 0))
+@partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0), out_axes=(0, 0, 0, 0))
 def inference(model, params, K, G, L, X, AM):
     dim = X.shape[-1]
     outputs = model(params, G, L, X, AM)
@@ -18,17 +19,14 @@ def sample_crystal(key, lattice_mlp, transformer, params, n_max, dim, batchsize,
     mlp_params, transformer_params = params
     
     # L ~ p(L|G)
-    G = jax.nn.one_hot(G-1, 230)
-    mu, sigma = lattice_mlp(mlp_params, G) # (6, )
+    G = jax.nn.one_hot(G-1, 230).reshape(batchsize, 230)
+    mu, sigma = jax.vmap(lattice_mlp, (None, 0))(mlp_params, G) # (batchsize, 6)
     #print ('mu, sigma for lattice', mu, sigma)
 
     key, key_l = jax.random.split(key)
 
-    #TODO: now this is only for cubic, do this generally for any crystal system
-    l = jax.random.normal(key_l, (batchsize, 1)) * sigma[0] + mu[0] # (batchsize, 1)
-    L = jnp.concatenate([l, l, l, 
-                        jnp.full((batchsize, 3), 90.0) # put in angles by hand for cubic system
-                        ], axis=1) # (batchsize, 6)
+    L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
+    L = jax.vmap(make_spacegroup_lattice)(jnp.argmax(G, axis=-1), L) # impose space group constraint to lattice params 
 
     X = jnp.zeros((batchsize, 0, dim))
 

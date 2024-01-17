@@ -6,7 +6,7 @@ import optax
 import os
 
 from utils import GLXAM_from_file
-from mlp import make_lattice_mlp
+from lattice import make_lattice_mlp
 from transformer import make_transformer  
 from train import train
 from sample import sample_crystal
@@ -47,7 +47,7 @@ group.add_argument('--n_max', type=int, default=5, help='The maximum number of a
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
 group.add_argument('--mult_types', type=int, default=5, help='Multiplicity types')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
-group.add_argument('--G', type=int, default=221, help='The space group id to be sampled')
+group.add_argument('--G', type=int,  nargs='+', help='The space group id to be sampled, e.g., 24 98 220')
 
 args = parser.parse_args()
 
@@ -61,7 +61,6 @@ if args.optimizer != "none":
 
     valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
     valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
-
 else:
     test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
     test_data = jax.tree_map(lambda x : x[:1000], test_data)
@@ -128,7 +127,12 @@ else:
     print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
 
     print("\n========== Start sampling ==========")
-    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, args.G)
+    G = jnp.array(args.G)
+    key, subkey = jax.random.split(key)
+    idx = jax.random.choice(subkey, jnp.arange(len(G)), shape=(args.batchsize,))
+    G = G[idx]
+    print (G) 
+    L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G)
     print (L)
     print (X)
     print (A)  # atom type

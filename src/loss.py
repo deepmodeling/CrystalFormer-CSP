@@ -4,6 +4,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import von_mises_logpdf
+from lattice import make_spacegroup_mask
 
 def make_loss_fn(n_max, K, lattice_mlp, transformer):
 
@@ -18,9 +19,11 @@ def make_loss_fn(n_max, K, lattice_mlp, transformer):
         
         mlp_params, transformer_params = params
 
+        spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)) # first convert one-hot to integer rep, than look for mask
+
         mu, sigma = lattice_mlp(mlp_params, G)
-        #TODO only for these independent variables 
-        logp_l = jnp.sum(jax.scipy.stats.norm.logpdf(L[:1],loc=mu[:1],scale=sigma[:1]))
+        logp_l = jax.scipy.stats.norm.logpdf(L,loc=mu,scale=sigma) # (dim, )
+        logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
         dim = X.shape[-1]
         am_types = AM.shape[-1]
@@ -49,7 +52,7 @@ def make_loss_fn(n_max, K, lattice_mlp, transformer):
 
 if __name__=='__main__':
     from utils import GLXAM_from_file
-    from mlp import make_lattice_mlp
+    from lattice import make_lattice_mlp
     from transformer import make_transformer
     atom_types = 118 
     mult_types = 5
