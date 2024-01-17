@@ -29,6 +29,7 @@ group.add_argument("--restore_path", default=None, help="checkpoint path or file
 group = parser.add_argument_group('dataset')
 group.add_argument('--train_path', default='/home/wanglei/cdvae/data/perov_5/train.csv', help='')
 group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val.csv', help='')
+group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
 group = parser.add_argument_group('mlp parameters')
 group.add_argument('--mlp_size', type=int, default=32, help='The number of hidden neurons in lattice mlp')
@@ -58,8 +59,12 @@ if args.optimizer != "none":
     train_data = GLXAM_from_file(args.train_path, args.atom_types, args.mult_types, args.n_max, args.dim)
     train_data = jax.tree_map(lambda x : x[:10000], train_data)
 
-valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
+    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    valid_data = jax.tree_map(lambda x : x[:1000], valid_data)
+
+else:
+    test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    test_data = jax.tree_map(lambda x : x[:1000], test_data)
 
 ################### Model #############################
 
@@ -108,12 +113,12 @@ if args.optimizer != "none":
     params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
-    print("\n========== Inference on validation data ==========")
-    G, L, X, A, M = valid_data
+    print("\n========== Inference on test data ==========")
+    G, L, X, AM = test_data
     mlp_params, transformer_params = params
-    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], A[:5], M[:5])
-    x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim, 
-                                                                             args.K+2*args.K*args.dim+args.atom_types], axis=-1) 
+    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0), (0))(transformer_params, G[:5], L[:5], X[:5], AM[:5])
+    x_logit, mu, kappa, am_logit  = jnp.split(outputs[:, :-1], [args.K, args.K+args.K*args.dim,                                                                         args.K+2*args.K*args.dim
+                                                                           ], axis=-1) 
     
     print (jnp.argmax(G[:5], axis=1))
     print (L[:5])
@@ -122,15 +127,9 @@ else:
     mu = mu.reshape(5, args.n_max, args.K, args.dim)
     print ((mu[:5]+jnp.pi)/(2.0*jnp.pi))
 
-    print (jnp.argmax(A[:5], axis=2))
-    print (jnp.argmax(jnp.exp(atom_logit), axis=2))
-    print (jnp.argmax(M[:5], axis=2))
-    print (jnp.argmax(jnp.exp(mult_logit), axis=2))
-    
     print("\n========== Start sampling ==========")
     L, X, A, M = sample_crystal(key, lattice_mlp, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, args.G)
     print (L)
     print (X)
-    print (jnp.argmax(A, axis=2))  # atom type
-    print (jnp.argmax(M, axis=2))  # mutiplicities 
-
+    print (A)  # atom type
+    print (M)  # mutiplicities 

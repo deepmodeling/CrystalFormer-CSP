@@ -7,14 +7,13 @@ from von_mises import von_mises_logpdf
 
 def make_loss_fn(n_max, K, lattice_mlp, transformer):
 
-    @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0, 0), out_axes=0)
-    def logp_fn(params, G, L, X, A, M):
+    @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
+    def logp_fn(params, G, L, X, AM):
         '''
         G: (230, )
         L: [a, b, c, alpha, beta, gamma] 
         X: (n, dim)
-        A: (n, atom_types)
-        M: (n, mult_types)
+        AM: (n, am_types)
         '''
         
         mlp_params, transformer_params = params
@@ -24,12 +23,10 @@ def make_loss_fn(n_max, K, lattice_mlp, transformer):
         logp_l = jnp.sum(jax.scipy.stats.norm.logpdf(L[:1],loc=mu[:1],scale=sigma[:1]))
 
         dim = X.shape[-1]
-        atom_types = A.shape[-1]
-        mult_types = M.shape[-1]
+        am_types = AM.shape[-1]
 
-        outputs = transformer(transformer_params, G, L, X, A, M)
-        x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:-1], [K, K+K*dim, K+2*K*dim, 
-                                                                              K+2*K*dim+atom_types], axis=-1) 
+        outputs = transformer(transformer_params, G, L, X, AM)
+        x_logit, mu, kappa, am_logit = jnp.split(outputs[:-1], [K, K+K*dim, K+2*K*dim], axis=-1) 
 
         mu = mu.reshape(n_max, K, dim)
         kappa = kappa.reshape(n_max, K, dim)
@@ -37,17 +34,15 @@ def make_loss_fn(n_max, K, lattice_mlp, transformer):
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, mu, kappa) # (n_max, K, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
     
-        A_flat = jnp.argmax(A, axis=-1) #(n_max, ) 
-        M_flat = jnp.argmax(M, axis=-1) #(n_max, )
-        logp_x = jnp.sum(jnp.where((A_flat>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
+        AM_flat = jnp.argmax(AM, axis=-1) #(n_max, ) 
+        logp_x = jnp.sum(jnp.where((AM_flat>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
 
-        logp_a = jnp.sum(atom_logit[jnp.arange(n_max), A_flat.astype(int)])  
-        logp_m = jnp.sum(mult_logit[jnp.arange(n_max), M_flat.astype(int)])
-        
-        return logp_l + logp_x + logp_a + logp_m
+        logp_am = jnp.sum(am_logit[jnp.arange(n_max), AM_flat.astype(int)])  
 
-    def loss_fn(params, G, L, X, A, M):
-        logp = logp_fn(params, G, L, X, A, M)
+        return logp_l + logp_x + logp_am
+
+    def loss_fn(params, G, L, X, AM):
+        logp = logp_fn(params, G, L, X, AM)
         return -jnp.mean(logp)
         
     return loss_fn
@@ -63,7 +58,7 @@ if __name__=='__main__':
     dim = 3
 
     csv_file = './mini.csv'
-    G, L, X, A, M = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
+    G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)
     
@@ -72,19 +67,17 @@ if __name__=='__main__':
 
     params = mlp_params, transformer_params 
 
-    outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0, 0, 0), out_axes=0)(transformer_params, G, L, X, A, M)
-    x_logit, mu, kappa, atom_logit, mult_logit = jnp.split(outputs[:, :-1], [K, K+K*dim, K+2*K*dim, 
-                                                                             K+2*K*dim+atom_types], axis=-1) 
+    outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0, 0), out_axes=0)(transformer_params, G, L, X, AM)
+    x_logit, mu, kappa, am_logit = jnp.split(outputs[:, :-1], [K, K+K*dim, K+2*K*dim], axis=-1) 
 
     print ('x_logit.shape', x_logit.shape)
-    print ('atom_logit.shape', atom_logit.shape)
-    print ('mult_logit.shape', mult_logit.shape)
-    print ('A_flat.shape', jnp.argmax(A, axis=-1).shape)
+    print ('am_logit.shape', am_logit.shape)
+    print ('AM_flat.shape', jnp.argmax(AM, axis=-1).shape)
     
     loss_fn = make_loss_fn(n_max, K, lattice_mlp, transformer)
     
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], A[:1], M[:1])
+    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AM[:1])
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1]-1.0, A[:1], M[:1])
+    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1]-1.0, AM[:1])
     print (value)
