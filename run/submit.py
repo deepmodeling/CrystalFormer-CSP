@@ -48,6 +48,7 @@ if __name__=='__main__':
                         'lr':lr, 
                         'lr_decay': lr_decay, 
                         'weight_decay': weight_decay, 
+                        'clip_grad': clip_grad, 
                         'batchsize': batchsize,
                         'epochs': epochs, 
                         'optimizer': optimizer, 

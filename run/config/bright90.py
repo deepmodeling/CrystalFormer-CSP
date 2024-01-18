@@ -16,6 +16,14 @@ num_heads = 8
 key_size = 32
 model_size = 8
 
+optimizer = 'adamw'
+weight_decay = 1e-3
+lr = 1e-4
+lr_decay = 0.0
+clip_grad = 1.0 
+batchsize = 100
+epochs = 100000
+
 dataset = 'perov'
 
 if dataset == 'perov':
@@ -32,13 +40,6 @@ elif dataset == 'mp':
 else:
     print (dataset)
 
-lr = 1e-4
-lr_decay = 1e-5
-weight_decay = 1e-3
-batchsize = 100
-epochs = 100000
-
-optimizer = 'adamw'
 
 ###############################
 prog = '../src/main.py'
@@ -48,7 +49,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a100
+#SBATCH --partition=a800
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00

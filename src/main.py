@@ -19,9 +19,10 @@ parser = argparse.ArgumentParser(description='')
 group = parser.add_argument_group('training parameters')
 group.add_argument('--epochs', type=int, default=100000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
-group.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-group.add_argument('--lr_decay', type=float, default=1e-3, help='lr decay')
+group.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+group.add_argument('--lr_decay', type=float, default=1e-5, help='lr decay')
 group.add_argument('--weight_decay', type=float, default=1e-3, help='weight decay')
+group.add_argument('--clip_grad', type=float, default=1.0, help='clip gradient')
 parser.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
 
 group.add_argument("--folder", default="../data/", help="the folder to save data")
@@ -84,7 +85,7 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 loss_fn = make_loss_fn(args.n_max, args.atom_types, args.mult_types, args.K, transformer)
 
 print("\n========== Prepare logs ==========")
-path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g" % (args.batchsize, args.lr, args.lr_decay) \
+path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_M_%g_N_%g'%(args.atom_types, args.mult_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    +  "_" + transformer_name 
@@ -106,11 +107,14 @@ if args.optimizer != "none":
     schedule = lambda t: args.lr/(1+args.lr_decay*t)
 
     if args.optimizer == "adam":
-        optimizer = optax.chain(optax.scale_by_adam(), 
+        optimizer = optax.chain(optax.clip(args.clip_grad), 
+                                optax.scale_by_adam(), 
                                 optax.scale_by_schedule(schedule), 
                                 optax.scale(-1.))
     elif args.optimizer == 'adamw':
-        optimizer = optax.adamw(learning_rate=schedule, weight_decay=args.weight_decay)
+        optimizer = optax.chain(optax.clip(args.clip_grad),
+                                optax.adamw(learning_rate=schedule, weight_decay=args.weight_decay)
+                               )
 
     opt_state = optimizer.init(params)
     try:
