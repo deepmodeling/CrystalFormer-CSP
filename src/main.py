@@ -117,7 +117,7 @@ else:
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print (outputs.shape)
     am_types = (args.atom_types -1)*(args.mult_types -1) + 1
-    length, angle, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize]+1, args.K+2*args.K*args.dim+am_types:], [3, 6], axis=-1)
+    length, angle, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], [3, 6], axis=-1)
     length = length*num_atoms[:batchsize, None]**(1/3)
     mu = jnp.concatenate([length, angle], axis=1) 
     
@@ -126,8 +126,6 @@ else:
     print (L[:batchsize])
     print (mu)
     print (sigma)
-
-    sys.exit(1)
 
     print("\n========== Start sampling ==========")
     G = jnp.array(args.G)
@@ -141,4 +139,4 @@ else:
     print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
-    print (L)
+    print (L)  # sample lattice
