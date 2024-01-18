@@ -8,10 +8,8 @@ import math
 from utils import shuffle
 import checkpoint
 
-def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
+def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
            
-    opt_state = optimizer.init(params)
-
     @jax.jit
     def update(params, opt_state, data):
         G, L, X, AM = data
@@ -62,10 +60,11 @@ def train(key, optimizer, loss_fn, params, epoch_finished, epochs, batchsize, tr
             f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, train_loss, valid_loss) )
 
             ckpt = {"params": params,
+                    "opt_state" : opt_state
                    }
             ckpt_filename = os.path.join(path, "epoch_%06d.pkl" %(epoch))
             checkpoint.save_data(ckpt, ckpt_filename)
             print("Save checkpoint file: %s" % ckpt_filename)
 
     f.close()
-    return params
+    return params, opt_state

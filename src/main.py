@@ -20,6 +20,7 @@ group = parser.add_argument_group('training parameters')
 group.add_argument('--epochs', type=int, default=100000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
 group.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+group.add_argument('--lr_decay', type=float, default=1e-3, help='lr decay')
 group.add_argument('--weight_decay', type=float, default=1e-3, help='weight decay')
 parser.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
 
@@ -36,8 +37,8 @@ group.add_argument('--K', type=int, default=8, help='number of modes in von-mise
 group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
-group.add_argument('--key_size', type=int, default=16, help='The key size')
-group.add_argument('--model_size', type=int, default=32, help='The model size')
+group.add_argument('--key_size', type=int, default=32, help='The key size')
+group.add_argument('--model_size', type=int, default=8, help='The model size')
 
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
@@ -83,12 +84,13 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 loss_fn = make_loss_fn(args.n_max, args.atom_types, args.mult_types, args.K, transformer)
 
 print("\n========== Prepare logs ==========")
-path = args.folder + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
+path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g" % (args.batchsize, args.lr, args.lr_decay) \
                    + '_A_%g_M_%g_N_%g'%(args.atom_types, args.mult_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    +  "_" + transformer_name 
 os.makedirs(path, exist_ok=True)
 print("Create directory: %s" % path)
+
 
 print("\n========== Load checkpoint==========")
 ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or path) 
@@ -101,13 +103,24 @@ else:
 
 if args.optimizer != "none":
 
-    if args.optimizer == 'adam':
-        optimizer = optax.adam(args.lr)
+    schedule = lambda t: args.lr/(1+args.lr_decay*t)
+
+    if args.optimizer == "adam":
+        optimizer = optax.chain(optax.scale_by_adam(), 
+                                optax.scale_by_schedule(schedule), 
+                                optax.scale(-1.))
     elif args.optimizer == 'adamw':
-        optimizer = optax.adamw(args.lr, weight_decay=args.weight_decay)
+        optimizer = optax.adamw(learning_rate=schedule, weight_decay=args.weight_decay)
+
+    opt_state = optimizer.init(params)
+    try:
+        opt_state.update(ckpt["opt_state"])
+    except: 
+        print ("failed to update opt_state from checkpoint")
+        pass 
  
     print("\n========== Start training ==========")
-    params = train(key, optimizer, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
     print("\n========== Inference on test data ==========")
@@ -123,8 +136,12 @@ else:
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
     print (num_sites)
     print (num_atoms)
+
     
     batchsize = 10
+    for a in A[:batchsize]: 
+       print([element_list[i] for i in a])
+    print (M[:batchsize])
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print (outputs.shape)
     mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], 2, axis=-1)

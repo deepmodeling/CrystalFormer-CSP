@@ -46,6 +46,7 @@ if __name__=='__main__':
                         'key_size':key_size,
                         'model_size':model_size, 
                         'lr':lr, 
+                        'lr_decay': lr_decay, 
                         'weight_decay': weight_decay, 
                         'batchsize': batchsize,
                         'epochs': epochs, 

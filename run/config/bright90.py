@@ -3,26 +3,26 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp'
+nickname = 'mp-perov-debug-lscale-fix'
 
 ###############################
-atom_types = 118
+atom_types = 119
+mult_types = 10
 
 K = 8
-mlp_size = 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
-key_size = 16
+key_size = 32
 model_size = 8
 
-dataset = 'mp'
+dataset = 'perov'
 
 if dataset == 'perov':
     n_max = 5 
-    train_path = '/home/wanglei/cdvae/data/perov/train.csv'
-    valid_path = '/home/wanglei/cdvae/data/perov/val.csv'
-    test_path = '/home/wanglei/cdvae/data/perov/test.csv'
+    train_path = '/home/wanglei/cdvae/data/perov_5/train.csv'
+    valid_path = '/home/wanglei/cdvae/data/perov_5/val.csv'
+    test_path = '/home/wanglei/cdvae/data/perov_5/test.csv'
 
 elif dataset == 'mp':
     n_max = 20
@@ -33,7 +33,8 @@ else:
     print (dataset)
 
 lr = 1e-4
-weight_decay = 1e-3 
+lr_decay = 1e-5
+weight_decay = 1e-3
 batchsize = 100
 epochs = 100000
 
@@ -50,7 +51,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --time=10:00:00
+#SBATCH --time=24:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
 #SBATCH --error=%s'''%(jobname,logname,logname)
