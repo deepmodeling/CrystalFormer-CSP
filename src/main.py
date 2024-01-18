@@ -144,15 +144,19 @@ else:
     G = G[idx]
     print (G) 
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(G) 
-    print (spacegroup_mask)
-    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
+    X, A, M, L, mu, sigma = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
     print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
-    print (jnp.sum(mult_table[M], axis=1))  # num_atoms
+
+    num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
+    print (num_sites)
+    print (num_atoms)
+    
     print (L)  # sample lattice
+
+    print (mu[-5:])
+    print (sigma[-5:])
     
     for a in A: 
        print([element_list[i] for i in a])
-        
-

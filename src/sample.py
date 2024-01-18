@@ -55,17 +55,17 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
         AM = jnp.concatenate([AM, am[:, None, :]], axis=1)
 
         L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
-
+    
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
 
     #scale length according to atom number
     length, angle, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [3, 6], axis=-1)
     length = length*num_atoms[:, None]**(1/3)
-    mu = jnp.concatenate([length, angle], axis=1)
+    mu = jnp.concatenate([length, angle], axis=-1)
 
     key, key_l = jax.random.split(key)
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
     L = jax.vmap(make_spacegroup_lattice)(jnp.argmax(G, axis=-1)+1, L) # impose space group constraint to lattice params 
 
-    return X, A, M, L
+    return X, A, M, L, mu, sigma
