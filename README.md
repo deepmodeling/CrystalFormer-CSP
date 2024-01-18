@@ -10,7 +10,6 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] for data start with carbon_24, write data parse to get LXA
 - [X] adapt trainning code at https://github.com/wangleiphy/ml4p/blob/main/projects/alanine_dipeptide.ipynb for the present case 
 - [X] move code from notebook to script 
-- [ ] write more tests 
 - [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
 - [ ] find out a way to evaluate the model, see whether this is indeed promising.
@@ -23,8 +22,13 @@ enhancement
 - [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
 - [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities
+- [ ] fix the primitive versus conventional cell issue when loading the mp_20 dataset
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
+
+always welcome
+- [ ] write more tests 
+- [ ] polishing the code
 
 production
 - [ ] high pressure dataset 
@@ -55,9 +59,12 @@ https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
 For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
+In practice, the space group label `G` plays two effect to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AM`, `L`) depends on it; 2) it determines the spacegroup_mask such as [111000] that very placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `make_spacegroup_lattice`  function. 
+
 Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have a special type 0 element. 
 Note that we have designed an encoding scheme for atom type and multipliciy into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, M| ...) = P(A| ... ) * P(M | ...)
 
+Note that we have to the lattice `L` to the very end of the sampling. That was due to the consideration that generating lattice out of vacumm is much harder than if we already have the lattice. 
 
 ## optimization 
 
