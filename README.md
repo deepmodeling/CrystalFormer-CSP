@@ -25,6 +25,7 @@ enhancement
 - [ ] fix the primitive versus conventional cell issue when loading the mp_20 dataset
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
+- [X] specify possible elements at sampling time
 
 always welcome
 - [ ] write more tests 

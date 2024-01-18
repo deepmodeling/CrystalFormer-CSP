@@ -12,8 +12,8 @@ mult_dict = {value: index for index, value in enumerate(mult_list)}
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
     AM = jnp.argmax(AM, axis=-1)
-    A = jnp.where(AM==0, jnp.zeros_like(AM), AM%(atom_types-1)+1)
-    M = jnp.where(AM==0, jnp.zeros_like(AM), AM//(atom_types-1)+1)
+    A = jnp.where(AM==0, jnp.zeros_like(AM), (AM-1)%(atom_types-1)+1)
+    M = jnp.where(AM==0, jnp.zeros_like(AM), (AM-1)//(atom_types-1)+1)
     return A, M    
 
 def shuffle(key, data):
@@ -63,7 +63,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
             assert (a < atom_types)
             assert (mult_dict[m] < mult_types)
             #print ('xxx', a, m)
-            am.append( (mult_dict[m]-1) * (atom_types-1)+ (a-1) )
+            am.append( (mult_dict[m]-1) * (atom_types-1)+ (a-1) +1 )
         AM.append( am + [0] * (n_max - num_sites) )
    
     G = jnp.array(G)
@@ -114,7 +114,6 @@ if __name__=='__main__':
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     print (A)
     print (M) 
-    sys.exit(1)
 
     print (M)
     print (mult_table[M]) # the actual degeneracy

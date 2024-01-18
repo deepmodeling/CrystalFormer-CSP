@@ -17,7 +17,7 @@ def inference(model, params, am_types, K, G, X, AM):
     return x_logit, loc, kappa, am_logit, lattice_params
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G):
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask):
     
     mult_table = jnp.array(mult_list[:mult_types])
     am_types = (atom_types -1)*(mult_types -1) + 1
@@ -44,9 +44,11 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
         x = sample_von_mises(key_x, loc, kappa, (batchsize, dim)) # [-pi, pi]
         x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
+        am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
+
         am = jax.random.categorical(key_am, am_logit, axis=1)  # am_logit.shape : (batchsize, )
-        m = jnp.where(am==0, jnp.zeros_like(am), am//(atom_types-1)+1)
-        a = jnp.where(am==0, jnp.zeros_like(am), am%(atom_types-1)+1)
+        m = jnp.where(am==0, jnp.zeros_like(am), (am-1)//(atom_types-1)+1)
+        a = jnp.where(am==0, jnp.zeros_like(am), (am-1)%(atom_types-1)+1)
         am = jax.nn.one_hot(am, am_types) # (batchsize, am_types)
 
         X = jnp.concatenate([X, x[:, None, :]], axis=1)

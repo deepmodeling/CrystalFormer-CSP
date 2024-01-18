@@ -6,6 +6,7 @@ import optax
 import os
 
 from utils import GLXAM_from_file
+from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
 from sample import sample_crystal
@@ -43,8 +44,8 @@ group.add_argument('--n_max', type=int, default=5, help='The maximum number of a
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
 group.add_argument('--mult_types', type=int, default=15, help='Number of possible multiplicites including 0')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
-group.add_argument('--G', type=int, nargs='+', help='The space group id to be sampled (1-230), e.g., 25, 99, 221')
-group.add_argument('--mult_list', type=int, nargs='+', default=[0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192], help='The mult table')
+group.add_argument('--spacegroup', type=int, nargs='+', help='The space group id to be sampled (1-230), e.g., 25, 99, 221')
+group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
 
 args = parser.parse_args()
 
@@ -57,6 +58,16 @@ if args.optimizer != "none":
     valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
 else:
     test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    
+    am_types = (args.atom_types -1)*(args.mult_types -1) + 1
+    if args.elements is not None:
+        idx = [element_dict[e] for e in args.elements]
+        am_mask = [1] + [1 if ((i-1)%(args.atom_types-1)+1 in idx) else 0 for i in range(1, am_types)]
+        am_mask = jnp.array(am_mask)
+    else:
+        am_mask = jnp.zeros((am_types), dtype=int)
+    print (args.elements)
+    print (am_mask)
 
 ################### Model #############################
 params, transformer = make_transformer(key, args.K, args.h0_size, 
@@ -116,7 +127,6 @@ else:
     batchsize = 10
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print (outputs.shape)
-    am_types = (args.atom_types -1)*(args.mult_types -1) + 1
     length, angle, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], [3, 6], axis=-1)
     length = length*num_atoms[:batchsize, None]**(1/3)
     mu = jnp.concatenate([length, angle], axis=1) 
@@ -128,15 +138,21 @@ else:
     print (sigma)
 
     print("\n========== Start sampling ==========")
-    G = jnp.array(args.G)
+    G = jnp.array(args.spacegroup)
     key, subkey = jax.random.split(key)
     idx = jax.random.choice(subkey, jnp.arange(len(G)), shape=(args.batchsize,))
     G = G[idx]
     print (G) 
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(G) 
     print (spacegroup_mask)
-    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G)
+    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
     print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
+    print (jnp.sum(mult_table[M], axis=1))  # num_atoms
     print (L)  # sample lattice
+    
+    for a in A: 
+       print([element_list[i] for i in a])
+        
+
