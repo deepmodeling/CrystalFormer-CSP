@@ -38,12 +38,12 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         #    Ga[analyzer.get_space_group_number()].append(structure.lattice.abc[0])
         #else:
         #    Ga[analyzer.get_space_group_number()] = [structure.lattice.abc[0]]
-
         #Ga.append(symmetrized_structure.equivalent_sites[0][0].specie.number)
 
         #print (structure.lattice.abc)
         G.append ([analyzer.get_space_group_number()])
-        L.append (structure.lattice.abc + structure.lattice.angles)
+        abc = tuple([l/structure.num_sites**(1./3.) for l in structure.lattice.abc])
+        L.append (abc + structure.lattice.angles) # scale length with number of total atoms
         num_sites = len(symmetrized_structure.equivalent_sites)
         assert (n_max >= num_sites)
         frac_coords = jnp.array([site[0].frac_coords for site in 

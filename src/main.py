@@ -127,10 +127,7 @@ else:
     batchsize = 10
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print (outputs.shape)
-    length, angle, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], [3, 6], axis=-1)
-    length = length*num_atoms[:batchsize, None]**(1/3)
-    mu = jnp.concatenate([length, angle], axis=1) 
-    
+    mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], 2, axis=-1)
     print (spacegroup_mask[:batchsize])
     print (jnp.argmax(G, axis=-1)[:batchsize]+1)
     print (L[:batchsize])
@@ -144,7 +141,7 @@ else:
     G = G[idx]
     print (G) 
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(G) 
-    X, A, M, L, mu, sigma = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
+    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
     print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
@@ -153,10 +150,7 @@ else:
     print (num_sites)
     print (num_atoms)
     
-    print (L)  # sample lattice
+    print (L)  # sampled lattice
 
-    print (mu[-5:])
-    print (sigma[-5:])
-    
     for a in A: 
        print([element_list[i] for i in a])

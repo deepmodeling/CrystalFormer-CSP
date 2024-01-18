@@ -24,7 +24,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
         am_types = AM.shape[-1]
 
         A, M = to_A_M(AM, atom_types)
-        num_sites, num_atoms = jnp.sum(A!=0), jnp.sum(mult_table[M])
+        num_sites = jnp.sum(A!=0)
 
         outputs = transformer(params, G, X, AM)
 
@@ -47,9 +47,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
-        length, angle, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], [3, 6])
-        length = length*num_atoms**(1/3)
-        mu = jnp.concatenate([length, angle])
+        mu, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], 2, axis=-1)
         logp_l = jax.scipy.stats.norm.logpdf(L,loc=mu,scale=sigma) # (6, )
         logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
