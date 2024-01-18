@@ -27,6 +27,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
         num_sites, num_atoms = jnp.sum(A!=0), jnp.sum(mult_table[M])
 
         outputs = transformer(params, G, X, AM)
+
         x_logit, loc, kappa, am_logit, _ = jnp.split(outputs[:-1], [K, 
                                                                    K+K*dim, 
                                                                    K+2*K*dim, 
@@ -46,7 +47,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
-        length, angle, sigma = jnp.split(outputs[num_sites+1, K+2*K*dim+am_types:], [3, 6])
+        length, angle, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], [3, 6])
         length = length*num_atoms**(1/3)
         mu = jnp.concatenate([length, angle])
         logp_l = jax.scipy.stats.norm.logpdf(L,loc=mu,scale=sigma) # (6, )
@@ -71,10 +72,6 @@ if __name__=='__main__':
 
     csv_file = '../data/mini.csv'
     G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
-    
-    from lattice import make_spacegroup_mask
-    spacegroup_mask = jax.vmap(make_spacegroup_mask)(jnp.argmax(G, axis=-1)+1) 
-    print (spacegroup_mask)
 
     am_types = AM.shape[-1]
 

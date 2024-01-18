@@ -86,13 +86,13 @@ def GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
 
 if __name__=='__main__':
     atom_types = 118
-    mult_types = 10
-    n_max = 20
+    mult_types = 6
+    n_max = 5
     dim = 3
 
     mult_table = jnp.array(mult_list[:mult_types])
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = 'mini.csv'
+    csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
     G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
     
@@ -103,17 +103,19 @@ if __name__=='__main__':
     
     print (jnp.argmax(G, axis=1))
     print (L)
-
     print (X)
 
     AM_flat = jnp.argmax(AM, axis=-1)
     print (AM_flat)
+
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     print (A)
-    
-    import numpy as np 
-    np.set_printoptions(threshold=np.inf)
+    print (M) 
+    sys.exit(1)
+
     print (M)
     print (mult_table[M]) # the actual degeneracy
     N = mult_table[M].sum(axis=1)

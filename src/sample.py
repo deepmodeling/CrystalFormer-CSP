@@ -57,8 +57,8 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
 
-    #adjust length according to atom number
-    length, angle, sigma = jnp.split(L[jnp.arange(batchsize), num_sites+1, :], [3, 6], axis=-1)
+    #scale length according to atom number
+    length, angle, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [3, 6], axis=-1)
     length = length*num_atoms[:, None]**(1/3)
     mu = jnp.concatenate([length, angle], axis=1)
 
