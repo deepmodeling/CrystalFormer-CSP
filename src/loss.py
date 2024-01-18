@@ -5,9 +5,11 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
-from utils import to_A_M, mult_table, mult_types
+from utils import to_A_M, mult_list
 
-def make_loss_fn(n_max, atom_types, K, transformer):
+def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
+
+    mult_table = jnp.array(mult_list[:mult_types])
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
     def logp_fn(params, G, L, X, AM):
@@ -43,7 +45,7 @@ def make_loss_fn(n_max, atom_types, K, transformer):
         logp_am = jnp.sum(am_logit[jnp.arange(n_max), AM_flat.astype(int)])  
 
         # first convert one-hot to integer, then look for mask
-        spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)) 
+        spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
         length, angle, sigma = jnp.split(outputs[num_sites+1, K+2*K*dim+am_types:], [3, 6])
         length = length*num_atoms**(1/3)
         mu = jnp.concatenate([length, angle])
@@ -62,6 +64,7 @@ if __name__=='__main__':
     from utils import GLXAM_from_file
     from transformer import make_transformer
     atom_types = 118 
+    mult_types = 10
     n_max = 20
     K = 8 
     dim = 3
@@ -86,7 +89,7 @@ if __name__=='__main__':
     print ('AM_flat.shape', jnp.argmax(AM, axis=-1).shape)
 
 
-    loss_fn = make_loss_fn(n_max, atom_types, K, transformer)
+    loss_fn = make_loss_fn(n_max, atom_types, mult_types, K, transformer)
     
     value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AM[:1])
     print (value)

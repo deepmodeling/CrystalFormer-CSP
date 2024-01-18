@@ -37,9 +37,9 @@ if __name__=='__main__':
     if True:
                 args = {'n_max':n_max, 
                         'atom_types': atom_types, 
+                        'mult_types': mult_types, 
                         'folder':resfolder,
                         'K':K,
-                        'mlp_size': mlp_size, 
                         'h0_size': h0_size, 
                         'transformer_layers':transformer_layers, 
                         'num_heads':num_heads, 

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import sample_von_mises
-from utils import to_A_M, mult_table
+from utils import to_A_M, mult_list
 from lattice import make_spacegroup_lattice
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=(0, 0, 0, 0, 0))
@@ -19,6 +19,7 @@ def inference(model, params, am_types, K, G, X, AM):
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
 def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G):
     
+    mult_table = jnp.array(mult_list[:mult_types])
     am_types = (atom_types -1)*(mult_types -1) + 1
 
     G = jax.nn.one_hot(G-1, 230).reshape(batchsize, 230)
@@ -63,6 +64,6 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
     key, key_l = jax.random.split(key)
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
-    L = jax.vmap(make_spacegroup_lattice)(jnp.argmax(G, axis=-1), L) # impose space group constraint to lattice params 
+    L = jax.vmap(make_spacegroup_lattice)(jnp.argmax(G, axis=-1)+1, L) # impose space group constraint to lattice params 
 
     return X, A, M, L

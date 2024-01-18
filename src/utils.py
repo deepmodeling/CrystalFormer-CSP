@@ -9,9 +9,6 @@ from functools import partial
 mult_list = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] # possible multiplicites 
 mult_dict = {value: index for index, value in enumerate(mult_list)}
 
-mult_table = jnp.array(mult_list)
-mult_types = len(mult_list)
-
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
     AM = jnp.argmax(AM, axis=-1)
@@ -88,9 +85,11 @@ def GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
 
 if __name__=='__main__':
     atom_types = 118
+    mult_types = 10
     n_max = 20
     dim = 3
 
+    mult_table = jnp.array(mult_list[:mult_types])
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = 'mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
