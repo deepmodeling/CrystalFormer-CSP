@@ -59,8 +59,9 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         am = []
         for site in symmetrized_structure.equivalent_sites:
             a = site[0].specie.number # element number 
-            assert (a < atom_types)
             m = len(site)             # multiplicity
+            assert (a < atom_types)
+            assert (mult_dict[m] < mult_types)
             #print ('xxx', a, m)
             am.append( (mult_dict[m]-1) * (atom_types-1)+ (a-1) )
         AM.append( am + [0] * (n_max - num_sites) )

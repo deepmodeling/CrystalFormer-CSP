@@ -33,7 +33,7 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
                                                                   K+K*dim, 
                                                                   K+2*K*dim, 
                                                                   K+2*K*dim+am_types, 
-                                                                  K+2*K*dim+am_types+3, 
+                                                                  K+2*K*dim+am_types+6, 
                                                                   ])
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 
@@ -79,7 +79,7 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
                                                                  K+K*dim, 
                                                                  K+2*K*dim, 
                                                                  K+2*K*dim+am_types,
-                                                                 K+2*K*dim+am_types+3, 
+                                                                 K+2*K*dim+am_types+6, 
                                                                  ], axis=-1)
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 

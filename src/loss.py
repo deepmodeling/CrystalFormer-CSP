@@ -64,13 +64,18 @@ if __name__=='__main__':
     from utils import GLXAM_from_file
     from transformer import make_transformer
     atom_types = 118 
-    mult_types = 10
-    n_max = 20
+    mult_types = 4
+    n_max = 5
     K = 8 
     dim = 3
 
-    csv_file = './mini.csv'
+    csv_file = '../data/mini.csv'
     G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
+    
+    from lattice import make_spacegroup_mask
+    spacegroup_mask = jax.vmap(make_spacegroup_mask)(jnp.argmax(G, axis=-1)+1) 
+    print (spacegroup_mask)
+
     am_types = AM.shape[-1]
 
     key = jax.random.PRNGKey(42)
