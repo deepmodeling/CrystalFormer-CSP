@@ -25,7 +25,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     G = jax.nn.one_hot(G-1, 230).reshape(batchsize, 230)
     X = jnp.zeros((batchsize, 0, dim))
     AM = jnp.zeros((batchsize, 0, am_types))
-    L = jnp.zeros((batchsize, 0, 12)) # we accumulate lattice params and sample lattice in the end
+    L = jnp.zeros((batchsize, 0, K+2*6*K)) # we accumulate lattice params and sample lattice after
 
     #TODO replace this with a lax.scan
     for i in range(n_max):
