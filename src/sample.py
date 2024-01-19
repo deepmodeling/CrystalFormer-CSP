@@ -41,7 +41,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
         kappa = kappa.reshape(batchsize, K, dim)
         kappa = kappa[jnp.arange(batchsize), k]
 
-        x = sample_von_mises(key_x, loc, kappa/temperature, (batchsize, dim)) # [-pi, pi]
+        x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
         x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
         am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)

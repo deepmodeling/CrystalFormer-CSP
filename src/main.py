@@ -151,6 +151,7 @@ else:
     for a in A[:batchsize]: 
        print([element_list[i] for i in a])
     print ("M\n",M[:batchsize])
+    print ("X\n",X[:batchsize])
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print ("outputs.shape", outputs.shape)
 
@@ -189,7 +190,7 @@ else:
     print (G) 
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(G) 
     X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask, args.temperature)
-    #print (X)
+    print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
 
