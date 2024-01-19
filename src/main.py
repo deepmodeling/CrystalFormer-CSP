@@ -107,7 +107,7 @@ if args.optimizer != "none":
     schedule = lambda t: args.lr/(1+args.lr_decay*t)
 
     if args.optimizer == "adam":
-        optimizer = optax.chain(optax.clip(args.clip_grad), 
+        optimizer = optax.chain(optax.clip_by_global_norm(args.clip_grad), 
                                 optax.scale_by_adam(), 
                                 optax.scale_by_schedule(schedule), 
                                 optax.scale(-1.))
