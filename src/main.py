@@ -17,7 +17,7 @@ import argparse
 parser = argparse.ArgumentParser(description='')
 
 group = parser.add_argument_group('training parameters')
-group.add_argument('--epochs', type=int, default=100000, help='')
+group.add_argument('--epochs', type=int, default=1000000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
 group.add_argument('--lr', type=float, default=1e-4, help='learning rate')
 group.add_argument('--lr_decay', type=float, default=1e-5, help='lr decay')
@@ -72,7 +72,8 @@ else:
     print (am_mask)
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.K, args.h0_size, 
+params, transformer = make_transformer(key, args.K, args.n_max, args.dim, 
+                                      args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.mult_types)
@@ -129,7 +130,7 @@ if args.optimizer != "none":
 else:
     print("\n========== Inference on test data ==========")
     G, L, X, AM = test_data
-
+    
     from lattice import make_spacegroup_mask
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(jnp.argmax(G, axis=-1)+1) # first convert one-hot to integer rep, then look for mask
     
@@ -141,8 +142,8 @@ else:
     print (num_sites)
     print (num_atoms)
 
-    
     batchsize = 10
+    print (jnp.argmax(G[:batchsize], axis=-1)+1)
     for a in A[:batchsize]: 
        print([element_list[i] for i in a])
     print (M[:batchsize])
@@ -152,7 +153,7 @@ else:
     print (spacegroup_mask[:batchsize])
     print (jnp.argmax(G, axis=-1)[:batchsize]+1)
     print (L[:batchsize])
-    print (mu)
+    print (jnp.exp(mu+ sigma**2/2))
     print (sigma)
 
     print("\n========== Start sampling ==========")

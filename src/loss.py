@@ -7,6 +7,9 @@ from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
 from utils import to_A_M, mult_list
 
+def lognorm_logpdf(x, mu, s):
+    return -(jnp.log(x)-mu)**2 / (2*s**2) - jnp.log(s*x*jnp.sqrt(2*jnp.pi))
+
 def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
     mult_table = jnp.array(mult_list[:mult_types])
@@ -48,7 +51,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
         mu, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], 2, axis=-1)
-        logp_l = jax.scipy.stats.norm.logpdf(L,loc=mu,scale=sigma) # (6, )
+        logp_l = lognorm_logpdf(L,mu,sigma) # (6, )
         logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
         return logp_x + logp_am + logp_l
@@ -62,7 +65,7 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 if __name__=='__main__':
     from utils import GLXAM_from_file
     from transformer import make_transformer
-    atom_types = 118 
+    atom_types = 119
     mult_types = 4
     n_max = 5
     K = 8 
@@ -75,7 +78,7 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, K, 128, 4, 4, 8, 16, atom_types, mult_types) 
+    params, transformer = make_transformer(key, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, mult_types) 
 
     outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0), out_axes=0)(params, G, X, AM)
     x_logit, loc, kappa, am_logit, _ = jnp.split(outputs[:, :-1], [K, 

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
+def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
@@ -16,7 +16,8 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
         AM: (n, am_types)
         '''
 
-        n, dim = X.shape[0], X.shape[1]
+        n = X.shape[0]
+        assert (X.shape[1] == dim)
         am_types = AM.shape[-1]
         output_size = K+2*K*dim+am_types+12
 
@@ -47,14 +48,19 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
         mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
 
         h = jnp.concatenate([G.reshape([1, 230]).repeat(n, axis=0), 
+                             jnp.arange(n).reshape(n, 1), 
                              jnp.cos(2*jnp.pi*X).reshape([n, dim]),
                              jnp.sin(2*jnp.pi*X).reshape([n, dim]),
                              AM, 
                              ], 
-                             axis=1) # (n, 230+3+3+am_types)
+                             axis=1) # (n, 230+1+3+3+am_types)
        
         h = hk.Linear(model_size, w_init=initializer)(h)
-        
+
+        #positional_embeddings = hk.get_parameter(
+        #                        'positional_embeddings', [n_max, model_size], init=initializer)
+        #h = h + positional_embeddings[:n, :]
+
         for _ in range(num_layers):
             attn_block = hk.MultiHeadAttention(num_heads=num_heads,
                                                key_size=key_size,
@@ -104,11 +110,10 @@ def make_transformer(key, K, h0_size, num_layers, num_heads, key_size, model_siz
         return h
  
 
-    n, dim = 24, 3
     G = jax.random.uniform(key, (230, ))
-    X = jax.random.uniform(key, (n, dim))
+    X = jax.random.uniform(key, (n_max, dim))
     am_types = (atom_types -1)*(mult_types -1) + 1
-    AM = jax.random.uniform(key, (n, am_types)) 
+    AM = jax.random.uniform(key, (n_max, am_types)) 
     params = network.init(key, G, X, AM)
     return params, network.apply
 
