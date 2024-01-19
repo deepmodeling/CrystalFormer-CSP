@@ -28,7 +28,9 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
     X = [] # fractional coordinate 
     AM = [] # atom type and multiplicity; 0 for placeholder
     for i, structure in enumerate(structures):
-        analyzer = SpacegroupAnalyzer(structure)
+        analyzer = SpacegroupAnalyzer(structure, symprec=0.1)   # a looser tolerance of 0.1 (the value used in Materials Project) is often needed.
+        refined_structure = analyzer.get_refined_structure()
+        analyzer = SpacegroupAnalyzer(refined_structure)
         symmetrized_structure = analyzer.get_symmetrized_structure()
         #print (analyzer.get_space_group_number(), symmetrized_structure)
         
@@ -41,7 +43,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
 
         #print (structure.lattice.abc)
         G.append ([analyzer.get_space_group_number()])
-        L.append (structure.lattice.abc+ structure.lattice.angles)
+        L.append (symmetrized_structure.lattice.abc+ symmetrized_structure.lattice.angles)
         num_sites = len(symmetrized_structure.equivalent_sites)
         frac_coords = jnp.array([site[0].frac_coords for site in 
                                 symmetrized_structure.equivalent_sites]).reshape(num_sites, dim)
