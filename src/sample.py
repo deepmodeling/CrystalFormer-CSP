@@ -17,7 +17,7 @@ def inference(model, params, am_types, K, G, X, AM):
     return x_logit, loc, kappa, am_logit, lattice_params
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask):
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask, temperature):
     
     mult_table = jnp.array(mult_list[:mult_types])
     am_types = (atom_types -1)*(mult_types -1) + 1
@@ -34,21 +34,19 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
         
         #sample coordinate from mixture of von-mises distribution 
         # k is (batchsize, ) integer array whose value in [0, K) 
-        k = jax.random.categorical(key_k, x_logit, axis=1)  # x_logit.shape : (batchsize, K)
+        k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
 
         loc = loc.reshape(batchsize, K, dim)
         loc = loc[jnp.arange(batchsize), k]
         kappa = kappa.reshape(batchsize, K, dim)
         kappa = kappa[jnp.arange(batchsize), k]
 
-        x = sample_von_mises(key_x, loc, kappa, (batchsize, dim)) # [-pi, pi]
+        x = sample_von_mises(key_x, loc, kappa/temperature, (batchsize, dim)) # [-pi, pi]
         x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
         am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
 
-        am = jax.random.categorical(key_am, am_logit, axis=1)  # am_logit.shape : (batchsize, )
-        m = jnp.where(am==0, jnp.zeros_like(am), (am-1)//(atom_types-1)+1)
-        a = jnp.where(am==0, jnp.zeros_like(am), (am-1)%(atom_types-1)+1)
+        am = jax.random.categorical(key_am, am_logit/temperature, axis=1)  # am_logit.shape : (batchsize, )
         am = jax.nn.one_hot(am, am_types) # (batchsize, am_types)
 
         X = jnp.concatenate([X, x[:, None, :]], axis=1)
@@ -63,13 +61,13 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
     key, key_k, key_l = jax.random.split(key, 3)
     # k is (batchsize, ) integer array whose value in [0, K) 
-    k = jax.random.categorical(key_k, l_logit, axis=1)  # x_logit.shape : (batchsize, K)
+    k = jax.random.categorical(key_k, l_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
 
     mu = mu.reshape(batchsize, K, 6)
     mu = mu[jnp.arange(batchsize), k]
     sigma = sigma.reshape(batchsize, K, 6)
     sigma = sigma[jnp.arange(batchsize), k]
-    L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
+    L = jax.random.normal(key_l, (batchsize, 6)) * sigma/temperature + mu # (batchsize, 6)
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)

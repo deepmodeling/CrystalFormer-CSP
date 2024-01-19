@@ -46,8 +46,11 @@ group.add_argument('--n_max', type=int, default=5, help='The maximum number of a
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
 group.add_argument('--mult_types', type=int, default=15, help='Number of possible multiplicites including 0')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
+
+group = parser.add_argument_group('sampling parameters')
 group.add_argument('--spacegroup', type=int, nargs='+', help='The space group id to be sampled (1-230), e.g., 25, 99, 221')
 group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
+group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
 args = parser.parse_args()
 
@@ -142,20 +145,41 @@ else:
     print (num_sites)
     print (num_atoms)
 
-    batchsize = 10
+    batchsize = 20
     print (jnp.argmax(G[:batchsize], axis=-1)+1)
+    print ("A\n", A[:batchsize])
     for a in A[:batchsize]: 
        print([element_list[i] for i in a])
-    print (M[:batchsize])
+    print ("M\n",M[:batchsize])
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
-    print (outputs.shape)
+    print ("outputs.shape", outputs.shape)
+
+    am_logit = outputs[:, :, args.K + 2*args.K*args.dim: args.K+2*args.K*args.dim+am_types]
+    print (am_logit.shape)
+    print ('am_types', am_types)
+
+    AM_map = jnp.argmax(am_logit, axis=-1) # (batchsize,n_max+1)
+    AM_map = jax.nn.one_hot(AM_map, am_types) # (batchsize,n_max+1,am_types)
+    print (AM_map.shape)
+    A_map, M_map = jax.vmap(to_A_M, (0, None))(AM_map, args.atom_types)
+    print ("A_map\n", A_map)
+    print ("M_map\n", M_map)
+        
+    # sample given ground truth
+    key, key_am = jax.random.split(key)
+    AM_sample = jax.random.categorical(key_am, am_logit, axis=-1)
+    AM_sample = jax.nn.one_hot(AM_sample, am_types) # (batchsize,n_max+1,am_types)
+    A_sample, M_sample = jax.vmap(to_A_M, (0, None))(AM_sample, args.atom_types)
+    print ("A_sample\n", A_sample)
+    print ("M_sample\n", M_sample)
+ 
     l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], [6, 6*args.K], axis=-1)
     print (spacegroup_mask[:batchsize])
     print (jnp.argmax(G, axis=-1)[:batchsize]+1)
     print (L[:batchsize])
     print (jnp.exp(l_logit))
-    print (mu)
-    print (sigma)
+    #print (mu)
+    #print (sigma)
 
     print("\n========== Start sampling ==========")
     G = jnp.array(args.spacegroup)
@@ -164,15 +188,14 @@ else:
     G = G[idx]
     print (G) 
     spacegroup_mask = jax.vmap(make_spacegroup_mask)(G) 
-    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask)
-    print (X)
+    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, G, am_mask, args.temperature)
+    #print (X)
     print (A)  # atom type
     print (mult_table[M])  # mutiplicities 
 
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
     print (num_sites)
     print (num_atoms)
-    
     print (L)  # sampled lattice
 
     for a in A: 
