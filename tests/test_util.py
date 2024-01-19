@@ -1,61 +1,19 @@
-import jax
-import jax.numpy as jnp
+from config import *
+from src.utils import GLXAM_from_structures
+
 import pandas as pd
-import numpy as np
-from pymatgen.core.structure import Structure, Lattice
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.core.structure import Structure
 
 
-def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
-    G = [] # space group
-    L = [] # abc alpha beta gamma
-    X = [] # fractional coordinate 
-    AM = [] # atom type and multiplicity; 0 for placeholder
-    for i, structure in enumerate(structures):
-        analyzer = SpacegroupAnalyzer(structure, symprec=0.1)
-        refined_structure = analyzer.get_refined_structure()
-        analyzer = SpacegroupAnalyzer(refined_structure)
-        symmetrized_structure = analyzer.get_symmetrized_structure()
-
-        G.append ([analyzer.get_space_group_number()])
-        L.append (symmetrized_structure.lattice.abc+ symmetrized_structure.lattice.angles)
-        num_sites = len(symmetrized_structure.equivalent_sites)
-        frac_coords = jnp.array([site[0].frac_coords for site in 
-                                symmetrized_structure.equivalent_sites]).reshape(num_sites, dim)
-        frac_coords = jnp.concatenate([frac_coords, 
-                                       jnp.full((n_max - num_sites, dim), 1e10)], 
-                                       axis = 0)
-        X.append (frac_coords)  
-    
-        #print (analyzer.get_space_group_number(), [site[0].specie.number for site in symmetrized_structure.equivalent_sites])
-        
-        am = []
-        for site in symmetrized_structure.equivalent_sites:
-            a = site[0].specie.number # element number 
-            assert (a < atom_types)
-            m = len(site)             # multiplicity
-            # print (f'sturct{i} {a}  {m}')
-            am.append( (m-1) * (atom_types-1)+ (a-1) )
-        AM.append( am + [0] * (n_max - num_sites) )
-   
-    G = jnp.array(G)
-    # G = jax.nn.one_hot(G-1, 230).reshape(-1, 230) # G-1 to shift 1-230 to 0-229  # for test
-    L = jnp.array(L).reshape(-1, 6)
-
-    X = jnp.array(X).reshape(-1, n_max, dim)
-    
-    AM = jnp.array(AM).reshape(-1, n_max)
-    am_types = (atom_types -1)*(mult_types -1) + 1
-    AM = jax.nn.one_hot(AM, am_types) # (-1, n_max, am_types)
-    return G, L, X, AM
-
-
-def main():
-    data = pd.read_csv('/data/zdcao/crystal_gpt/dataset/mp_20/train.csv')
+def test_spg_lattice_match():
+    data = pd.read_csv('./src/minival.csv') # it will take ~5 minutes for the whole val.csv
     cif_strings = data['cif']
     structures = [Structure.from_str(cif_string, fmt='cif') for cif_string in cif_strings]
 
     G, L, X, AM = GLXAM_from_structures(structures, atom_types=118, mult_types=6, n_max=20, dim=3)
+
+    # convert G from one-hot to index
+    G = jnp.argmax(G, axis=-1) + 1
 
     # Iterate over G and L arrays
     for idx, (space_group, lattice_params) in enumerate(zip(G, L)):
@@ -83,5 +41,4 @@ def main():
             assert np.allclose([a, b, c], [a, b, c], atol=abc_epsilon)
 
 
-if __name__ == "__main__":
-    main()
+test_spg_lattice_match()
