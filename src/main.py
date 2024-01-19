@@ -34,6 +34,7 @@ group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val
 group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
 group = parser.add_argument_group('transformer parameters')
+group.add_argument('--Nf', type=int, default=5, help='number of frequencies')
 group.add_argument('--K', type=int, default=8, help='number of modes in von-mises')
 group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
@@ -75,12 +76,12 @@ else:
     print (am_mask)
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.K, args.n_max, args.dim, 
+params, transformer = make_transformer(key, args.Nf, args.K, args.n_max, args.dim, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.mult_types)
-transformer_name = 'K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'Nf_%d_K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.Nf, args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 

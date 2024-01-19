@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
+def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
@@ -49,19 +49,22 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
 
         mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
 
-        h = jnp.concatenate([G.reshape([1, 230]).repeat(n, axis=0), 
-                             jnp.arange(n).reshape(n, 1), 
-                             jnp.cos(2*jnp.pi*X).reshape([n, dim]),
-                             jnp.sin(2*jnp.pi*X).reshape([n, dim]),
-                             AM, 
-                             ], 
-                             axis=1) # (n, 230+1+3+3+am_types)
-       
-        h = hk.Linear(model_size, w_init=initializer)(h)
+        h = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                            jax.nn.gelu,
+                            hk.Linear(model_size, w_init=initializer)]
+                            )(G)
+        
+        h = [h.reshape([1, model_size]).repeat(n, axis=0)] 
+        for f in range(1, Nf+1):
+            h += [jnp.cos(2*jnp.pi*X*f),
+                  jnp.sin(2*jnp.pi*X*f)]
+        h += [AM]
+        h = jnp.concatenate(h,axis=1) # (n, model_size+3*Nf+3*Nf+am_types)
+        h = hk.Linear(model_size, w_init=initializer)(h)  # (n, model_size)
 
-        #positional_embeddings = hk.get_parameter(
-        #                        'positional_embeddings', [n_max, model_size], init=initializer)
-        #h = h + positional_embeddings[:n, :]
+        positional_embeddings = hk.get_parameter(
+                                'positional_embeddings', [n_max, model_size], init=initializer)
+        h = h + positional_embeddings[:n, :]
 
         for _ in range(num_layers):
             attn_block = hk.MultiHeadAttention(num_heads=num_heads,

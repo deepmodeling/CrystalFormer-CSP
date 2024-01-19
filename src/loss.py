@@ -67,6 +67,7 @@ if __name__=='__main__':
     from transformer import make_transformer
     atom_types = 119
     mult_types = 4
+    Nf = 5
     n_max = 5
     K = 8 
     dim = 3
@@ -78,7 +79,7 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, mult_types) 
+    params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, mult_types) 
 
     outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0), out_axes=0)(params, G, X, AM)
     x_logit, loc, kappa, am_logit, _ = jnp.split(outputs[:, :-1], [K, 
