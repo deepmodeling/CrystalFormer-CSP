@@ -59,10 +59,17 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
     
-    mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], 2, axis=-1)
-    key, key_l = jax.random.split(key)
+    l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [K, K+6*K], axis=-1)
+
+    key, key_k, key_l = jax.random.split(key, 3)
+    # k is (batchsize, ) integer array whose value in [0, K) 
+    k = jax.random.categorical(key_k, l_logit, axis=1)  # x_logit.shape : (batchsize, K)
+
+    mu = mu.reshape(batchsize, K, 6)
+    mu = mu[jnp.arange(batchsize), k]
+    sigma = sigma.reshape(batchsize, K, 6)
+    sigma = sigma[jnp.arange(batchsize), k]
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma + mu # (batchsize, 6)
-    L = jnp.exp(L) # log-normal distribution to ensure positive numbers  
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)

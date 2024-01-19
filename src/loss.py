@@ -7,9 +7,6 @@ from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
 from utils import to_A_M, mult_list
 
-def lognorm_logpdf(x, mu, s):
-    return -(jnp.log(x)-mu)**2 / (2*s**2) - jnp.log(s*x*jnp.sqrt(2*jnp.pi))
-
 def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
     mult_table = jnp.array(mult_list[:mult_types])
@@ -50,8 +47,11 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
-        mu, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], 2, axis=-1)
-        logp_l = lognorm_logpdf(L,mu,sigma) # (6, )
+        l_logit, mu, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], [K, K+K*6], axis=-1)
+        mu = mu.reshape(K, 6)
+        sigma = sigma.reshape(K, 6)
+        logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) # (6, ) #(K, 6)
+        logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
         return logp_x + logp_am + logp_l

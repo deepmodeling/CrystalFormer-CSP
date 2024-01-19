@@ -19,7 +19,7 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
         n = X.shape[0]
         assert (X.shape[1] == dim)
         am_types = AM.shape[-1]
-        output_size = K+2*K*dim+am_types+12
+        output_size = K+2*K*dim+am_types+K+2*6*K
 
         initializer = hk.initializers.TruncatedNormal(0.01)
 
@@ -30,11 +30,12 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
                             )(G)
         #h0 = hk.get_parameter("h0", [output_size,], init=initializer)
 
-        x_logit, loc, kappa, am_logit, mu, sigma = jnp.split(h0, [K, 
+        x_logit, loc, kappa, am_logit, l_logit, mu, sigma = jnp.split(h0, [K, 
                                                                   K+K*dim, 
                                                                   K+2*K*dim, 
                                                                   K+2*K*dim+am_types, 
-                                                                  K+2*K*dim+am_types+6, 
+                                                                  K+2*K*dim+am_types+K, 
+                                                                  K+2*K*dim+am_types+K+K*6, 
                                                                   ])
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 
@@ -42,7 +43,8 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
         # normalization
         x_logit -= jax.scipy.special.logsumexp(x_logit)
         am_logit -= jax.scipy.special.logsumexp(am_logit)
-        h0 = jnp.concatenate([x_logit, loc, kappa, am_logit, mu, sigma])  # (output_size,)
+        l_logit -= jax.scipy.special.logsumexp(l_logit) 
+        h0 = jnp.concatenate([x_logit, loc, kappa, am_logit, l_logit, mu, sigma])  # (output_size,)
         if n==0: return h0.reshape(1, output_size)
 
         mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
@@ -81,11 +83,12 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
 
         h = _layer_norm(h)
         h = hk.Linear(output_size, w_init=initializer)(h)
-        x_logit, loc, kappa, am_logit, mu, sigma = jnp.split(h, [K, 
+        x_logit, loc, kappa, am_logit, l_logit, mu, sigma = jnp.split(h, [K, 
                                                                  K+K*dim, 
                                                                  K+2*K*dim, 
                                                                  K+2*K*dim+am_types,
-                                                                 K+2*K*dim+am_types+6, 
+                                                                 K+2*K*dim+am_types+K, 
+                                                                 K+2*K*dim+am_types+K+K*6, 
                                                                  ], axis=-1)
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 
@@ -93,6 +96,7 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
 
         # normalization
         x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
+        l_logit -= jax.scipy.special.logsumexp(l_logit, axis=1)[:, None] 
         
         AM_flat = jnp.argmax(AM, axis=-1) #(n,)
         mask = jnp.concatenate(
@@ -102,7 +106,7 @@ def make_transformer(key, K, n_max, dim, h0_size, num_layers, num_heads, key_siz
         am_logit = am_logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
         am_logit -= jax.scipy.special.logsumexp(am_logit, axis=1)[:, None] # normalization
 
-        h = jnp.concatenate([x_logit, loc, kappa, am_logit, mu, sigma], axis=-1) # (n, output_size)
+        h = jnp.concatenate([x_logit, loc, kappa, am_logit, l_logit, mu, sigma], axis=-1) # (n, output_size)
 
         h = jnp.concatenate( [h0.reshape(1, output_size), 
                               h
