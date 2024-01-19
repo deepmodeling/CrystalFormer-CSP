@@ -49,17 +49,21 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
 
         mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
 
-        h = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+        hG = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                             jax.nn.gelu,
                             hk.Linear(model_size, w_init=initializer)]
-                            )(G)
+                            )(G) # (model_size,)
+
+        hAM = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                            jax.nn.gelu,
+                            hk.Linear(model_size, w_init=initializer)]
+                            )(AM) # (n, model_size) 
         
-        h = [h.reshape([1, model_size]).repeat(n, axis=0)] 
+        h = [hG.reshape([1, model_size]).repeat(n, axis=0), hAM] 
         for f in range(1, Nf+1):
             h += [jnp.cos(2*jnp.pi*X*f),
                   jnp.sin(2*jnp.pi*X*f)]
-        h += [AM]
-        h = jnp.concatenate(h,axis=1) # (n, model_size+3*Nf+3*Nf+am_types)
+        h = jnp.concatenate(h,axis=1) # (n, 2*model_size+3*Nf+3*Nf)
         h = hk.Linear(model_size, w_init=initializer)(h)  # (n, model_size)
 
         positional_embeddings = hk.get_parameter(

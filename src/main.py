@@ -146,7 +146,7 @@ else:
     print (num_sites)
     print (num_atoms)
 
-    batchsize = 20
+    batchsize = args.batchsize
     print (jnp.argmax(G[:batchsize], axis=-1)+1)
     print ("A\n", A[:batchsize])
     for a in A[:batchsize]: 
