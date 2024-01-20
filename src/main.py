@@ -180,6 +180,17 @@ else:
     print ("A_sample\n", A_sample)
     print ("M_sample\n", M_sample)
 
+    outputs = outputs.reshape(batchsize, args.n_max+1, 2, am_types)[:, :, 1, :]
+    offset = args.K+2*args.K*args.dim 
+    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
+                                                      offset:offset+args.K+2*6*args.K], 
+                                                      [args.K, args.K+6*args.K], axis=-1)
+    print (spacegroup_mask[:batchsize])
+    print (jnp.argmax(G, axis=-1)[:batchsize]+1)
+    print (L[:batchsize])
+    print (jnp.exp(l_logit))
+    print (mu.reshape(batchsize, args.K, 6))
+    print (sigma.reshape(batchsize, args.K, 6))
  
     print("\n========== Start sampling ==========")
     G = jnp.array(args.spacegroup)

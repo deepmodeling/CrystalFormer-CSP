@@ -8,7 +8,7 @@ from lattice import make_spacegroup_lattice
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=0)
 def inference(model, params, am_types, K, G, X, AM):
-    return model(params, G, X, AM)[-2:]
+    return model(params, G, X, AM)
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
 def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask, temperature):
@@ -23,10 +23,10 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     L = jnp.zeros((batchsize, 0, K+2*6*K)) # we accumulate lattice params and sample lattice after
 
     #TODO replace this with a lax.scan
-    for i in range(2*n_max+2):
+    for i in range(2*n_max):
 
         if i%2 ==0:
-            outputs = inference(transformer, params, am_types, K, G, X, AM)
+            outputs = inference(transformer, params, am_types, K, G, X, AM)[:, -2:]
             outputs = outputs.reshape(batchsize, 2, am_types)
             am_logit = outputs[:, 0, :] # (batchsize, am_types)
 
@@ -42,7 +42,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
         else:
             # pad another zero to match the dimensionality of AM
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
-            outputs = inference(transformer, params, am_types, K, G, Xpad, AM)
+            outputs = inference(transformer, params, am_types, K, G, Xpad, AM)[:, -4:-2]
             outputs = outputs.reshape(batchsize, 2, am_types)
             hXL = outputs[:, 1, :] # (batchsize, am_types)
 

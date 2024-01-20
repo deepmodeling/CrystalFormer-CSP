@@ -15,7 +15,8 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         X: (n, dim)
         AM: (n, am_types)
         '''
-
+    
+        assert (X.shape[0] == AM.shape[0])
         n = X.shape[0]
         assert (X.shape[1] == dim)
         am_types = AM.shape[-1]
@@ -32,7 +33,7 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         # normalization
         am_logit -= jax.scipy.special.logsumexp(am_logit) # (am_types, )
         
-        if AM.shape[0] > 0: 
+        if n > 0: 
             hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                 jax.nn.gelu,
                                 hk.Linear(xl_types, w_init=initializer)]
