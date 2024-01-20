@@ -153,12 +153,17 @@ else:
        print([element_list[i] for i in a])
     print ("M\n",M[:batchsize])
     print ("X\n",X[:batchsize])
+
+    am_types = (args.atom_types -1)*(args.mult_types -1) + 1
+    xl_types = args.K+2*args.K*args.dim+args.K+2*6*args.K
+    print (am_types, xl_types)
+
     outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
     print ("outputs.shape", outputs.shape)
 
-    am_logit = outputs[:, :, args.K + 2*args.K*args.dim: args.K+2*args.K*args.dim+am_types]
+    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, am_types)
+    am_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, am_types)
     print (am_logit.shape)
-    print ('am_types', am_types)
 
     AM_map = jnp.argmax(am_logit, axis=-1) # (batchsize,n_max+1)
     AM_map = jax.nn.one_hot(AM_map, am_types) # (batchsize,n_max+1,am_types)
@@ -174,15 +179,8 @@ else:
     A_sample, M_sample = jax.vmap(to_A_M, (0, None))(AM_sample, args.atom_types)
     print ("A_sample\n", A_sample)
     print ("M_sample\n", M_sample)
- 
-    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], args.K+2*args.K*args.dim+am_types:], [6, 6*args.K], axis=-1)
-    print (spacegroup_mask[:batchsize])
-    print (jnp.argmax(G, axis=-1)[:batchsize]+1)
-    print (L[:batchsize])
-    print (jnp.exp(l_logit))
-    #print (mu)
-    #print (sigma)
 
+ 
     print("\n========== Start sampling ==========")
     G = jnp.array(args.spacegroup)
     key, subkey = jax.random.split(key)

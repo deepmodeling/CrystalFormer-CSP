@@ -19,56 +19,69 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         n = X.shape[0]
         assert (X.shape[1] == dim)
         am_types = AM.shape[-1]
-        output_size = K+2*K*dim+am_types+K+2*6*K
+        xl_types = K+2*K*dim+K+2*6*K
+        assert (am_types > xl_types)
 
         initializer = hk.initializers.TruncatedNormal(0.01)
 
-        # the first atom
-        h0 = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
-                            jax.nn.gelu,
-                            hk.Linear(output_size, w_init=initializer)]
-                            )(G)
-        #h0 = hk.get_parameter("h0", [output_size,], init=initializer)
-
-        x_logit, loc, kappa, am_logit, l_logit, mu, sigma = jnp.split(h0, [K, 
-                                                                  K+K*dim, 
-                                                                  K+2*K*dim, 
-                                                                  K+2*K*dim+am_types, 
-                                                                  K+2*K*dim+am_types+K, 
-                                                                  K+2*K*dim+am_types+K+K*6, 
-                                                                  ])
-        # ensure positivity
-        kappa = jax.nn.softplus(kappa) 
-        sigma = jax.nn.softplus(sigma)
+        # first atom
+        am_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                                  jax.nn.gelu,
+                                  hk.Linear(am_types, w_init=initializer)]
+                                  )(G)
         # normalization
-        x_logit -= jax.scipy.special.logsumexp(x_logit)
-        am_logit -= jax.scipy.special.logsumexp(am_logit)
-        l_logit -= jax.scipy.special.logsumexp(l_logit) 
-        h0 = jnp.concatenate([x_logit, loc, kappa, am_logit, l_logit, mu, sigma])  # (output_size,)
-        if n==0: return h0.reshape(1, output_size)
-
-        mask = jnp.tril(jnp.ones((1, n, n))) # mask for the attention matrix
-
-        hG = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
-                            jax.nn.gelu,
-                            hk.Linear(model_size, w_init=initializer)]
-                            )(G) # (model_size,)
-
-        hAM = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
-                            jax.nn.gelu,
-                            hk.Linear(model_size, w_init=initializer)]
-                            )(AM) # (n, model_size) 
+        am_logit -= jax.scipy.special.logsumexp(am_logit) # (am_types, )
         
-        h = [hG.reshape([1, model_size]).repeat(n, axis=0), hAM] 
-        for f in range(1, Nf+1):
-            h += [jnp.cos(2*jnp.pi*X*f),
-                  jnp.sin(2*jnp.pi*X*f)]
-        h = jnp.concatenate(h,axis=1) # (n, 2*model_size+3*Nf+3*Nf)
-        h = hk.Linear(model_size, w_init=initializer)(h)  # (n, model_size)
+        if AM.shape[0] > 0: 
+            hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                                jax.nn.gelu,
+                                hk.Linear(xl_types, w_init=initializer)]
+                                )(jnp.concatenate([G, AM[0, :]], axis=0)) # (xl_types, )
+     
+            x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL, [K, 
+                                                                     K+K*dim, 
+                                                                     K+2*K*dim, 
+                                                                     K+2*K*dim+K, 
+                                                                     K+2*K*dim+K+K*6, 
+                                                                      ])
+            # ensure positivity
+            kappa = jax.nn.softplus(kappa) 
+            sigma = jax.nn.softplus(sigma)
+            # normalization
+            x_logit -= jax.scipy.special.logsumexp(x_logit)
+            l_logit -= jax.scipy.special.logsumexp(l_logit) 
+            # make it up to am_types
+            hXL = jnp.concatenate([x_logit, loc, kappa, 
+                                   l_logit, mu, sigma, 
+                                   jnp.zeros(am_types-xl_types)])  # (am_size,)
+        else:
+            hXL = jnp.zeros((am_types,))
+        h0 = jnp.concatenate([am_logit[None, :], hXL[None, :]], axis=0)
+        if n == 0: return h0
 
-        positional_embeddings = hk.get_parameter(
-                                'positional_embeddings', [n_max, model_size], init=initializer)
-        h = h + positional_embeddings[:n, :]
+        mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
+
+        hAM = jnp.concatenate([jnp.arange(n).reshape(n, 1),   
+               G.reshape([1, 230]).repeat(n, axis=0), 
+               AM, 
+               ], axis=1) # (n, ...)
+        hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
+
+        hX = [jnp.arange(n).reshape(n, 1),
+              G.reshape([1, 230]).repeat(n, axis=0)
+              ]      
+        for f in range(1, Nf+1):
+            hX += [jnp.cos(2*jnp.pi*X*f),
+                   jnp.sin(2*jnp.pi*X*f)]
+        hX = jnp.concatenate(hX, axis=1) # (n, ...) 
+        hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
+
+        # interleave the two matrix
+        h = jnp.concatenate([hAM[:, None, :], hX[:, None, :]], axis=1) # (n, 2, model_size)
+        h = h.reshape(2*n, -1)                                        # (2*n, model_size)
+
+        del hAM 
+        del hX
 
         for _ in range(num_layers):
             attn_block = hk.MultiHeadAttention(num_heads=num_heads,
@@ -89,14 +102,25 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
             h = h + h_dense
 
         h = _layer_norm(h)
-        h = hk.Linear(output_size, w_init=initializer)(h)
-        x_logit, loc, kappa, am_logit, l_logit, mu, sigma = jnp.split(h, [K, 
-                                                                 K+K*dim, 
-                                                                 K+2*K*dim, 
-                                                                 K+2*K*dim+am_types,
-                                                                 K+2*K*dim+am_types+K, 
-                                                                 K+2*K*dim+am_types+K+K*6, 
-                                                                 ], axis=-1)
+        h = hk.Linear(am_types, w_init=initializer)(h) # (2*n, am_types)
+        
+        h = h.reshape(n, 2, -1)
+        am_logit, hXL = h[:, 0, :], h[:, 1, :]
+        
+        AM_flat = jnp.argmax(AM, axis=-1) #(n,)
+        am_mask = jnp.concatenate(
+                [ jnp.where(AM_flat==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                  jnp.zeros((n, am_types-1))
+                ], axis = 1 )  # (n, am_types) mask = 1 for those locations to place pad atoms of type 0
+        am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of pad atoms
+        am_logit -= jax.scipy.special.logsumexp(am_logit, axis=1)[:, None] # normalization
+
+        x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL[:, :xl_types], [K, 
+                                                                  K+K*dim, 
+                                                                  K+2*K*dim, 
+                                                                  K+2*K*dim+K, 
+                                                                  K+2*K*dim+K+K*6, 
+                                                                  ], axis=-1)
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 
         sigma = jax.nn.softplus(sigma)
@@ -104,20 +128,17 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         # normalization
         x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
         l_logit -= jax.scipy.special.logsumexp(l_logit, axis=1)[:, None] 
+
+        hXL = jnp.concatenate([x_logit, loc, kappa, 
+                               l_logit, mu, sigma,
+                               jnp.zeros((n, am_types - xl_types))
+                               ], axis=-1) # (n, am_types)
         
-        AM_flat = jnp.argmax(AM, axis=-1) #(n,)
-        mask = jnp.concatenate(
-                [ jnp.where(AM_flat==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
-                  jnp.zeros((n, am_types-1))
-                ], axis = 1 )  # (n, am_types) mask = 1 for those locations to place pad atoms of type 0
-        am_logit = am_logit + jnp.where(mask, 1e10, 0.0) # enhance the probability of pad atoms
-        am_logit -= jax.scipy.special.logsumexp(am_logit, axis=1)[:, None] # normalization
+        h = jnp.concatenate([am_logit[:, None, :], hXL[:, None, :]], axis=1) # (n, 2, am_types)
+        h = h.reshape(2*n, am_types) # (2*n, am_types)
 
-        h = jnp.concatenate([x_logit, loc, kappa, am_logit, l_logit, mu, sigma], axis=-1) # (n, output_size)
+        h = jnp.concatenate( [h0, h], axis = 0) # (2*n+2, am_types)
 
-        h = jnp.concatenate( [h0.reshape(1, output_size), 
-                              h
-                           ], axis = 0) # (n+1, output_size)
         return h
  
 

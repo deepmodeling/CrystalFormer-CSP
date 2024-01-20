@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-perov-debug-lscale-fix'
+nickname = 'mp-perov-debug-lscale-posemb-AM-X'
 
 ###############################
 atom_types = 119
@@ -20,7 +20,7 @@ optimizer = 'adamw'
 weight_decay = 1e-3
 lr = 1e-4
 lr_decay = 0.0
-clip_grad = 1.0 
+clip_grad = 1.0
 batchsize = 100
 epochs = 100000
 
@@ -49,7 +49,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a800
+#SBATCH --partition=v100
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00

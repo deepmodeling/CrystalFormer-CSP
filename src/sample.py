@@ -6,21 +6,16 @@ from von_mises import sample_von_mises
 from utils import to_A_M, mult_list
 from lattice import make_spacegroup_lattice
 
-@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=(0, 0, 0, 0, 0))
+@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=0)
 def inference(model, params, am_types, K, G, X, AM):
-    dim = X.shape[-1]
-    outputs = model(params, G, X, AM)
-    x_logit, loc, kappa, am_logit, lattice_params = jnp.split(outputs[-1], [K, K+K*dim, 
-                                                                K+2*K*dim, 
-                                                                K+2*K*dim+am_types, 
-                                                                ], axis=-1)
-    return x_logit, loc, kappa, am_logit, lattice_params
+    return model(params, G, X, AM)[-2:]
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
 def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask, temperature):
     
     mult_table = jnp.array(mult_list[:mult_types])
     am_types = (atom_types -1)*(mult_types -1) + 1
+    xl_types = K+2*K*dim+K+2*6*K
 
     G = jax.nn.one_hot(G-1, 230).reshape(batchsize, 230)
     X = jnp.zeros((batchsize, 0, dim))
@@ -28,31 +23,50 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     L = jnp.zeros((batchsize, 0, K+2*6*K)) # we accumulate lattice params and sample lattice after
 
     #TODO replace this with a lax.scan
-    for i in range(n_max):
-        x_logit, loc, kappa, am_logit, lattice_params = inference(transformer, params, am_types, K, G, X, AM)
-        key, key_k, key_x, key_am = jax.random.split(key, 4)
-        
-        #sample coordinate from mixture of von-mises distribution 
-        # k is (batchsize, ) integer array whose value in [0, K) 
-        k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
+    for i in range(2*n_max+2):
 
-        loc = loc.reshape(batchsize, K, dim)
-        loc = loc[jnp.arange(batchsize), k]
-        kappa = kappa.reshape(batchsize, K, dim)
-        kappa = kappa[jnp.arange(batchsize), k]
+        if i%2 ==0:
+            outputs = inference(transformer, params, am_types, K, G, X, AM)
+            outputs = outputs.reshape(batchsize, 2, am_types)
+            am_logit = outputs[:, 0, :] # (batchsize, am_types)
 
-        x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
-        x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
+            key, key_am = jax.random.split(key)
 
-        am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
+            am_logit = am_logit + jnp.where(am_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
 
-        am = jax.random.categorical(key_am, am_logit/temperature, axis=1)  # am_logit.shape : (batchsize, )
-        am = jax.nn.one_hot(am, am_types) # (batchsize, am_types)
+            am = jax.random.categorical(key_am, am_logit/temperature, axis=1)  # am_logit.shape : (batchsize, )
+            am = jax.nn.one_hot(am, am_types) # (batchsize, am_types)
 
-        X = jnp.concatenate([X, x[:, None, :]], axis=1)
-        AM = jnp.concatenate([AM, am[:, None, :]], axis=1)
+            AM = jnp.concatenate([AM, am[:, None, :]], axis=1)
+ 
+        else:
+            # pad another zero to match the dimensionality of AM
+            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
+            outputs = inference(transformer, params, am_types, K, G, Xpad, AM)
+            outputs = outputs.reshape(batchsize, 2, am_types)
+            hXL = outputs[:, 1, :] # (batchsize, am_types)
 
-        L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
+            key, key_k, key_x = jax.random.split(key, 3)
+            x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
+                                                                     [K, 
+                                                                      K+K*dim, 
+                                                                      K+2*K*dim, 
+                                                                    ], axis=-1)
+
+            #sample coordinate from mixture of von-mises distribution 
+            # k is (batchsize, ) integer array whose value in [0, K) 
+            k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
+
+            loc = loc.reshape(batchsize, K, dim)
+            loc = loc[jnp.arange(batchsize), k]
+            kappa = kappa.reshape(batchsize, K, dim)
+            kappa = kappa[jnp.arange(batchsize), k]
+
+            x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
+            x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
+            X = jnp.concatenate([X, x[:, None, :]], axis=1)
+
+            L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)

@@ -26,13 +26,15 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
         A, M = to_A_M(AM, atom_types)
         num_sites = jnp.sum(A!=0)
 
-        outputs = transformer(params, G, X, AM)
+        h = transformer(params, G, X, AM)
+        h = h.reshape(n_max+1, 2, -1)
+        hAM, hXL = h[:, 0, :], h[:, 1, :]
 
-        x_logit, loc, kappa, am_logit, _ = jnp.split(outputs[:-1], [K, 
-                                                                   K+K*dim, 
-                                                                   K+2*K*dim, 
-                                                                   K+2*K*dim+am_types, 
-                                                                   ], axis=-1) 
+        am_logit = hAM[:-1] # (n_max, am_types)
+        x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [K, 
+                                                      K+K*dim, 
+                                                      K+2*K*dim, 
+                                                      ], axis=-1) 
 
         loc = loc.reshape(n_max, K, dim)
         kappa = kappa.reshape(n_max, K, dim)
@@ -47,10 +49,11 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
-        l_logit, mu, sigma = jnp.split(outputs[num_sites, K+2*K*dim+am_types:], [K, K+K*6], axis=-1)
+        l_logit, mu, sigma = jnp.split(hXL[num_sites, 
+                                           K+2*K*dim:K+2*K*dim+K+2*6*K], [K, K+K*6], axis=-1)
         mu = mu.reshape(K, 6)
         sigma = sigma.reshape(K, 6)
-        logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) # (6, ) #(K, 6)
+        logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) #(K, 6)
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
@@ -80,18 +83,6 @@ if __name__=='__main__':
     key = jax.random.PRNGKey(42)
 
     params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, mult_types) 
-
-    outputs = jax.vmap(transformer, in_axes=(None, 0, 0, 0), out_axes=0)(params, G, X, AM)
-    x_logit, loc, kappa, am_logit, _ = jnp.split(outputs[:, :-1], [K, 
-                                                                  K+K*dim, 
-                                                                  K+2*K*dim, 
-                                                                  K+2*K*dim+am_types, 
-                                                                  ], axis=-1) 
-
-    print ('x_logit.shape', x_logit.shape)
-    print ('am_logit.shape', am_logit.shape)
-    print ('AM_flat.shape', jnp.argmax(AM, axis=-1).shape)
-
 
     loss_fn = make_loss_fn(n_max, atom_types, mult_types, K, transformer)
     
