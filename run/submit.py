@@ -26,13 +26,20 @@ if __name__=='__main__':
         sys.exit(1)
     #########################################################
 
+    from pygit2 import Repository
+    head = Repository('.').head
+    branch = head.shorthand + "-" + head.target.hex[:5]
+
+    resfolder = os.path.join(resfolder, branch) + '/'
+
     jobdir='../jobs/' + nickname + '/'
+    jobdir = os.path.join(jobdir, branch) + '/'
+
     cmd = ['mkdir', '-p', jobdir]
     subprocess.check_call(cmd)
 
     cmd = ['mkdir', '-p', resfolder]
     subprocess.check_call(cmd)
-    
     
     if True:
                 args = {'n_max':n_max, 
@@ -57,7 +64,7 @@ if __name__=='__main__':
                         'test_path' : test_path,  
                         }
 
-                logname = jobdir
+                logname = jobdir 
                 for key, val in args.items():
                     if not ('_path' in key or 'folder' in key):
                         k = str(key)

@@ -43,7 +43,7 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
             information about A the one hot code for atom type, and M the multplicities
             '''
             A, M = to_A_M(AM, atom_types) 
-            A = jax.nn.one_hot(A, am_types) # (n, atom_types)
+            A = jax.nn.one_hot(A, atom_types) # (n, atom_types)
             M = mult_table[M].reshape(n, 1) # (n, 1)
 
             hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
@@ -74,25 +74,27 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
 
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
 
-        hAM = jnp.concatenate([jnp.arange(n).reshape(n, 1),   
-               G.reshape([1, 230]).repeat(n, axis=0), 
-               A, # (n, atom_types)
-               M, # (n, 1)
-               ], axis=1) # (n, ...)
+        hAM = jnp.concatenate([G.reshape([1, 230]).repeat(n, axis=0), 
+                               A, # (n, atom_types)
+                               M, # (n, 1)
+                              ], axis=1) # (n, ...)
         hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
 
-        hX = [jnp.arange(n).reshape(n, 1),
-              G.reshape([1, 230]).repeat(n, axis=0)
-              ]      
+        hX = [G.reshape([1, 230]).repeat(n, axis=0)]      
         for f in range(1, Nf+1):
             hX += [jnp.cos(2*jnp.pi*X*f),
                    jnp.sin(2*jnp.pi*X*f)]
         hX = jnp.concatenate(hX, axis=1) # (n, ...) 
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
+
         # interleave the two matrix
         h = jnp.concatenate([hAM[:, None, :], hX[:, None, :]], axis=1) # (n, 2, model_size)
-        h = h.reshape(2*n, -1)                                        # (2*n, model_size)
+        h = h.reshape(2*n, -1)                                         # (2*n, model_size)
+
+        positional_embeddings = hk.get_parameter(
+                        'positional_embeddings', [2*n_max, model_size], init=initializer)
+        h = h + positional_embeddings[:2*n, :]
 
         del hAM 
         del hX

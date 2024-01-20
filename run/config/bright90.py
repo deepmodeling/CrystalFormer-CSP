@@ -3,13 +3,13 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-perov-debug-lscale-posemb-AM-X'
+nickname = 'mp-perov-debug-lscale-posemb1-AM-X-decode'
 
 ###############################
 atom_types = 119
 mult_types = 10
 
-K = 8
+K = 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
