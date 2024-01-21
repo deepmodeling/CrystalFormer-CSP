@@ -5,7 +5,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 
-from wyckoff import get_wyckoff_table
+from wyckoff import wyckoff_dict
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
@@ -44,8 +44,6 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         assert (structure.num_sites == symmetrized_structure.num_sites)
         
         g = analyzer.get_space_group_number()
-        mult_dict = get_wyckoff_table(g)
-
         G.append ([g])
         abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
         L.append (abc + symmetrized_structure.lattice.angles) # scale length with number of total atoms
@@ -60,17 +58,25 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
     
         #print (analyzer.get_space_group_number(), [site[0].specie.number for site in symmetrized_structure.equivalent_sites])
 
-     
+        #print (symmetrized_structure.equivalent_sites) 
         am = []
+        ws = []
         for i, site in enumerate(symmetrized_structure.equivalent_sites):
             a = site[0].specie.number # element number 
             #m = len(site)             # multiplicity
             wyckoff_symbol = symmetrized_structure.wyckoff_symbols[i]
-            print ('g, a, m, symbol', g, a, mult_dict[wyckoff_symbol], wyckoff_symbol)
+            m = wyckoff_dict[g-1][wyckoff_symbol]
+            print ('g, a, m, symbol', g, a, m, wyckoff_symbol)
             assert (a < atom_types)
-            assert (mult_dict[wyckoff_symbol] < mult_types)
-            am.append( (mult_dict[wyckoff_symbol]-1) * (atom_types-1)+ (a-1) +1 )
+            assert (m < mult_types)
+            am.append( (m-1) * (atom_types-1)+ (a-1) +1 )
+            ws.append( wyckoff_symbol)
+        #sort atoms according to lexicographic order of wyckoff symbol
+        combined = sorted(zip(ws, am))
+        sorted_ws, sorted_am = zip(*combined)
+        am = list(sorted_am)
         AM.append( am + [0] * (n_max - num_sites) )
+        print ('====================')
    
     G = jnp.array(G)
     G = jax.nn.one_hot(G-1, 230).reshape(-1, 230) # G-1 to shift 1-230 to 0-229

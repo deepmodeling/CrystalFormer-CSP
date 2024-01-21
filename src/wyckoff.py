@@ -1,160 +1,240 @@
-#see https://www.cryst.ehu.es/cgi-bin/cryst/programs/nph-wp-list?gnum=1
-import jax
-import jax.numpy as jnp 
-from functools import partial
-
-wyckoff_list = [[1],                          # 1
-                [1, 1, 1, 1, 1, 1, 1, 1, 2],  # 2
-                [1, 1, 1, 1, 2],              # 3 
-                [2],              # 4 
-                [2, 2, 4],  # 5 
-                [1, 2, 2],  # 6 
-                [2],        # 7 
-                [2, 4],     # 8 
-                [4], # 9 
-                [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 4], # 10
-                [2, 2, 2, 2, 2, 4], # 11 
-                [2, 2, 2, 2, 4, 4, 4, 4, 8], # 12 
-                [2, 2, 2, 2, 2, 2, 4], # 13
-                [2, 2, 2, 2, 4], # 14 
-                [4,4,4,4,4,8], # 15
-                [1]*8 + [2]*12 + [4], # 16
-                [2]*4 + [4], # 17
-                [2, 2, 4], # 18
-                [4], # 19
-                [4, 4, 8], # 20 
-                [2]*4 + [4]*7 + [8], # 21
-                [4]*4 + [8]*6 + [16], # 22
-                [2]*4 + [4]*6 + [8], # 23 
-                [4, 4, 4, 8], # 24
-                [1]*4 + [2]*4 + [4], # 25
-                [2, 2, 4], # 26 
-                [2, 2, 2, 2, 4] , # 27
-                [2, 2, 2, 4] , # 28
-                [4], # 29 
-                [2, 2, 4], # 30
-                [2, 4], # 31
-                [2, 2, 4], # 32
-                ]
-
-def make_wyckoff_table():
-    max_len = max(len(sublist) for sublist in wyckoff_list)
-
-    # Create a (10, 15) NumPy array filled with zeros
-    result_array = np.zeros((len(wyckoff_list), max_len), dtype=int)
-
-    # Fill in the values from wyckoff_list
-    for i, sublist in enumerate(wyckoff_list):
-        result_array[i, :len(sublist)] = sublist
-    return jnp.array(result_array)
-
-@partial(jax.jit, static_argnums=0)
-def apply_wyckoff_condition(g, m, xyz):
-
-    f_25 = [lambda x,y,z : jnp.array([0.0, 0.0, z]), 
-            lambda x,y,z : jnp.array([0.0, 0.5, z]), 
-            lambda x,y,z : jnp.array([0.5, 0.0, z]), 
-            lambda x,y,z : jnp.array([0.5, 0.5, z]), 
-            lambda x,y,z : jnp.array([x, 0.0 , z]), 
-            lambda x,y,z : jnp.array([x, 0.5, z]), 
-            lambda x,y,z : jnp.array([0.5, y, z])
-            ] 
-
-    f_47 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]), 
-            lambda x,y,z : jnp.array([0.5, 0.0, 0.0]), 
-            lambda x,y,z : jnp.array([0.5, 0.0, 0.5]), 
-            lambda x,y,z : jnp.array([0.5, 0.0, 0.5]), 
-            lambda x,y,z : jnp.array([0.0, 0.5, 0.0]), 
-            lambda x,y,z : jnp.array([0.5, 0.5, 0.0]), 
-            lambda x,y,z : jnp.array([0.0, 0.5, 0.5]), 
-            lambda x,y,z : jnp.array([0.5, 0.5, 0.5]), 
-            lambda x,y,z : jnp.array([x, 0.0, 0.0]), 
-            lambda x,y,z : jnp.array([x, 0.0, 0.5]), 
-            lambda x,y,z : jnp.array([x, 0.5, 0.0]), 
-            ]
-
-    f_99 = [lambda x,y,z : jnp.array([0.0, 0.0, z]), 
-            lambda x,y,z : jnp.array([0.5, 0.5, z]), 
-            lambda x,y,z : jnp.array([0.5, 0.0, z]), 
-            lambda x,y,z : jnp.array([x, x, z]), 
-            ]
-
-    f_123 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]),
-             lambda x,y,z : jnp.array([0.0, 0.0, 0.5]),
-             lambda x,y,z : jnp.array([0.5, 0.5, 0.0]),
-             lambda x,y,z : jnp.array([0.5, 0.5, 0.5]),
-             lambda x,y,z : jnp.array([0.0, 0.5, 0.5]),
-             lambda x,y,z : jnp.array([0.0, 0.5, 0.0]),
-             lambda x,y,z : jnp.array([0.0, 0.0, z]),
-             lambda x,y,z : jnp.array([0.5, 0.5, z]),
-            ]
-
-    f_221 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]), 
-             lambda x,y,z : jnp.array([0.5, 0.5, 0.5]), 
-             lambda x,y,z : jnp.array([0.0, 0.5, 0.5]), 
-             lambda x,y,z : jnp.array([0.5, 0.0, 0.0]), 
-             lambda x,y,z : jnp.array([x, 0.0, 0.0]), 
-             lambda x,y,z : jnp.array([x, 0.5, 0.5])
-            ]
-
-    fn_dict = {
-        25: f_25, 
-        47: f_47, 
-        99: f_99, 
-        123: f_123, 
-        221: f_221, 
-    }
-
-    x, y, z = xyz[0], xyz[1], xyz[2]
-    xyz = jax.lax.switch(m.sum(), fn_dict[g], x,y,z) # sum to get scalar
-
-    return xyz
-
-
-def get_wyckoff_table(g):
-
-    if g == 25:
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g"]
-    elif g == 47:
-        fn_list = ["1a", "1b", "1c", "1d", "1e", "1f", "1g", "1h", 
-                   "2i", "2j", "2k", "2l", "2m", "2n", "2o", "2p", "2q", "2r", "2s", "2t"
-                  ]
-
-    elif g == 99:
-        fn_list = ["1a", "1b", 
-                   "2c", 
-                   "4d"
+wyckoff_symbols = [ [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    ["1a", "1b", "1c", "1d", "2e", "2f", "2g"],  # 25
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    ["1a", "1b", "1c", "1d", "1e", "1f", "1g", "1h", "2i", "2j", "2k", "2l", "2m", "2n", "2o", "2p", "2q", "2r", "2s", "2t", "4u", "4v", "4w", "4x", "4y", "4z", "8A"],  # 47 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    ["1a", "1b", "2c", "4d", "4e", "4f", "8g"],  # 99
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    ["1a", "1b", "1c", "1d", "2e", "2f", "2g", "2h"], # 123 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    ["1a", "1b", "3c", "3d", "6e", "6f"], # 221
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""], 
+                    [""]
                    ]
 
-    elif g == 123:
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g", "2h", 
-                   ]
-
-    elif g == 221:
-        fn_list = ["1a", "1b",
-                   "3c", "3d", 
-                   "6e", "6f"
-                   ]
-    else:
-        raise NotImplementedError
-    
-    fn_list = ["0"] + fn_list
-    fn_dict = {value: index for index, value in enumerate(fn_list)}
-    return fn_dict # a table that maps Wyckoff symbol to an integer index 
-
+wyckoff_dict = []
+for ws in wyckoff_symbols:
+    ws = [""] + ws
+    wyckoff_dict.append( {value: index for index, value in enumerate(ws)} )
 
 if __name__=='__main__':
-    import numpy as np
 
-    wyckoff_table = make_wyckoff_table()
-
-    print (wyckoff_table)
-    
-    xyz = np.array([0.12, 0.23, 0.45])
-    g = 25 
-    m = jnp.array([0, 1, 2])
-    xyz = jax.vmap(apply_wyckoff_condition, (None, 0, None))(g, m, xyz)
-
-    print (xyz)
+    print (wyckoff_dict[47-1]['1a'])
