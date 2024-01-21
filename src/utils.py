@@ -3,11 +3,52 @@ import jax.numpy as jnp
 import pandas as pd
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+import importlib
 
 from functools import partial
 
-mult_list = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 192] # possible multiplicites 
-mult_dict = {value: index for index, value in enumerate(mult_list)}
+def get_sg_table(g):
+
+    if g == 25:
+        '''
+        _f1a = lambda x,y,z : 0., 0.,  z
+        _f1b = lambda x,y,z : 0., 1/2, z
+        _f1c = lambda x,y,z : 1/2, 0.,  z
+        _f1d = lambda x,y,z : 1/2, 1/2, z
+        _f2e = lambda x,y,z : x, 0, z
+        _f2f = lambda x,y,z : x, 1/2, z
+        _f2g = lambda x,y,z : 0, y, z
+        '''
+
+        fn_list = ["1a", "1b", "1c", "1d", 
+                   "2e", "2f", "2g"]
+    elif g == 47:
+        fn_list = ["1a", "1b", "1c", "1d", "1e", "1f", "1g", "1h", 
+                   "2i", "2j", "2k", "2l", "2m", "2n", "2o", "2p", "2q", "2r", "2s", "2t"
+                  ]
+
+    elif g == 99:
+        fn_list = ["1a", "1b", 
+                   "2c", 
+                   "4d"
+                   ]
+
+    elif g == 123:
+        fn_list = ["1a", "1b", "1c", "1d", 
+                   "2e", "2f", "2g", "2h", 
+                   ]
+
+    elif g == 221:
+        fn_list = ["1a", "1b",
+                   "3c", "3d", 
+                   "6e", "6f"
+                   ]
+    else:
+        raise NotImplementedError
+    
+    fn_list = ["0"] + fn_list
+    fn_dict = {value: index for index, value in enumerate(fn_list)}
+    return fn_dict # a table that maps Wyckoff symbol to an integer index 
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
@@ -30,7 +71,9 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
     X = [] # fractional coordinate 
     AM = [] # atom type and multiplicity; 0 for placeholder
     for i, structure in enumerate(structures):
-        analyzer = SpacegroupAnalyzer(structure)
+        analyzer = SpacegroupAnalyzer(structure, symprec=0.1)   # a looser tolerance of 0.1 (the value used in Materials Project) is often needed.
+        refined_structure = analyzer.get_refined_structure()
+        analyzer = SpacegroupAnalyzer(refined_structure)
         symmetrized_structure = analyzer.get_symmetrized_structure()
         #print (analyzer.get_space_group_number(), symmetrized_structure)
         
@@ -40,10 +83,15 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         #    Ga[analyzer.get_space_group_number()] = [structure.lattice.abc[0]]
         #Ga.append(symmetrized_structure.equivalent_sites[0][0].specie.number)
 
-        #print (structure.lattice.abc)
-        G.append ([analyzer.get_space_group_number()])
-        abc = tuple([l/structure.num_sites**(1./3.) for l in structure.lattice.abc])
-        L.append (abc + structure.lattice.angles) # scale length with number of total atoms
+        #print (structure.lattice.abc, symmetrized_structure.lattice.abc)
+        assert (structure.num_sites == symmetrized_structure.num_sites)
+        
+        g = analyzer.get_space_group_number()
+        mult_dict = get_sg_table(g)
+
+        G.append ([g])
+        abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
+        L.append (abc + symmetrized_structure.lattice.angles) # scale length with number of total atoms
         num_sites = len(symmetrized_structure.equivalent_sites)
         assert (n_max >= num_sites)
         frac_coords = jnp.array([site[0].frac_coords for site in 
@@ -54,15 +102,17 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         X.append (frac_coords)  
     
         #print (analyzer.get_space_group_number(), [site[0].specie.number for site in symmetrized_structure.equivalent_sites])
-        
+
+     
         am = []
-        for site in symmetrized_structure.equivalent_sites:
+        for i, site in enumerate(symmetrized_structure.equivalent_sites):
             a = site[0].specie.number # element number 
-            m = len(site)             # multiplicity
+            #m = len(site)             # multiplicity
+            wyckoff_symbol = symmetrized_structure.wyckoff_symbols[i]
+            print ('g, a, m, symbol', g, a, mult_dict[wyckoff_symbol], wyckoff_symbol)
             assert (a < atom_types)
-            assert (mult_dict[m] < mult_types)
-            #print ('xxx', a, m)
-            am.append( (mult_dict[m]-1) * (atom_types-1)+ (a-1) +1 )
+            assert (mult_dict[wyckoff_symbol] < mult_types)
+            am.append( (mult_dict[wyckoff_symbol]-1) * (atom_types-1)+ (a-1) +1 )
         AM.append( am + [0] * (n_max - num_sites) )
    
     G = jnp.array(G)
@@ -84,12 +134,11 @@ def GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim):
     return G, L, X, AM
 
 if __name__=='__main__':
-    atom_types = 118
-    mult_types = 6
+    atom_types = 119
+    mult_types = 10
     n_max = 5
     dim = 3
 
-    mult_table = jnp.array(mult_list[:mult_types])
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
@@ -100,9 +149,9 @@ if __name__=='__main__':
     print (X.shape)
     print (AM.shape)
     
-    print (jnp.argmax(G, axis=1))
     print (L)
     print (X)
+    print (jnp.argmax(G, axis=1)+1)
 
     AM_flat = jnp.argmax(AM, axis=-1)
     print (AM_flat)
@@ -113,9 +162,3 @@ if __name__=='__main__':
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     print (A)
     print (M) 
-
-    print (M)
-    print (mult_table[M]) # the actual degeneracy
-    N = mult_table[M].sum(axis=1)
-    print (N)
-

@@ -30,7 +30,7 @@ if __name__=="__main__":
     print (len(element_list))
     print (element_dict["H"])
         
-    atom_types = 118
+    atom_types = 119
     mult_types = 3
     am_types = (atom_types -1)*(mult_types -1) + 1
     print (am_types)

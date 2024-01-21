@@ -5,11 +5,9 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
-from utils import to_A_M, mult_list
+from utils import to_A_M
 
 def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
-
-    mult_table = jnp.array(mult_list[:mult_types])
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
     def logp_fn(params, G, L, X, AM):
@@ -69,7 +67,7 @@ if __name__=='__main__':
     from utils import GLXAM_from_file
     from transformer import make_transformer
     atom_types = 119
-    mult_types = 4
+    mult_types = 10
     Nf = 5
     n_max = 5
     K = 8 

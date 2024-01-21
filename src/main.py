@@ -158,7 +158,8 @@ else:
     xl_types = args.K+2*args.K*args.dim+args.K+2*6*args.K
     print (am_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
+    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], A[:batchsize], 
+                                                                                                   M[:batchsize])
     print ("outputs.shape", outputs.shape)
 
     outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, am_types)

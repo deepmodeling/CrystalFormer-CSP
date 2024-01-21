@@ -5,11 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from utils import to_A_M, mult_list
-
 def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, mult_types, widening_factor=4):
-
-    mult_table = jnp.array(mult_list[:mult_types])
 
     @hk.without_apply_rng
     @hk.transform
@@ -38,18 +34,10 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         am_logit -= jax.scipy.special.logsumexp(am_logit) # (am_types, )
         
         if n > 0: 
-            '''
-            here we unpack the am code so that the transformer get more physical 
-            information about A the one hot code for atom type, and M the multplicities
-            '''
-            A, M = to_A_M(AM, atom_types) 
-            A = jax.nn.one_hot(A, atom_types) # (n, atom_types)
-            M = mult_table[M].reshape(n, 1) # (n, 1)
-
             hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                 jax.nn.gelu,
                                 hk.Linear(xl_types, w_init=initializer)]
-                                )(jnp.concatenate([G, A[0,:], M[0,:]], axis=0)) # (xl_types, )
+                                )(jnp.concatenate([G, AM[0,:]], axis=0)) # (xl_types, )
      
             x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL, [K, 
                                                                      K+K*dim, 
@@ -75,8 +63,7 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
 
         hAM = jnp.concatenate([G.reshape([1, 230]).repeat(n, axis=0), 
-                               A, # (n, atom_types)
-                               M, # (n, 1)
+                               AM, # (n, am_types)
                               ], axis=1) # (n, ...)
         hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
 
@@ -86,7 +73,6 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
                    jnp.sin(2*jnp.pi*X*f)]
         hX = jnp.concatenate(hX, axis=1) # (n, ...) 
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
-
 
         # interleave the two matrix
         h = jnp.concatenate([hAM[:, None, :], hX[:, None, :]], axis=1) # (n, 2, model_size)
