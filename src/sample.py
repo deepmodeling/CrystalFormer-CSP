@@ -5,7 +5,8 @@ from functools import partial
 from von_mises import sample_von_mises
 from utils import to_A_M
 from lattice import make_spacegroup_lattice
-from wyckoff import apply_wyckoff_condition
+from wyckoff import wyckoff_table
+from symmetrize import apply_wyckoff_condition
 
 @partial(jax.vmap, in_axes=(None, None, None, None, None, 0, 0), out_axes=0)
 def inference(model, params, am_types, K, G, X, AM):
@@ -69,14 +70,13 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             am = jnp.argmax(am, axis=-1) 
             m = jnp.where(am==0, jnp.zeros_like(am), (am-1)//(atom_types-1)+1) # (batchsize, )
             x = jax.vmap(apply_wyckoff_condition, (None, 0, 0))(spacegroup, m-1, x) 
-
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites = jnp.sum(A!=0, axis=1)
-    num_atoms = 1.0 # TODO: need to compute it 
+    num_atoms = jnp.sum(wyckoff_table[spacegroup, M], axis=1)
     
     l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [K, K+6*K], axis=-1)
 
@@ -92,7 +92,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)
-    #length = length*num_atoms[:, None]**(1/3)
+    length = length*num_atoms[:, None]**(1/3)
     L = jnp.concatenate([length, angle], axis=-1)
 
     #impose space group constraint to lattice params

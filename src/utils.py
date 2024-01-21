@@ -5,7 +5,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 
-from wyckoff import wyckoff_dict
+from wyckoff import wyckoff_dict, wyckoff_table
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
@@ -124,4 +124,10 @@ if __name__=='__main__':
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     print (A)
-    print (M) 
+    print (M)
+    
+    @jax.vmap
+    def lookup(G, M):
+        return wyckoff_table[jnp.argmax(G), M] # (n_max, )
+    W = lookup(G, M) # (batchsize, n_max)
+    print (W.sum(axis=-1))
