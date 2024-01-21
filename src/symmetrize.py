@@ -3,17 +3,6 @@ import jax
 import jax.numpy as jnp 
 from functools import partial
 
-from wyckoff_table import wyckoff_list
-
-def make_wyckoff_table():
-    max_len = max(len(sublist) for sublist in wyckoff_list)
-    result_array = np.zeros((len(wyckoff_list), max_len), dtype=int)
-
-    # Fill in the values from wyckoff_list
-    for i, sublist in enumerate(wyckoff_list):
-        result_array[i, :len(sublist)] = sublist
-    return jnp.array(result_array)
-
 @partial(jax.jit, static_argnums=0)
 def apply_wyckoff_condition(g, m, xyz):
 
@@ -76,54 +65,13 @@ def apply_wyckoff_condition(g, m, xyz):
 
     return xyz
 
-
-def get_wyckoff_table(g):
-
-    if g == 25:
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g"]
-    elif g == 47:
-        fn_list = ["1a", "1b", "1c", "1d", "1e", "1f", "1g", "1h", 
-                   "2i", "2j", "2k", "2l", "2m", "2n", "2o", "2p", "2q", "2r", "2s", "2t"
-                  ]
-
-    elif g == 99:
-        fn_list = ["1a", "1b", 
-                   "2c", 
-                   "4d"
-                   ]
-
-    elif g == 123:
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g", "2h", 
-                   ]
-
-    elif g == 221:
-        fn_list = ["1a", "1b",
-                   "3c", "3d", 
-                   "6e", "6f"
-                   ]
-    else:
-        raise NotImplementedError
-    
-    fn_list = ["0"] + fn_list
-    fn_dict = {value: index for index, value in enumerate(fn_list)}
-    return fn_dict # a table that maps Wyckoff symbol to an integer index 
-
-
 if __name__=='__main__':
     import numpy as np
     np.set_printoptions(threshold=np.inf)
-
-    wyckoff_table = make_wyckoff_table()
-
-    print (wyckoff_table.shape)
-    
     xyz = np.array([0.12, 0.23, 0.45])
     g = 25 
     m = jnp.array([0, 1, 2])
     xyz = jax.vmap(apply_wyckoff_condition, (None, 0, None))(g, m, xyz)
-
     print (xyz)
 
 
