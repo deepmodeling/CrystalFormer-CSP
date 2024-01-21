@@ -76,7 +76,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
     num_sites = jnp.sum(A!=0, axis=1)
-    num_atoms = jnp.sum(wyckoff_table[spacegroup, M], axis=1)
+    num_atoms = jnp.sum(wyckoff_table[spacegroup-1, M], axis=1)
     
     l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [K, K+6*K], axis=-1)
 

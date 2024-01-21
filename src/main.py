@@ -12,6 +12,7 @@ from train import train
 from sample import sample_crystal
 from loss import make_loss_fn
 import checkpoint
+from wyckoff import wyckoff_table
 
 import argparse
 parser = argparse.ArgumentParser(description='')
@@ -194,6 +195,9 @@ else:
     print (X)
     print (A)  # atom type
     print (M)  # Wyckoff positions
+    W = wyckoff_table[args.spacegroup-1, M] # (batchsize, n_max)
+    print (W.shape)
+    print (W.sum(axis=-1))
     print (L)  # sampled lattice
     for a in A: 
        print([element_list[i] for i in a])

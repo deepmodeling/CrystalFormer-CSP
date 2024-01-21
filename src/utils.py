@@ -76,7 +76,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         sorted_ws, sorted_am = zip(*combined)
         am = list(sorted_am)
         AM.append( am + [0] * (n_max - num_sites) )
-        print ('====================')
+        print ('===================================')
    
     G = jnp.array(G)
     G = jax.nn.one_hot(G-1, 230).reshape(-1, 230) # G-1 to shift 1-230 to 0-229
