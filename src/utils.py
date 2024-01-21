@@ -3,52 +3,9 @@ import jax.numpy as jnp
 import pandas as pd
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-import importlib
-
 from functools import partial
 
-def get_sg_table(g):
-
-    if g == 25:
-        '''
-        _f1a = lambda x,y,z : 0., 0.,  z
-        _f1b = lambda x,y,z : 0., 1/2, z
-        _f1c = lambda x,y,z : 1/2, 0.,  z
-        _f1d = lambda x,y,z : 1/2, 1/2, z
-        _f2e = lambda x,y,z : x, 0, z
-        _f2f = lambda x,y,z : x, 1/2, z
-        _f2g = lambda x,y,z : 0, y, z
-        '''
-
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g"]
-    elif g == 47:
-        fn_list = ["1a", "1b", "1c", "1d", "1e", "1f", "1g", "1h", 
-                   "2i", "2j", "2k", "2l", "2m", "2n", "2o", "2p", "2q", "2r", "2s", "2t"
-                  ]
-
-    elif g == 99:
-        fn_list = ["1a", "1b", 
-                   "2c", 
-                   "4d"
-                   ]
-
-    elif g == 123:
-        fn_list = ["1a", "1b", "1c", "1d", 
-                   "2e", "2f", "2g", "2h", 
-                   ]
-
-    elif g == 221:
-        fn_list = ["1a", "1b",
-                   "3c", "3d", 
-                   "6e", "6f"
-                   ]
-    else:
-        raise NotImplementedError
-    
-    fn_list = ["0"] + fn_list
-    fn_dict = {value: index for index, value in enumerate(fn_list)}
-    return fn_dict # a table that maps Wyckoff symbol to an integer index 
+from wyckoff import get_wyckhoff_table
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
@@ -87,7 +44,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         assert (structure.num_sites == symmetrized_structure.num_sites)
         
         g = analyzer.get_space_group_number()
-        mult_dict = get_sg_table(g)
+        mult_dict = get_wyckhoff_table(g)
 
         G.append ([g])
         abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])

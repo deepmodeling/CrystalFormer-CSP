@@ -3,21 +3,21 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import sample_von_mises
-from utils import to_A_M, mult_list
+from utils import to_A_M
 from lattice import make_spacegroup_lattice
+from wyckoff import apply_wyckoff_condition
 
-@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0, 0), out_axes=0)
+@partial(jax.vmap, in_axes=(None, None, None, None, None, 0, 0), out_axes=0)
 def inference(model, params, am_types, K, G, X, AM):
     return model(params, G, X, AM)
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, G, am_mask, temperature):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9))
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, mult_types, K, spacegroup, am_mask, temperature):
     
-    mult_table = jnp.array(mult_list[:mult_types])
     am_types = (atom_types -1)*(mult_types -1) + 1
     xl_types = K+2*K*dim+K+2*6*K
 
-    G = jax.nn.one_hot(G-1, 230).reshape(batchsize, 230)
+    G = jax.nn.one_hot(spacegroup-1, 230) # (230,)
     X = jnp.zeros((batchsize, 0, dim))
     AM = jnp.zeros((batchsize, 0, am_types))
     L = jnp.zeros((batchsize, 0, K+2*6*K)) # we accumulate lattice params and sample lattice after
@@ -64,12 +64,18 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
+
+            # impose constrain based on space group and wyckhoff index
+            M = (jnp.argmax(AM, axis=-1)-1)//(atom_types-1)+1 # (batchsize, )
+            x = jax.vmap(apply_wyckoff_condition, (None, 0, 0))(spacegroup, M, x) 
+
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
     A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
-    num_sites, num_atoms = jnp.sum(A!=0, axis=1), jnp.sum(mult_table[M], axis=1)
+    num_sites = jnp.sum(A!=0, axis=1)
+    num_atoms = 1.0 # TODO: need to compute it 
     
     l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [K, K+6*K], axis=-1)
 
