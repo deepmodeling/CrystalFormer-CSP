@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from functools import partial
 
 @partial(jax.jit, static_argnums=0)
-def apply_wyckhoff_condition(g, m, xyz):
+def apply_wyckoff_condition(g, m, xyz):
 
     f_25 = [lambda x,y,z : jnp.array([0.0, 0.0, z]), 
             lambda x,y,z : jnp.array([0.0, 0.5, z]), 
@@ -66,7 +66,7 @@ def apply_wyckhoff_condition(g, m, xyz):
     return xyz
 
 
-def get_wyckhoff_table(g):
+def get_wyckoff_table(g):
 
     if g == 25:
         fn_list = ["1a", "1b", "1c", "1d", 
@@ -107,6 +107,6 @@ if __name__=='__main__':
     xyz = np.array([0.12, 0.23, 0.45])
     g = 25 
     m = jnp.array([0, 1, 2])
-    xyz = jax.vmap(apply_wyckhoff_condition, (None, 0, None))(g, m, xyz)
+    xyz = jax.vmap(apply_wyckoff_condition, (None, 0, None))(g, m, xyz)
 
     print (xyz)

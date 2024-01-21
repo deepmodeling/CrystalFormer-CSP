@@ -5,7 +5,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 
-from wyckoff import get_wyckhoff_table
+from wyckoff import get_wyckoff_table
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_M(AM, atom_types):
@@ -44,7 +44,7 @@ def GLXAM_from_structures(structures, atom_types, mult_types, n_max, dim):
         assert (structure.num_sites == symmetrized_structure.num_sites)
         
         g = analyzer.get_space_group_number()
-        mult_dict = get_wyckhoff_table(g)
+        mult_dict = get_wyckoff_table(g)
 
         G.append ([g])
         abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
