@@ -66,8 +66,9 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
             # impose constrain based on space group and wyckhoff index
-            M = (jnp.argmax(AM, axis=-1)-1)//(atom_types-1)+1 # (batchsize, )
-            x = jax.vmap(apply_wyckoff_condition, (None, 0, 0))(spacegroup, M, x) 
+            am = jnp.argmax(am, axis=-1) 
+            m = jnp.where(am==0, jnp.zeros_like(am), (am-1)//(atom_types-1)+1) # (batchsize, )
+            x = jax.vmap(apply_wyckoff_condition, (None, 0, 0))(spacegroup, m-1, x) 
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
@@ -91,10 +92,10 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)
-    length = length*num_atoms[:, None]**(1/3)
+    #length = length*num_atoms[:, None]**(1/3)
     L = jnp.concatenate([length, angle], axis=-1)
 
     #impose space group constraint to lattice params
-    L = jax.vmap(make_spacegroup_lattice)(jnp.argmax(G, axis=-1)+1, L)  
+    L = jax.vmap(make_spacegroup_lattice, (None, 0))(spacegroup, L)  
 
     return X, A, M, L

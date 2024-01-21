@@ -3,6 +3,51 @@ import jax
 import jax.numpy as jnp 
 from functools import partial
 
+wyckoff_list = [[1],                          # 1
+                [1, 1, 1, 1, 1, 1, 1, 1, 2],  # 2
+                [1, 1, 1, 1, 2],              # 3 
+                [2],              # 4 
+                [2, 2, 4],  # 5 
+                [1, 2, 2],  # 6 
+                [2],        # 7 
+                [2, 4],     # 8 
+                [4], # 9 
+                [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 4], # 10
+                [2, 2, 2, 2, 2, 4], # 11 
+                [2, 2, 2, 2, 4, 4, 4, 4, 8], # 12 
+                [2, 2, 2, 2, 2, 2, 4], # 13
+                [2, 2, 2, 2, 4], # 14 
+                [4,4,4,4,4,8], # 15
+                [1]*8 + [2]*12 + [4], # 16
+                [2]*4 + [4], # 17
+                [2, 2, 4], # 18
+                [4], # 19
+                [4, 4, 8], # 20 
+                [2]*4 + [4]*7 + [8], # 21
+                [4]*4 + [8]*6 + [16], # 22
+                [2]*4 + [4]*6 + [8], # 23 
+                [4, 4, 4, 8], # 24
+                [1]*4 + [2]*4 + [4], # 25
+                [2, 2, 4], # 26 
+                [2, 2, 2, 2, 4] , # 27
+                [2, 2, 2, 4] , # 28
+                [4], # 29 
+                [2, 2, 4], # 30
+                [2, 4], # 31
+                [2, 2, 4], # 32
+                ]
+
+def make_wyckoff_table():
+    max_len = max(len(sublist) for sublist in wyckoff_list)
+
+    # Create a (10, 15) NumPy array filled with zeros
+    result_array = np.zeros((len(wyckoff_list), max_len), dtype=int)
+
+    # Fill in the values from wyckoff_list
+    for i, sublist in enumerate(wyckoff_list):
+        result_array[i, :len(sublist)] = sublist
+    return jnp.array(result_array)
+
 @partial(jax.jit, static_argnums=0)
 def apply_wyckoff_condition(g, m, xyz):
 
@@ -61,7 +106,7 @@ def apply_wyckoff_condition(g, m, xyz):
     }
 
     x, y, z = xyz[0], xyz[1], xyz[2]
-    xyz = jax.lax.switch(m, fn_dict[g], x,y,z)
+    xyz = jax.lax.switch(m.sum(), fn_dict[g], x,y,z) # sum to get scalar
 
     return xyz
 
@@ -101,8 +146,11 @@ def get_wyckoff_table(g):
 
 
 if __name__=='__main__':
-
     import numpy as np
+
+    wyckoff_table = make_wyckoff_table()
+
+    print (wyckoff_table)
     
     xyz = np.array([0.12, 0.23, 0.45])
     g = 25 
