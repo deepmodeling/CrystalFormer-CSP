@@ -28,7 +28,6 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
     X = [] # fractional coordinate 
     AW = [] # atom type and wyck type; 0 for placeholder
     for i, structure in enumerate(structures):
-        print (structure)
         analyzer = SpacegroupAnalyzer(structure, symprec=0.1)   # a looser tolerance of 0.1 (the value used in Materials Project) is often needed.
         refined_structure = analyzer.get_refined_structure()
         analyzer = SpacegroupAnalyzer(refined_structure)
@@ -100,7 +99,7 @@ if __name__=='__main__':
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     #csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
-    csv_file = './mp.csv'
+    csv_file = './mp_problem.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
     print (G.shape)

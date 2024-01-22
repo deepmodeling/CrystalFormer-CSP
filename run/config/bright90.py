@@ -7,9 +7,8 @@ nickname = 'mp-perov-wyckoff-debug-sortx'
 
 ###############################
 atom_types = 119
-wyck_types = 10
 
-Kx, Kl = 8, 1
+Kx, Kl = 16, 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
@@ -19,7 +18,7 @@ model_size = 8
 optimizer = 'adamw'
 weight_decay = 1e-3
 lr = 1e-4
-lr_decay = 0.0
+lr_decay = 1e-5
 clip_grad = 1.0
 batchsize = 100
 epochs = 100000
@@ -28,12 +27,16 @@ dataset = 'perov'
 
 if dataset == 'perov':
     n_max = 5 
+    wyck_types = 10
+
     train_path = '/home/wanglei/cdvae/data/perov_5/train.csv'
     valid_path = '/home/wanglei/cdvae/data/perov_5/val.csv'
     test_path = '/home/wanglei/cdvae/data/perov_5/test.csv'
 
 elif dataset == 'mp':
     n_max = 20
+    wyck_types = 10
+
     train_path = '/home/wanglei/cdvae/data/mp_20/train.csv'
     valid_path = '/home/wanglei/cdvae/data/mp_20/val.csv'
     test_path = '/home/wanglei/cdvae/data/mp_20/test.csv'
@@ -49,7 +52,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=v100
+#SBATCH --partition=a800
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00
