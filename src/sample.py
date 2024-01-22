@@ -5,13 +5,13 @@ from functools import partial
 from von_mises import sample_von_mises
 from utils import to_A_W
 from lattice import make_spacegroup_lattice
-from wyckoff import wyckoff_table
+from wyckoff import mult_table
 from symmetrize import apply_wyckoff_condition
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
 def inference(model, params, atom_types, G, X, AW):
     A, W = to_A_W(AW, atom_types) 
-    M = wyckoff_table[G-1, W]  
+    M = mult_table[G-1, W]  
     return model(params, G, X, A, W, M)
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
@@ -72,7 +72,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
     A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
-    M = wyckoff_table[G-1, W]
+    M = mult_table[G-1, W]
     num_sites = jnp.sum(A!=0, axis=1)
     num_atoms = jnp.sum(M, axis=1)
     

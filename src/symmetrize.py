@@ -8,7 +8,8 @@ from f_n import *
 
 @partial(jax.jit, static_argnums=0)
 def apply_wyckoff_condition(g, m, xyz):
-
+    
+    #TODO can try nest lax.switch to support tractable g
     x, y, z = xyz[0], xyz[1], xyz[2]
     xyz = jax.lax.switch(m.sum(), fn_dict[g], x,y,z) # sum to get scalar
 

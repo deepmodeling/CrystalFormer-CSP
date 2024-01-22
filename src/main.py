@@ -12,7 +12,7 @@ from train import train
 from sample import sample_crystal
 from loss import make_loss_fn
 import checkpoint
-from wyckoff import wyckoff_table
+from wyckoff import mult_table
 
 import argparse
 parser = argparse.ArgumentParser(description='')
@@ -144,7 +144,7 @@ else:
     print (num_sites)
     @jax.vmap
     def lookup(G, W):
-        return wyckoff_table[G-1, W] # (n_max, )
+        return mult_table[G-1, W] # (n_max, )
     M = lookup(G, W) # (batchsize, n_max)
     num_atoms = M.sum(axis=-1)
     print (num_atoms)

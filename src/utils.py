@@ -6,7 +6,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 
-from wyckoff import wyckoff_dict, wyckoff_table
+from wyckoff import wyckoff_dict, mult_table
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_W(AW, atom_types):
@@ -97,9 +97,9 @@ if __name__=='__main__':
     dim = 3
 
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    #csv_file = '../data/mini.csv'
+    csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
-    csv_file = './mp_problem.csv'
+    #csv_file = './mp_problem.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
     print (G.shape)
@@ -119,6 +119,6 @@ if __name__=='__main__':
     
     @jax.vmap
     def lookup(G, W):
-        return wyckoff_table[G-1, W] # (n_max, )
+        return mult_table[G-1, W] # (n_max, )
     M = lookup(G, W) # (batchsize, n_max)
     print (M.sum(axis=-1))

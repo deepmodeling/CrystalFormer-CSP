@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 
-df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'wyckoff.csv'))
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/wyckoff_symbols.csv'))
 df['Wyckoff Positions'] = df['Wyckoff Positions'].apply(eval)  # convert string to list
 
 wyckoff_symbols = df['Wyckoff Positions'].tolist()
@@ -19,16 +19,16 @@ for ws in wyckoff_symbols:
     wyckoff_dict.append( {value: index for index, value in enumerate(ws)} )
 
 max_len = max(len(sublist) for sublist in wyckoff_list)
-wyckoff_table = np.zeros((len(wyckoff_list), max_len), dtype=int)
+mult_table = np.zeros((len(wyckoff_list), max_len), dtype=int)
 for i, sublist in enumerate(wyckoff_list):
-    wyckoff_table[i, :len(sublist)] = sublist
-wyckoff_table = jnp.array(wyckoff_table)
+    mult_table[i, :len(sublist)] = sublist
+mult_table = jnp.array(mult_table)
 
 if __name__=='__main__':
 
-    print (wyckoff_dict[47-1]['1a'])
-    print (wyckoff_table[25-1])
-    print (wyckoff_table[47-1])
-    print (wyckoff_table[99-1])
-    print (wyckoff_table[123-1])
-    print (wyckoff_table[221-1])
+    print (wyckoff_dict[47-1]['1a']) # wyckoff symbol -> ordering 
+    print (mult_table[25-1]) # space group id -> multiplicity table
+    print (mult_table[47-1])
+    print (mult_table[99-1])
+    print (mult_table[123-1])
+    print (mult_table[221-1])

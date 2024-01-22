@@ -6,7 +6,7 @@ from functools import partial
 from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
 from utils import to_A_W
-from wyckoff import wyckoff_table
+from wyckoff import mult_table
 
 def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
@@ -23,7 +23,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
         A, W = to_A_W(AW, atom_types) # (n_max,) (n_max,)
         num_sites = jnp.sum(A!=0)
-        M = wyckoff_table[G-1, W]  # (n_max,) multplicities
+        M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
 
         h = transformer(params, G, X, A, W, M)
