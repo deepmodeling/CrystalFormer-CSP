@@ -22,10 +22,13 @@ enhancement
 - [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
 - [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities
-- [ ] fix the primitive versus conventional cell issue when loading the mp_20 dataset
+- [X] fix the primitive versus conventional cell issue when loading the mp_20 dataset
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
 - [X] specify possible elements at sampling time
+- [ ] implement more wyckoff symbols in `wyckoff.py`
+- [ ] implement more symmetrize function in `symmetrize.py`
+- [ ] build up (230, 27, 3) mask for frac_coor d 
 
 always welcome
 - [ ] write more tests 
@@ -43,13 +46,14 @@ https://github.com/txie-93/cdvae/tree/main/data
 
 ## model 
 
-We will build an autoregressive model P(G, L, X, AM) = P (X_1, AM_1| G) P ( X_2, AM_2 | G, X_1, AM_1 ) ... P(L| ...)
+We will build an autoregressive model P(G, L, X, AW) = P (X_1, AW_1| G) P ( X_2, AW_2 | G, X_1, AW_1 ) ... P(L| ...)
 The autoregressive model will be a causal transformer (what else ?).
 
 G: space group
 L: lattice vector
 X: factional coordiate
-AM: atom type and multiplicity
+A: atom type
+W: wyckoff position
 
 Sec. A2 of [MatterGen paper](https://arxiv.org/abs/2312.03687) contains a discussion of the relevant symmetries between them. 
 
@@ -60,12 +64,13 @@ https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
 For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
-In practice, the space group label `G` plays two effect to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AM`, `L`) depends on it; 2) it determines the spacegroup_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `make_spacegroup_lattice`  function. 
+In practice, the space group label `G` plays several effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the spacegroup_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `make_spacegroup_lattice`  function.  3) it determines the wyckoff table so that W means different things depending on G. for example, `M` is the multiplicity, which is looked up from `W` depending the group `G`, 4) G and W together constraints on the factional coordinate that is currenly used in sampling (in future will also be used in training with a mask for frac_coord)
 
 Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have a special type 0 element. 
-Note that we have designed an encoding scheme for atom type and multipliciy into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, M| ...) = P(A| ... ) * P(M | ...)
+Note that we have designed an encoding scheme for atom type and multipliciy into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, W| ...) = P(A| ... ) * P(W | ...)
 
 Note that we have to the lattice `L` to the very end of the sampling. That was due to the consideration that generating lattice out of vacumm is much harder than if we already have the lattice. 
+
 
 ## optimization 
 
@@ -80,10 +85,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov-mixture-noangle-am/ --K 8 --mlp_size 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer adamw 
+python ../src/main.py --n_max 5 --atom_types 119 --wyck_types 10 --folder /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-38b5e/ --K 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.001 --clip_grad 1.0 --batchsize 100 --epochs 100000 --optimizer adamw --train_path /home/wanglei/cdvae/data/perov_5/train.csv --valid_path /home/wanglei/cdvae/data/perov_5/val.csv --test_path /home/wanglei/cdvae/data/perov_5/test.csv 
 ```
 
 sample
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 118 --mult_types 5 --folder /data/wanglei/crystalgpt/perov-mixture-noangle-am/ --K 8 --mlp_size 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 100 --epochs 100000 --optimizer none --restore_path /data/wanglei/crystalgpt/perov-mixture-noangle-am/adamw_bs_100_lr_0.0001_a_118_m_5_wd_0.001_mlp_16_K_8_h0_256_l_4_H_8_k_16_m_8/
+python ../src/main.py --n_max 5 --atom_types 119 --folder /data/wanglei/crystalgpt/mp-perov/ --K 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 20 --epochs 100000 --optimizer none --restore_path /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-38b5e/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_10_N_5_wd_0.001_Nf_5_K_16_h0_256_l_4_H_8_k_32_m_8/       --test_path /home/wanglei/crystal_gpt/data/mini.csv   --spacegroup 25  --wyck_types 10 --temperature 1.0
 ```

@@ -3,11 +3,11 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-perov-debug-lscale-posemb1-AM-X-decode'
+nickname = 'mp-perov-wyckoff-debug-sortx'
 
 ###############################
 atom_types = 119
-mult_types = 10
+wyck_types = 10
 
 K = 16
 h0_size = 256

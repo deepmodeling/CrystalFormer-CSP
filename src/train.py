@@ -12,8 +12,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
            
     @jax.jit
     def update(params, opt_state, data):
-        G, L, X, AM = data
-        value, grad = jax.value_and_grad(loss_fn)(params, G, L, X, AM)
+        G, L, X, AW = data
+        value, grad = jax.value_and_grad(loss_fn)(params, G, L, X, AW)
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
@@ -24,7 +24,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         key, subkey = jax.random.split(key)
         train_data = shuffle(subkey, train_data)
 
-        train_G, train_L, train_X, train_AM = train_data 
+        train_G, train_L, train_X, train_AW = train_data 
 
         train_loss = 0.0 
         num_samples = len(train_L)
@@ -35,25 +35,25 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
             data = train_G[start_idx:end_idx], \
                    train_L[start_idx:end_idx], \
                    train_X[start_idx:end_idx], \
-                   train_AM[start_idx:end_idx]
+                   train_AW[start_idx:end_idx]
 
             params, opt_state, loss = update(params, opt_state, data)
             train_loss += loss 
         train_loss = train_loss/num_batches
 
         if epoch % 100 == 0:
-            valid_G, valid_L, valid_X, valid_AM = valid_data 
+            valid_G, valid_L, valid_X, valid_AW = valid_data 
             valid_loss = 0.0 
             num_samples = len(valid_L)
             num_batches = math.ceil(num_samples / batchsize)
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * batchsize
                 end_idx = min(start_idx + batchsize, num_samples)
-                G, L, X, AM = valid_G[start_idx:end_idx], \
+                G, L, X, AW = valid_G[start_idx:end_idx], \
                               valid_L[start_idx:end_idx], \
                               valid_X[start_idx:end_idx], \
-                              valid_AM[start_idx:end_idx]
-                loss = loss_fn(params, G, L, X, AM)
+                              valid_AW[start_idx:end_idx]
+                loss = loss_fn(params, G, L, X, AW)
                 valid_loss += loss 
             valid_loss = valid_loss/num_batches
 

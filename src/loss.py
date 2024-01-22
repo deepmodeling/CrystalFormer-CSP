@@ -5,35 +5,32 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 from lattice import make_spacegroup_mask
-from utils import to_A_M
-#from wyckoff import wyckoff_table
+from utils import to_A_W
+from wyckoff import wyckoff_table
 
-def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
+def make_loss_fn(n_max, atom_types, wyck_types, K, transformer):
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
-    def logp_fn(params, G, L, X, AM):
+    def logp_fn(params, G, L, X, AW):
         '''
-        G: (230, )
-        L: [a, b, c, alpha, beta, gamma] 
+        G: scalar 
+        L: (6,) [a, b, c, alpha, beta, gamma] 
         X: (n_max, dim)
-        AM: (n_max, am_types)
+        AW: (n_max,)
         '''
         
         dim = X.shape[-1]
-        am_types = AM.shape[-1]
 
-        A, M = to_A_M(AM, atom_types) # (n_max,) (n_max,)
+        A, W = to_A_W(AW, atom_types) # (n_max,) (n_max,)
         num_sites = jnp.sum(A!=0)
+        M = wyckoff_table[G-1, W]  # (n_max,) multplicities
+        #num_atoms = jnp.sum(M)
 
-        #W = wyckoff_table[jnp.argmax(G), M]).reshape(n_max, 1) # (n_max, 1) multplicities
-        #num_atoms = jnp.sum(W)
-        #print (num_sites, num_atoms)
-
-        h = transformer(params, G, X, AM)
+        h = transformer(params, G, X, A, W, M)
         h = h.reshape(n_max+1, 2, -1)
-        hAM, hXL = h[:, 0, :], h[:, 1, :]
+        hAW, hXL = h[:, 0, :], h[:, 1, :]
 
-        am_logit = hAM[:-1] # (n_max, am_types)
+        aw_logit = hAW[:-1] # (n_max, am_types)
         x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [K, 
                                                       K+K*dim, 
                                                       K+2*K*dim, 
@@ -45,13 +42,12 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, K, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
     
-        AM_flat = jnp.argmax(AM, axis=-1) #(n_max, ) 
-        logp_x = jnp.sum(jnp.where((AM_flat>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
+        logp_x = jnp.sum(jnp.where((AW>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
 
-        logp_am = jnp.sum(am_logit[jnp.arange(n_max), AM_flat.astype(int)])  
+        logp_am = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
 
         # first convert one-hot to integer, then look for mask
-        spacegroup_mask = make_spacegroup_mask(jnp.argmax(G, axis=-1)+1) 
+        spacegroup_mask = make_spacegroup_mask(G) 
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
                                            K+2*K*dim:K+2*K*dim+K+2*6*K], [K, K+K*6], axis=-1)
         mu = mu.reshape(K, 6)
@@ -62,35 +58,33 @@ def make_loss_fn(n_max, atom_types, mult_types, K, transformer):
 
         return logp_x + logp_am + logp_l
 
-    def loss_fn(params, G, L, X, AM):
-        logp = logp_fn(params, G, L, X, AM)
+    def loss_fn(params, G, L, X, AW):
+        logp = logp_fn(params, G, L, X, AW)
         return -jnp.mean(logp)
         
     return loss_fn
 
 if __name__=='__main__':
-    from utils import GLXAM_from_file
+    from utils import GLXAW_from_file
     from transformer import make_transformer
     atom_types = 119
-    mult_types = 10
+    wyck_types = 10
     Nf = 5
     n_max = 5
     K = 8 
     dim = 3
 
     csv_file = '../data/mini.csv'
-    G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
-
-    am_types = AM.shape[-1]
+    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, mult_types) 
+    params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types) 
 
-    loss_fn = make_loss_fn(n_max, atom_types, mult_types, K, transformer)
+    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, K, transformer)
     
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AM[:1])
+    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AW[:1])
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1]-1.0, AM[:1])
+    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1]-1.0, AW[:1])
     print (value)

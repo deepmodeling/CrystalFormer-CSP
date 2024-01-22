@@ -5,7 +5,7 @@ from jax.flatten_util import ravel_pytree
 import optax
 import os
 
-from utils import GLXAM_from_file
+from utils import GLXAW_from_file
 from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
@@ -46,7 +46,7 @@ group.add_argument('--model_size', type=int, default=8, help='The model size')
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
-group.add_argument('--mult_types', type=int, default=15, help='Number of possible multiplicites including 0')
+group.add_argument('--wyck_types', type=int, default=15, help='Number of possible multiplicites including 0')
 group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
 
 group = parser.add_argument_group('sampling parameters')
@@ -61,18 +61,18 @@ key = jax.random.PRNGKey(42)
 
 ################### Data #############################
 if args.optimizer != "none":
-    train_data = GLXAM_from_file(args.train_path, args.atom_types, args.mult_types, args.n_max, args.dim)
-    valid_data = GLXAM_from_file(args.valid_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    train_data = GLXAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
+    valid_data = GLXAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
 else:
-    test_data = GLXAM_from_file(args.test_path, args.atom_types, args.mult_types, args.n_max, args.dim)
+    test_data = GLXAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
     
-    am_types = (args.atom_types -1)*(args.mult_types -1) + 1
+    aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     if args.elements is not None:
         idx = [element_dict[e] for e in args.elements]
-        am_mask = [1] + [1 if ((i-1)%(args.atom_types-1)+1 in idx) else 0 for i in range(1, am_types)]
-        am_mask = jnp.array(am_mask)
+        aw_mask = [1] + [1 if ((i-1)%(args.atom_types-1)+1 in idx) else 0 for i in range(1, aw_types)]
+        aw_mask = jnp.array(aw_mask)
     else:
-        am_mask = jnp.zeros((am_types), dtype=int)
+        am_mask = jnp.zeros((aw_types), dtype=int)
     print (args.elements)
     print (am_mask)
 
@@ -81,18 +81,18 @@ params, transformer = make_transformer(key, args.Nf, args.K, args.n_max, args.di
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types, args.mult_types)
+                                      args.atom_types, args.wyck_types)
 transformer_name = 'Nf_%d_K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.Nf, args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.mult_types, args.K, transformer)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.K, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
-                   + '_A_%g_M_%g_N_%g'%(args.atom_types, args.mult_types, args.n_max) \
+                   + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    +  "_" + transformer_name 
 os.makedirs(path, exist_ok=True)
@@ -134,70 +134,53 @@ if args.optimizer != "none":
 
 else:
     print("\n========== Inference on test data ==========")
-    G, L, X, AM = test_data
+    G, L, X, AW = test_data
+    print (G.shape, L.shape, X.shape, AW.shape)
     
-    from lattice import make_spacegroup_mask
-    spacegroup_mask = jax.vmap(make_spacegroup_mask)(jnp.argmax(G, axis=-1)+1) # first convert one-hot to integer rep, then look for mask
-    
-    from utils import to_A_M
-    A, M = jax.vmap(to_A_M, (0, None))(AM, args.atom_types)
+    from utils import to_A_W
+    A, W = jax.vmap(to_A_W, (0, None))(AW, args.atom_types)
     num_sites = jnp.sum(A!=0, axis=1)
     print (num_sites)
+    @jax.vmap
+    def lookup(G, W):
+        return wyckoff_table[G-1, W] # (n_max, )
+    M = lookup(G, W) # (batchsize, n_max)
+    num_atoms = M.sum(axis=-1)
+    print (num_atoms)
 
     batchsize = args.batchsize
-    print (jnp.argmax(G[:batchsize], axis=-1)+1)
+    print (G[:batchsize])
     print ("A\n", A[:batchsize])
     for a in A[:batchsize]: 
        print([element_list[i] for i in a])
-    print ("M\n",M[:batchsize])
+    print ("W\n",W[:batchsize])
     print ("X\n",X[:batchsize])
 
-    am_types = (args.atom_types -1)*(args.mult_types -1) + 1
+    aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     xl_types = args.K+2*args.K*args.dim+args.K+2*6*args.K
-    print (am_types, xl_types)
+    print (aw_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], AM[:batchsize])
+    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize])
     print ("outputs.shape", outputs.shape)
 
-    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, am_types)
-    am_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, am_types)
-    print (am_logit.shape)
+    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
+    aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
+    print (aw_logit.shape)
 
-    AM_map = jnp.argmax(am_logit, axis=-1) # (batchsize,n_max+1)
-    AM_map = jax.nn.one_hot(AM_map, am_types) # (batchsize,n_max+1,am_types)
-    print (AM_map.shape)
-    A_map, M_map = jax.vmap(to_A_M, (0, None))(AM_map, args.atom_types)
-    print ("A_map\n", A_map)
-    print ("M_map\n", M_map)
-        
     # sample given ground truth
-    key, key_am = jax.random.split(key)
-    AM_sample = jax.random.categorical(key_am, am_logit, axis=-1)
-    AM_sample = jax.nn.one_hot(AM_sample, am_types) # (batchsize,n_max+1,am_types)
-    A_sample, M_sample = jax.vmap(to_A_M, (0, None))(AM_sample, args.atom_types)
+    key, key_aw = jax.random.split(key)
+    AW_sample = jax.random.categorical(key_aw, aw_logit, axis=-1) # (batchsize, n_max+1, )
+    A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
     print ("A_sample\n", A_sample)
-    print ("M_sample\n", M_sample)
-
-    outputs = outputs.reshape(batchsize, args.n_max+1, 2, am_types)[:, :, 1, :]
-    offset = args.K+2*args.K*args.dim 
-    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
-                                                      offset:offset+args.K+2*6*args.K], 
-                                                      [args.K, args.K+6*args.K], axis=-1)
-    print (spacegroup_mask[:batchsize])
-    print (jnp.argmax(G, axis=-1)[:batchsize]+1)
-    print (L[:batchsize])
-    print (jnp.exp(l_logit))
-    print (mu.reshape(batchsize, args.K, 6))
-    print (sigma.reshape(batchsize, args.K, 6))
+    print ("W_sample\n", W_sample)
  
     print("\n========== Start sampling ==========")
-    X, A, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.mult_types, args.K, args.spacegroup, am_mask, args.temperature)
+    X, A, W, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.K, args.spacegroup, am_mask, args.temperature)
     print (X)
     print (A)  # atom type
-    print (M)  # Wyckoff positions
-    W = wyckoff_table[args.spacegroup-1, M] # (batchsize, n_max)
-    print (W.shape)
-    print (W.sum(axis=-1))
+    print (W)  # Wyckoff positions
+    print (M)
+    print (M.sum(axis=-1))
     print (L)  # sampled lattice
     for a in A: 
        print([element_list[i] for i in a])
