@@ -41,7 +41,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
             train_loss += loss 
         train_loss = train_loss/num_batches
 
-        if epoch % 100 == 0:
+        if epoch % 1000 == 0:
             valid_G, valid_L, valid_X, valid_AW = valid_data 
             valid_loss = 0.0 
             num_samples = len(valid_L)

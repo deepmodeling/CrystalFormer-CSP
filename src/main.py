@@ -36,7 +36,8 @@ group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test
 
 group = parser.add_argument_group('transformer parameters')
 group.add_argument('--Nf', type=int, default=5, help='number of frequencies')
-group.add_argument('--K', type=int, default=8, help='number of modes in von-mises')
+group.add_argument('--Kx', type=int, default=8, help='number of modes in von-mises')
+group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
 group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
@@ -77,18 +78,18 @@ else:
     print (am_mask)
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.Nf, args.K, args.n_max, args.dim, 
+params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, args.dim, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.wyck_types)
-transformer_name = 'Nf_%d_K_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.Nf, args.K, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'Nf_%d_K_%d_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.K, transformer)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
 
 print("\n========== Prepare logs ==========")
 path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
@@ -157,7 +158,7 @@ else:
     print ("X\n",X[:batchsize])
 
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
-    xl_types = args.K+2*args.K*args.dim+args.K+2*6*args.K
+    xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print (aw_types, xl_types)
 
     outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize])
@@ -173,9 +174,19 @@ else:
     A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
     print ("A_sample\n", A_sample)
     print ("W_sample\n", W_sample)
+
+    outputs = outputs.reshape(batchsize, args.n_max+1, 2, aw_types)[:, :, 1, :]
+    offset = args.Kx+2*args.Kx*args.dim 
+    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
+                                                      offset:offset+args.Kl+2*6*args.Kl], 
+                                                      [args.Kl, args.Kl+6*args.Kl], axis=-1)
+    print (L[:batchsize])
+    print (jnp.exp(l_logit))
+    print (mu.reshape(batchsize, args.Kl, 6))
+    print (sigma.reshape(batchsize, args.Kl, 6))
  
     print("\n========== Start sampling ==========")
-    X, A, W, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.K, args.spacegroup, am_mask, args.temperature)
+    X, A, W, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, am_mask, args.temperature)
     print (X)
     print (A)  # atom type
     print (W)  # Wyckoff positions

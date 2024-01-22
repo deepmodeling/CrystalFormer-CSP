@@ -9,7 +9,7 @@ nickname = 'mp-perov-wyckoff-debug-sortx'
 atom_types = 119
 wyck_types = 10
 
-K = 16
+Kx, Kl = 8, 1
 h0_size = 256
 transformer_layers = 4
 num_heads = 8

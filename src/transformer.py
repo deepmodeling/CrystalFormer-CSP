@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, widening_factor=4):
+def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, widening_factor=4):
 
     @hk.without_apply_rng
     @hk.transform
@@ -23,7 +23,7 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         assert (X.shape[1] == dim)
         
         aw_types = (atom_types -1)*(wyck_types-1) + 1
-        xl_types = K+2*K*dim+K+2*6*K
+        xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
         assert (aw_types > xl_types)
 
         G_one_hot = jax.nn.one_hot(G-1, 230)
@@ -48,11 +48,11 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
                                                    M[0, None]
                                                    ],axis=0)) #(230+atom_types+wyck_types+1, ) -> (xl_types, )
      
-            x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL, [K, 
-                                                                     K+K*dim, 
-                                                                     K+2*K*dim, 
-                                                                     K+2*K*dim+K, 
-                                                                     K+2*K*dim+K+K*6, 
+            x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL, [Kx, 
+                                                                      Kx+Kx*dim, 
+                                                                      Kx+2*Kx*dim, 
+                                                                      Kx+2*Kx*dim+Kl, 
+                                                                      Kx+2*Kx*dim+Kl+Kl*6, 
                                                                       ])
             # ensure positivity
             kappa = jax.nn.softplus(kappa) 
@@ -127,11 +127,11 @@ def make_transformer(key, Nf, K, n_max, dim, h0_size, num_layers, num_heads, key
         aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of pad atoms
         aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
 
-        x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL[:, :xl_types], [K, 
-                                                                  K+K*dim, 
-                                                                  K+2*K*dim, 
-                                                                  K+2*K*dim+K, 
-                                                                  K+2*K*dim+K+K*6, 
+        x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL[:, :xl_types], [Kx, 
+                                                                  Kx+Kx*dim, 
+                                                                  Kx+2*Kx*dim, 
+                                                                  Kx+2*Kx*dim+Kl, 
+                                                                  Kx+2*Kx*dim+Kl+Kl*6, 
                                                                   ], axis=-1)
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 

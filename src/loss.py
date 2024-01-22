@@ -8,7 +8,7 @@ from lattice import make_spacegroup_mask
 from utils import to_A_W
 from wyckoff import wyckoff_table
 
-def make_loss_fn(n_max, atom_types, wyck_types, K, transformer):
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
     def logp_fn(params, G, L, X, AW):
@@ -31,15 +31,15 @@ def make_loss_fn(n_max, atom_types, wyck_types, K, transformer):
         hAW, hXL = h[:, 0, :], h[:, 1, :]
 
         aw_logit = hAW[:-1] # (n_max, am_types)
-        x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [K, 
-                                                      K+K*dim, 
-                                                      K+2*K*dim, 
+        x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [Kx, 
+                                                      Kx+Kx*dim, 
+                                                      Kx+2*Kx*dim, 
                                                       ], axis=-1) 
 
-        loc = loc.reshape(n_max, K, dim)
-        kappa = kappa.reshape(n_max, K, dim)
+        loc = loc.reshape(n_max, Kx, dim)
+        kappa = kappa.reshape(n_max, Kx, dim)
 
-        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, K, dim)
+        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
     
         logp_x = jnp.sum(jnp.where((AW>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
@@ -49,10 +49,10 @@ def make_loss_fn(n_max, atom_types, wyck_types, K, transformer):
         # first convert one-hot to integer, then look for mask
         spacegroup_mask = make_spacegroup_mask(G) 
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
-                                           K+2*K*dim:K+2*K*dim+K+2*6*K], [K, K+K*6], axis=-1)
-        mu = mu.reshape(K, 6)
-        sigma = sigma.reshape(K, 6)
-        logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) #(K, 6)
+                                           Kx+2*Kx*dim:Kx+2*Kx*dim+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1)
+        mu = mu.reshape(Kl, 6)
+        sigma = sigma.reshape(Kl, 6)
+        logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) #(Kl, 6)
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
 
@@ -71,7 +71,7 @@ if __name__=='__main__':
     wyck_types = 10
     Nf = 5
     n_max = 5
-    K = 8 
+    Kx, Kl  = 8, 1
     dim = 3
 
     csv_file = '../data/mini.csv'
@@ -79,9 +79,9 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types) 
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types) 
 
-    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, K, transformer)
+    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
     value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AW[:1])
     print (value)

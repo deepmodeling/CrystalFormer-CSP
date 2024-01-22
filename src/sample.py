@@ -14,15 +14,15 @@ def inference(model, params, atom_types, G, X, AW):
     M = wyckoff_table[G-1, W]  
     return model(params, G, X, A, W, M)
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, K, G, aw_mask, temperature):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, G, aw_mask, temperature):
     
     aw_types = (atom_types -1)*(wyck_types -1) + 1
-    xl_types = K+2*K*dim+K+2*6*K
+    xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
 
     X = jnp.zeros((batchsize, 0, dim))
     AW = jnp.zeros((batchsize, 0), dtype=int)
-    L = jnp.zeros((batchsize, 0, K+2*6*K)) # we accumulate lattice paraws and sawple lattice after
+    L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice paraws and sawple lattice after
 
     #TODO replace this with a lax.scan
     for i in range(2*n_max):
@@ -47,18 +47,18 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             key, key_k, key_x = jax.random.split(key, 3)
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
-                                                                     [K, 
-                                                                      K+K*dim, 
-                                                                      K+2*K*dim, 
+                                                                     [Kx, 
+                                                                      Kx+Kx*dim, 
+                                                                      Kx+2*Kx*dim, 
                                                                     ], axis=-1)
 
             #sample coordinate from mixture of von-mises distribution 
-            # k is (batchsize, ) integer array whose value in [0, K) 
-            k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
+            # k is (batchsize, ) integer array whose value in [0, Kx) 
+            k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, Kx)
 
-            loc = loc.reshape(batchsize, K, dim)
+            loc = loc.reshape(batchsize, Kx, dim)
             loc = loc[jnp.arange(batchsize), k]
-            kappa = kappa.reshape(batchsize, K, dim)
+            kappa = kappa.reshape(batchsize, Kx, dim)
             kappa = kappa[jnp.arange(batchsize), k]
 
             x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
@@ -76,15 +76,15 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     num_sites = jnp.sum(A!=0, axis=1)
     num_atoms = jnp.sum(M, axis=1)
     
-    l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [K, K+6*K], axis=-1)
+    l_logit, mu, sigma = jnp.split(L[jnp.arange(batchsize), num_sites, :], [Kl, Kl+6*Kl], axis=-1)
 
     key, key_k, key_l = jax.random.split(key, 3)
-    # k is (batchsize, ) integer array whose value in [0, K) 
-    k = jax.random.categorical(key_k, l_logit/temperature, axis=1)  # x_logit.shape : (batchsize, K)
+    # k is (batchsize, ) integer array whose value in [0, Kl) 
+    k = jax.random.categorical(key_k, l_logit/temperature, axis=1)  # x_logit.shape : (batchsize, Kl)
 
-    mu = mu.reshape(batchsize, K, 6)
+    mu = mu.reshape(batchsize, Kl, 6)
     mu = mu[jnp.arange(batchsize), k]
-    sigma = sigma.reshape(batchsize, K, 6)
+    sigma = sigma.reshape(batchsize, Kl, 6)
     sigma = sigma[jnp.arange(batchsize), k]
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma/temperature + mu # (batchsize, 6)
     
