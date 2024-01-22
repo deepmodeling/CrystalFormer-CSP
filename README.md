@@ -27,8 +27,8 @@ enhancement
 - [ ] consider condition everying on the number of atoms 
 - [X] specify possible elements at sampling time
 - [ ] implement more wyckoff symbols in `wyckoff.py`
-- [ ] implement more symmetrize function in `symmetrize.py`
-- [ ] build up (230, 27, 3) mask for frac_coor d 
+- [ ] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
+- [ ] build up (230, 27, 3) mask for frac_coor 
 
 always welcome
 - [ ] write more tests 

@@ -1,4 +1,5 @@
-#see https://www.cryst.ehu.es/cgi-bin/cryst/programs/nph-wp-list?gnum=1
+#see https://www.cryst.ehu.es/cgi-bin/cryst/programs/nph-wp-list?gnum=
+#see https://github.com/qzhu2017/PyXtal/blob/master/pyxtal/database/wyckoff_list.csv
 import jax
 import jax.numpy as jnp 
 from functools import partial
@@ -12,7 +13,9 @@ def apply_wyckoff_condition(g, m, xyz):
             lambda x,y,z : jnp.array([0.5, 0.5, z]), 
             lambda x,y,z : jnp.array([x, 0.0 , z]), 
             lambda x,y,z : jnp.array([x, 0.5, z]), 
-            lambda x,y,z : jnp.array([0.5, y, z])
+            lambda x,y,z : jnp.array([0.0, y, z]),
+            lambda x,y,z : jnp.array([0.5, y, z]),
+            lambda x,y,z : jnp.array([x, y, z]),
             ] 
 
     f_47 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]), 
@@ -26,12 +29,16 @@ def apply_wyckoff_condition(g, m, xyz):
             lambda x,y,z : jnp.array([x, 0.0, 0.0]), 
             lambda x,y,z : jnp.array([x, 0.0, 0.5]), 
             lambda x,y,z : jnp.array([x, 0.5, 0.0]), 
+            lambda x,y,z : jnp.array([x, 0.5, 0.5]), 
             ]
 
     f_99 = [lambda x,y,z : jnp.array([0.0, 0.0, z]), 
             lambda x,y,z : jnp.array([0.5, 0.5, z]), 
             lambda x,y,z : jnp.array([0.5, 0.0, z]), 
             lambda x,y,z : jnp.array([x, x, z]), 
+            lambda x,y,z : jnp.array([x, 0.0, z]), 
+            lambda x,y,z : jnp.array([x, 0.5, z]), 
+            lambda x,y,z : jnp.array([x, y, z]), 
             ]
 
     f_123 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]),
@@ -42,6 +49,7 @@ def apply_wyckoff_condition(g, m, xyz):
              lambda x,y,z : jnp.array([0.0, 0.5, 0.0]),
              lambda x,y,z : jnp.array([0.0, 0.0, z]),
              lambda x,y,z : jnp.array([0.5, 0.5, z]),
+             lambda x,y,z : jnp.array([0.0, 0.5, z]),
             ]
 
     f_221 = [lambda x,y,z : jnp.array([0.0, 0.0, 0.0]), 
@@ -49,7 +57,8 @@ def apply_wyckoff_condition(g, m, xyz):
              lambda x,y,z : jnp.array([0.0, 0.5, 0.5]), 
              lambda x,y,z : jnp.array([0.5, 0.0, 0.0]), 
              lambda x,y,z : jnp.array([x, 0.0, 0.0]), 
-             lambda x,y,z : jnp.array([x, 0.5, 0.5])
+             lambda x,y,z : jnp.array([x, 0.5, 0.5]),
+             lambda x,y,z : jnp.array([x, x, x])
             ]
 
     fn_dict = {
