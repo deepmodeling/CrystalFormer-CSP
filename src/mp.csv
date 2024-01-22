@@ -1,0 +1,120 @@
+,material_id,formation_energy_per_atom,band_gap,pretty_formula,e_above_hull,elements,cif,spacegroup.number
+37228,mp-1221227,-1.637460082715517,0.2132999999999998,Na3MnCoNiO6,0.0430011104166663,"['Co', 'Mn', 'Na', 'Ni', 'O']","# generated using pymatgen
+data_Na3MnCoNiO6
+_symmetry_space_group_name_H-M   'P 1'
+_cell_length_a   7.97762755
+_cell_length_b   7.97762755
+_cell_length_c   5.63711369
+_cell_angle_alpha   72.48857871
+_cell_angle_beta   72.48857871
+_cell_angle_gamma   21.88936910
+_symmetry_Int_Tables_number   1
+_chemical_formula_structural   Na3MnCoNiO6
+_chemical_formula_sum   'Na3 Mn1 Co1 Ni1 O6'
+_cell_volume   127.31533261
+_cell_formula_units_Z   1
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  Na  Na0  1  0.33348900  0.33348900  0.00178500  1
+  Na  Na1  1  0.99987700  0.99987700  0.99972500  1
+  Na  Na2  1  0.66797500  0.66797500  0.99566200  1
+  Mn  Mn3  1  0.50017700  0.50017700  0.50073300  1
+  Co  Co4  1  0.82626400  0.82626400  0.49349200  1
+  Ni  Ni5  1  0.16703600  0.16703600  0.50580000  1
+  O  O6  1  0.92768300  0.92768300  0.69008100  1
+  O  O7  1  0.58132100  0.58132100  0.69828000  1
+  O  O8  1  0.25880500  0.25880500  0.71081800  1
+  O  O9  1  0.07075400  0.07075400  0.30547000  1
+  O  O10  1  0.75122900  0.75122900  0.29142500  1
+  O  O11  1  0.41538900  0.41538900  0.30672800  1
+",8
+4399,mp-643570,-1.6558437586805554,0.0,NiH2SO5,0.0,"['H', 'Ni', 'O', 'S']","# generated using pymatgen
+data_NiH2SO5
+_symmetry_space_group_name_H-M   'P 1'
+_cell_length_a   5.13713359
+_cell_length_b   5.13713359
+_cell_length_c   7.48924525
+_cell_angle_alpha   72.72000360
+_cell_angle_beta   72.72000360
+_cell_angle_gamma   96.29002777
+_symmetry_Int_Tables_number   1
+_chemical_formula_structural   NiH2SO5
+_chemical_formula_sum   'Ni2 H4 S2 O10'
+_cell_volume   175.91214310
+_cell_formula_units_Z   2
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  Ni  Ni0  1  0.00000000  0.50000000  0.50000000  1
+  Ni  Ni1  1  0.50000000  0.00000000  0.00000000  1
+  H  H2  1  0.62937100  0.54447700  0.79714400  1
+  H  H3  1  0.45552300  0.37062900  0.70285600  1
+  H  H4  1  0.37062900  0.45552300  0.20285600  1
+  H  H5  1  0.54447700  0.62937100  0.29714400  1
+  S  S6  1  0.09271100  0.90728900  0.75000000  1
+  S  S7  1  0.90728900  0.09271100  0.25000000  1
+  O  O8  1  0.22286900  0.81657400  0.90280300  1
+  O  O9  1  0.18342600  0.77713100  0.59719700  1
+  O  O10  1  0.77713100  0.18342600  0.09719700  1
+  O  O11  1  0.81657400  0.22286900  0.40280300  1
+  O  O12  1  0.17803300  0.21960700  0.65608400  1
+  O  O13  1  0.78039300  0.82196700  0.84391600  1
+  O  O14  1  0.82196700  0.78039300  0.34391600  1
+  O  O15  1  0.21960700  0.17803300  0.15608400  1
+  O  O16  1  0.61814100  0.38185900  0.75000000  1
+  O  O17  1  0.38185900  0.61814100  0.25000000  1
+",15
+35286,mp-1252764,-3.8352303706249993,7.4477,AlF3,0.0351393825000005,"['Al', 'F']","# generated using pymatgen
+data_AlF3
+_symmetry_space_group_name_H-M   'P 1'
+_cell_length_a   9.52670036
+_cell_length_b   3.63896336
+_cell_length_c   5.90514709
+_cell_angle_alpha   90.61382077
+_cell_angle_beta   149.85569715
+_cell_angle_gamma   89.11366893
+_symmetry_Int_Tables_number   1
+_chemical_formula_structural   AlF3
+_chemical_formula_sum   'Al2 F6'
+_cell_volume   102.79023342
+_cell_formula_units_Z   2
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  Al  Al0  1  0.55528800  0.30577900  0.03409900  1
+  Al  Al1  1  0.83022800  0.30562600  0.84821800  1
+  F  F2  1  0.19321700  0.30575100  0.44067100  1
+  F  F3  1  0.69402300  0.30578800  0.94327100  1
+  F  F4  1  0.83670200  0.80563500  0.86395600  1
+  F  F5  1  0.54823800  0.80579500  0.01779500  1
+  F  F6  1  0.91009000  0.29866100  0.65431600  1
+  F  F7  1  0.47507700  0.31269300  0.22767200  1
+",65
