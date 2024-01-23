@@ -58,8 +58,10 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
             ws.append( wyckoff_symbol)
             fc.append( x)
             print ('g, a, w, m, symbol', g, a, w, m, wyckoff_symbol, x)
-        #sort atoms according to lexicographic order of wyckoff symbol
-        idx = np.argsort(ws)
+        #sort atoms according to wyckoff symbol a-z,A
+        char = [''.join(filter(str.isalpha, s)) for s in ws]
+        if 'A' in char: raise NotImplementedError("Have not consider the case of wyckoff letter A")
+        idx = np.argsort(char)  
         ws = np.array(ws)[idx]
         aw = jnp.array(aw)[idx]
         fc = jnp.array(fc)[idx].reshape(num_sites, dim)
@@ -101,8 +103,9 @@ if __name__=='__main__':
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     #csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
-    #csv_file = './mp_problem.csv'
-    csv_file = '/data/zdcao/crystal_gpt/dataset/mp_20/symm_data/train.csv'
+    csv_file = './mini.csv'
+    #csv_file = '../data/symm_data/train.csv'
+
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
     print (G.shape)
@@ -110,18 +113,18 @@ if __name__=='__main__':
     print (X.shape)
     print (AW.shape)
     
-    print (L)
-    print (X)
+    print ('L:\n',L)
+    print ('X:\n',X)
 
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
     A, W = to_A_W(AW, atom_types)
-    print (A)
-    print (W)
+    print ('A:\n', A)
+    print ('W:\n', W)
     
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )
     M = lookup(G, W) # (batchsize, n_max)
-    print (M.sum(axis=-1))
+    print ('N:\n', M.sum(axis=-1))
