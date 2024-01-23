@@ -49,11 +49,17 @@ https://github.com/txie-93/cdvae/tree/main/data
 We will build an autoregressive model P(G, L, X, AW) = P (X_1, AW_1| G) P ( X_2, AW_2 | G, X_1, AW_1 ) ... P(L| ...)
 The autoregressive model will be a causal transformer (what else ?).
 
-G: space group
-L: lattice vector
-X: factional coordiate
-A: atom type
-W: wyckoff position
+`G`: space group 1-230
+
+`L`: lattice vector [a,b,c,alpha,beta,gamma]
+
+`X`: factional coordiate
+
+`A`: atom type (0 stands for empty)
+
+`W`: wyckoff symbol (0=empty, 1=a, 2=b, 3=c, ..., 28=A)  
+
+there is an associated data `M` stands for multiplicity, which can be read out by looking at the table `M=mult_table[G-1, W]`. 
 
 Sec. A2 of [MatterGen paper](https://arxiv.org/abs/2312.03687) contains a discussion of the relevant symmetries between them. 
 
@@ -64,9 +70,9 @@ https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
 For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
-In practice, the space group label `G` plays several effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the spacegroup_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `make_spacegroup_lattice`  function.  3) it determines the wyckoff table so that W means different things depending on G. for example, `M` is the multiplicity, which is looked up from `W` depending the group `G`, 4) G and W together constraints on the factional coordinate that is currenly used in sampling (in future will also be used in training with a mask for frac_coord)
+In practice, the space group label `G` plays three effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the lattice_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `symmetrize_lattice`  function.  3) G and W together constraints on the factional coordinate that is currenly used in training (via fc_mask) and  sampling (via apply_wyckoff_condition)
 
-Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have a special type 0 element. 
+Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have type 0. 
 Note that we have designed an encoding scheme for atom type and multipliciy into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, W| ...) = P(A| ... ) * P(W | ...)
 
 Note that we have to the lattice `L` to the very end of the sampling. That was due to the consideration that generating lattice out of vacumm is much harder than if we already have the lattice. 
