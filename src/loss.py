@@ -49,7 +49,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         fc_mask = jnp.logical_and((AW>0)[:, None], (fc_mask_table[G-1, W]>0)[None, :])
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
-        logp_am = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
+        logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
 
         # first convert one-hot to integer, then look for mask
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
@@ -60,7 +60,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
 
-        return logp_x + logp_am + logp_l
+        return logp_x + logp_aw + logp_l
 
     def loss_fn(params, G, L, X, AW):
         logp = logp_fn(params, G, L, X, AW)

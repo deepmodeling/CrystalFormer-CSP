@@ -21,13 +21,13 @@ enhancement
 - [X] consider perov_5 dataset
 - [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
-- [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities
+~~- [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities~~
 - [X] fix the primitive versus conventional cell issue when loading the mp_20 dataset
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
 - [X] specify possible elements at sampling time
-- [ ] implement more wyckoff symbols in `wyckoff.py`
-- [ ] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
+- [X] implement more wyckoff symbols in `wyckoff.py`
+- [X] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
 - [X] build up (230, 28, 3) fc mask
 
 always welcome
@@ -55,9 +55,9 @@ The autoregressive model will be a causal transformer (what else ?).
 
 `X`: factional coordiate
 
-`A`: atom type (0 stands for empty)
+`A`: atom type (0 stands for empty, 1=H, ..., 118=Og)
 
-`W`: wyckoff symbol (0=empty, 1=a, 2=b, 3=c, ..., 28=A)  
+`W`: wyckoff symbol (0=empty, 1=a, 2=b, 3=c, ..., 27=A)  
 
 there is an associated data `M` stands for multiplicity, which can be read out by looking at the table `M=mult_table[G-1, W]`. 
 
@@ -72,8 +72,8 @@ For space group other than P1, we sample the Wyckoff positions. Note that there 
 
 In practice, the space group label `G` plays three effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the lattice_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `symmetrize_lattice`  function.  3) G and W together constraints on the factional coordinate that is currenly used in training (via fc_mask) and  sampling (via apply_wyckoff_condition)
 
-Since the number of atoms can vary, we will pad the atoms to the same length. The paded atoms have type 0. 
-Note that we have designed an encoding scheme for atom type and multipliciy into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, W| ...) = P(A| ... ) * P(W | ...)
+Since the number of atoms may vary, we will pad the atoms to the same length up to `n_max`. The paded atoms have type 0. 
+Note that we have designed an encoding scheme for atom type and wyckoff symbol into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, W| ...) = P(A| ... ) * P(W | ...)
 
 Note that we have to the lattice `L` to the very end of the sampling. That was due to the consideration that generating lattice out of vacumm is much harder than if we already have the lattice. 
 
