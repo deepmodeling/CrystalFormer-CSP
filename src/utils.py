@@ -5,6 +5,7 @@ import pandas as pd
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
+from ast import literal_eval
 
 from wyckoff import wyckoff_dict, mult_table
 
@@ -28,9 +29,9 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
     X = [] # fractional coordinate 
     AW = [] # atom type and wyck type; 0 for placeholder
     for i, structure in enumerate(structures):
-        analyzer = SpacegroupAnalyzer(structure, symprec=0.1)   # a looser tolerance of 0.1 (the value used in Materials Project) is often needed.
-        refined_structure = analyzer.get_refined_structure()
-        analyzer = SpacegroupAnalyzer(refined_structure)
+        analyzer = SpacegroupAnalyzer(structure, symprec=0.01) 
+        # refined_structure = analyzer.get_refined_structure()
+        # analyzer = SpacegroupAnalyzer(refined_structure)
         symmetrized_structure = analyzer.get_symmetrized_structure()
 
         sg = analyzer.get_space_group_symbol()
@@ -86,21 +87,22 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
 def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
-    structures = [Structure.from_str(cif, fmt="cif") for cif in cif_strings]
+    structures = [Structure.from_dict(literal_eval(cif)) for cif in cif_strings]
     G, L, X, AW = GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim)
     return G, L, X, AW
 
 if __name__=='__main__':
     atom_types = 119
-    wyck_types = 24
+    wyck_types = 30
     n_max = 24
     dim = 3
 
-    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     #csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
     #csv_file = './mp_problem.csv'
+    csv_file = '/data/zdcao/crystal_gpt/dataset/mp_20/symm_data/train.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
     print (G.shape)
