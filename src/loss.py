@@ -4,11 +4,15 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import von_mises_logpdf
-from lattice import make_spacegroup_mask
+from lattice import make_lattice_mask
 from utils import to_A_W
 from wyckoff import mult_table
+from fc_mask import fc_mask_table
 
 def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
+
+    lattice_mask = make_lattice_mask()
+    assert mult_table.shape[:2] == fc_mask_table.shape[:2] == (230, 28)
 
     @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
     def logp_fn(params, G, L, X, AW):
@@ -41,20 +45,20 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
-    
-        logp_x = jnp.sum(jnp.where((AW>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
+
+        fc_mask = jnp.logical_and((AW>0)[:, None], (fc_mask_table[G-1, W]>0)[None, :])
+        logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
         logp_am = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
 
         # first convert one-hot to integer, then look for mask
-        spacegroup_mask = make_spacegroup_mask(G) 
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
                                            Kx+2*Kx*dim:Kx+2*Kx*dim+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1)
         mu = mu.reshape(Kl, 6)
         sigma = sigma.reshape(Kl, 6)
         logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) #(Kl, 6)
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
-        logp_l = jnp.sum(jnp.where((spacegroup_mask>0), logp_l, jnp.zeros_like(logp_l)))
+        logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
 
         return logp_x + logp_am + logp_l
 

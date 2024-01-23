@@ -32,16 +32,16 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
         refined_structure = analyzer.get_refined_structure()
         analyzer = SpacegroupAnalyzer(refined_structure)
         symmetrized_structure = analyzer.get_symmetrized_structure()
-        
-        
+
+        sg = analyzer.get_space_group_symbol()
         g = analyzer.get_space_group_number()
         G.append (g)
-        print (i, g, structure.num_sites, symmetrized_structure.num_sites)
+        print (i, g, sg, structure.num_sites, symmetrized_structure.num_sites)
         abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
         L.append (abc + symmetrized_structure.lattice.angles) # scale length with number of total atoms
         num_sites = len(symmetrized_structure.equivalent_sites)
         assert (n_max >= num_sites)
-   
+
         aw = []
         ws = []
         fc = []
@@ -92,12 +92,13 @@ def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim):
 
 if __name__=='__main__':
     atom_types = 119
-    wyck_types = 30
-    n_max = 20
+    wyck_types = 24
+    n_max = 24
     dim = 3
 
+    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = '../data/mini.csv'
+    #csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
     #csv_file = './mp_problem.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)

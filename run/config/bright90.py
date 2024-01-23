@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-perov-wyckoff-debug-sortx'
+nickname = 'mp-perov-wyckoff-debug-sortx-fc_mask'
 
 ###############################
 atom_types = 119
@@ -16,9 +16,9 @@ key_size = 32
 model_size = 8
 
 optimizer = 'adamw'
-weight_decay = 1e-3
+weight_decay = 0.0
 lr = 1e-4
-lr_decay = 1e-5
+lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
 epochs = 100000
@@ -40,6 +40,14 @@ elif dataset == 'mp':
     train_path = '/home/wanglei/cdvae/data/mp_20/train.csv'
     valid_path = '/home/wanglei/cdvae/data/mp_20/val.csv'
     test_path = '/home/wanglei/cdvae/data/mp_20/test.csv'
+
+elif dataset == 'carbon':
+    n_max = 24
+    wyck_types = 2
+
+    train_path = '/home/wanglei/cdvae/data/carbon_24/train.csv'
+    valid_path = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    test_path = '/home/wanglei/cdvae/data/carbon_24/test.csv'
 else:
     print (dataset)
 

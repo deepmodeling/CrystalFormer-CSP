@@ -28,7 +28,7 @@ enhancement
 - [X] specify possible elements at sampling time
 - [ ] implement more wyckoff symbols in `wyckoff.py`
 - [ ] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
-- [ ] build up (230, 27, 3) mask for frac_coor 
+- [X] build up (230, 28, 3) fc mask
 
 always welcome
 - [ ] write more tests 
@@ -85,10 +85,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 119 --wyck_types 10 --folder /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-30bb2/ --Kx 8 --Kl 1 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.001 --clip_grad 1.0 --batchsize 100 --epochs 100000 --optimizer adamw --train_path /home/wanglei/cdvae/data/perov_5/train.csv --valid_path /home/wanglei/cdvae/data/perov_5/val.csv --test_path /home/wanglei/cdvae/data/perov_5/test.csv 
+python ../src/main.py --n_max 5 --atom_types 119 --wyck_types 10 --folder /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-30bb2/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 100000 --optimizer adamw --train_path /home/wanglei/cdvae/data/perov_5/train.csv --valid_path /home/wanglei/cdvae/data/perov_5/val.csv --test_path /home/wanglei/cdvae/data/perov_5/test.csv 
 ```
 
 sample
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 119 --folder /data/wanglei/crystalgpt/mp-perov/ --Kx 8 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 20 --epochs 100000 --optimizer none --restore_path /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-38b5e/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_10_N_5_wd_0.001_Nf_5_K_8_1_h0_256_l_4_H_8_k_32_m_8/       --test_path /home/wanglei/crystal_gpt/data/mini.csv   --spacegroup 25  --wyck_types 10 --temperature 1.0
+python ../src/main.py --n_max 5 --atom_types 119 --folder /data/wanglei/crystalgpt/mp-perov/ --Kx 16 --Kl 16  --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 20 --epochs 100000 --optimizer none --restore_path /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-e4c88/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_10_N_5_wd_0_Nf_5_K_16_16_h0_256_l_4_H_8_k_32_m_8/   --test_path /home/wanglei/crystal_gpt/data/mini.csv   --spacegroup 25  --wyck_types 10 --temperature 1.0
 ```

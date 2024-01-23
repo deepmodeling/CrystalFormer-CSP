@@ -2,22 +2,26 @@ import jax
 import jax.numpy as jnp 
 import haiku as hk 
 
-def make_spacegroup_mask(spacegroup):
+def make_lattice_mask():
     '''
     return mask for independent lattice params 
     '''
+    # 1-2
+    # 3-15 
+    # 16-74
+    # 142-75
+    # 143-194
+    # 195-230    
+    mask = [1, 1, 1, 1, 1, 1] * 2 +\
+           [1, 1, 1, 0, 1, 0] * 13+\
+           [1, 1, 1, 0, 0, 0] * 59+\
+           [1, 0, 1, 0, 0, 0] * 68+\
+           [1, 0, 1, 0, 0, 0] * 52+\
+           [1, 0, 0, 0, 0, 0] * 36
 
-    mask = jnp.array([1, 1, 1, 1, 1, 1])
+    return jnp.array(mask).reshape(230, 6)
 
-    mask = jnp.where(spacegroup <= 2,   mask, jnp.array([1, 1, 1, 0, 1, 0]))
-    mask = jnp.where(spacegroup <= 15,  mask, jnp.array([1, 1, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 74,  mask, jnp.array([1, 0, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 142, mask, jnp.array([1, 0, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 194, mask, jnp.array([1, 0, 0, 0, 0, 0]))
-    
-    return mask
-
-def make_spacegroup_lattice(spacegroup, lattice):
+def symmetrize_lattice(spacegroup, lattice):
     '''
     place lattice params into lattice according to the space group 
     '''
@@ -35,14 +39,13 @@ def make_spacegroup_lattice(spacegroup, lattice):
 
 if __name__ == '__main__':
     
-    G = jnp.array([25, 99, 221])
-    mask = jax.vmap(make_spacegroup_mask)(G)
+    mask = make_lattice_mask()
     print (mask)
 
     key = jax.random.PRNGKey(42)
     lattice = jax.random.normal(key, (6,))
 
+    G = jnp.array([25, 99, 221])
     L = jax.vmap(make_spacegroup_lattice, (0, None))(G, lattice)
-
     print (L)
 
