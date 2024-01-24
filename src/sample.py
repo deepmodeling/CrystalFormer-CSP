@@ -96,4 +96,4 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     #impose space group constraint to lattice paraws
     L = jax.vmap(symmetrize_lattice, (None, 0))(G, L)  
 
-    return X, A, W, M, L
+    return X, A, W, M, L, AW

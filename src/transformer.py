@@ -5,6 +5,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
+from wyckoff import wmax_table
+
 def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4):
 
     @hk.transform
@@ -25,6 +27,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
         assert (aw_types > xl_types)
 
+        aw_max = wmax_table[G-1]*(atom_types-1)
+
         G_one_hot = jax.nn.one_hot(G-1, 230)
 
         initializer = hk.initializers.TruncatedNormal(0.01)
@@ -34,6 +38,9 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                   jax.nn.gelu,
                                   hk.Linear(aw_types, w_init=initializer)]
                                   )(G_one_hot)
+
+        # mask out unavaiable position for the given spacegroup
+        aw_logit = jnp.where(jnp.arange(aw_types)<=aw_max, aw_logit,aw_logit-1e10)
         # normalization
         aw_logit -= jax.scipy.special.logsumexp(aw_logit) # (aw_types, )
                
@@ -128,6 +135,9 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                   jnp.zeros((n, aw_types-1))
                 ], axis = 1 )  # (n, aw_types) mask = 1 for those locations to place pad atoms of type 0
         aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of pad atoms
+        aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
+        # mask out unavaiable position for the given spacegroup
+        aw_logit = jnp.where(jnp.arange(aw_types)<=aw_max, aw_logit,aw_logit-1e10)
         aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
 
         x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL[:, :xl_types], [Kx, 

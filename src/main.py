@@ -189,7 +189,7 @@ else:
     print (sigma.reshape(batchsize, args.Kl, 6))
  
     print("\n========== Start sampling ==========")
-    X, A, W, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, am_mask, args.temperature)
+    X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, am_mask, args.temperature)
     print ("X:\n", X)
     print ("A:\n", A)  # atom type
     print ("W:\n", W)  # Wyckoff positions
@@ -198,3 +198,5 @@ else:
     print ("L:\n", L)  # sampled lattice
     for a in A: 
        print([element_list[i] for i in a])
+
+    print ("AW:\n", AW)

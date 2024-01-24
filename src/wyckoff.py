@@ -19,10 +19,13 @@ for ws in wyckoff_symbols:
     wyckoff_dict.append( {value: index for index, value in enumerate(ws)} )
 
 max_len = max(len(sublist) for sublist in wyckoff_list)
-mult_table = np.zeros((len(wyckoff_list), max_len), dtype=int)
+mult_table = np.zeros((len(wyckoff_list), max_len), dtype=int) # mult_table[g-1, w] = multiplicity 
+wmax_table = np.zeros((len(wyckoff_list),), dtype=int)   # wmax_table[g-1] = number of wyckoff letters 
 for i, sublist in enumerate(wyckoff_list):
     mult_table[i, :len(sublist)] = sublist
+    wmax_table[i] = len(sublist)-1
 mult_table = jnp.array(mult_table)
+wmax_table = jnp.array(wmax_table)
 
 if __name__=='__main__':
 
@@ -33,3 +36,13 @@ if __name__=='__main__':
     print (mult_table[99-1])
     print (mult_table[123-1])
     print (mult_table[221-1])
+
+    print (wmax_table[47-1])
+
+    print (wmax_table)
+    
+    atom_types = 119 
+    aw_max = wmax_table*(atom_types-1)    # the maximum value of aw
+    print ( (aw_max-1)%(atom_types-1)+1 ) # = 118 
+    print ( (aw_max-1)//(atom_types-1)+1 ) # = wmax
+ 
