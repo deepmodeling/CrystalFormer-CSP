@@ -3,17 +3,18 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-perov-wyckoff-debug-sortx-fc_mask'
+nickname = 'mp-wyckoff-debug-sortx-sortw-fc_mask-aw-dropout'
 
 ###############################
 atom_types = 119
 
-Kx, Kl = 16, 16
+Kx, Kl = 16, 1
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
-key_size = 32
+key_size = 16
 model_size = 8
+dropout_rate = 0.1 
 
 optimizer = 'adamw'
 weight_decay = 0.0
@@ -21,9 +22,9 @@ lr = 1e-4
 lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
-epochs = 100000
+epochs = 10000
 
-dataset = 'perov'
+dataset = 'mp_symm'
 
 if dataset == 'perov':
     n_max = 5 
@@ -35,11 +36,19 @@ if dataset == 'perov':
 
 elif dataset == 'mp':
     n_max = 20
-    wyck_types = 10
+    wyck_types = 28
 
     train_path = '/home/wanglei/cdvae/data/mp_20/train.csv'
     valid_path = '/home/wanglei/cdvae/data/mp_20/val.csv'
     test_path = '/home/wanglei/cdvae/data/mp_20/test.csv'
+
+elif dataset == "mp_symm":
+    n_max = 20
+    wyck_types = 28
+
+    train_path = '/home/wanglei/crystal_gpt/data/symm_data/train.csv'
+    valid_path = '/home/wanglei/crystal_gpt/data/symm_data/val.csv'
+    test_path = '/home/wanglei/crystal_gpt/data/symm_data/test.csv'
 
 elif dataset == 'carbon':
     n_max = 24
@@ -60,7 +69,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a800
+#SBATCH --partition=a100
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00

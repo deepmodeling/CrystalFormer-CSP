@@ -8,11 +8,11 @@ from lattice import symmetrize_lattice
 from wyckoff import mult_table
 from symmetrize import apply_wyckoff_condition
 
-@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
-def inference(model, params, atom_types, G, X, AW):
+@partial(jax.vmap, in_axes=(None, None, None, None, None, 0, 0), out_axes=0) # batch 
+def inference(model, params, key, atom_types, G, X, AW):
     A, W = to_A_W(AW, atom_types) 
     M = mult_table[G-1, W]  
-    return model(params, G, X, A, W, M)
+    return model(params, key, G, X, A, W, M, 0.0)
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
 def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, G, aw_mask, temperature):
@@ -28,24 +28,25 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     for i in range(2*n_max):
 
         if i%2 ==0: # AW_n ~ p(AW_n | AW_1, X_1, ..., AW_(n-1), X_(n-1))
-            outputs = inference(transformer, params, atom_types, G, X, AW)[:, -2:]
+            key, key_inf, key_aw = jax.random.split(key, 3)
+
+            outputs = inference(transformer, params, key_inf, atom_types, G, X, AW)[:, -2:]
             outputs = outputs.reshape(batchsize, 2, aw_types)
             aw_logit = outputs[:, 0, :] # (batchsize, aw_types)
-
-            key, key_aw = jax.random.split(key)
 
             aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sawpling, not computing logp)
             aw = jax.random.categorical(key_aw, aw_logit/temperature, axis=1)  # aw_logit.shape : (batchsize, )
             AW = jnp.concatenate([AW, aw[:, None]], axis=1)
  
         else: # X_n ~ p(X_n | AW_1, X_1, ... AW_(n-1), X_(n-1), AW_n)
+            key, key_inf, key_k, key_x = jax.random.split(key, 4)
+
             # pad another zero to match the dimensionality of AW
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
-            outputs = inference(transformer, params, atom_types, G, Xpad, AW)[:, -4:-2]
+            outputs = inference(transformer, params, key_inf, atom_types, G, Xpad, AW)[:, -4:-2]
             outputs = outputs.reshape(batchsize, 2, aw_types)
             hXL = outputs[:, 1, :] # (batchsize, aw_types)
 
-            key, key_k, key_x = jax.random.split(key, 3)
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
                                                                      [Kx, 
                                                                       Kx+Kx*dim, 

@@ -14,8 +14,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
     lattice_mask = make_lattice_mask()
     assert mult_table.shape[:2] == fc_mask_table.shape[:2] == (230, 28)
 
-    @partial(jax.vmap, in_axes=(None, 0, 0, 0, 0), out_axes=0)
-    def logp_fn(params, G, L, X, AW):
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, None), out_axes=0)
+    def logp_fn(params, key, G, L, X, AW, dropout_rate):
         '''
         G: scalar 
         L: (6,) [a, b, c, alpha, beta, gamma] 
@@ -30,7 +30,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
 
-        h = transformer(params, G, X, A, W, M)
+        h = transformer(params, key, G, X, A, W, M, dropout_rate)
         h = h.reshape(n_max+1, 2, -1)
         hAW, hXL = h[:, 0, :], h[:, 1, :]
 
@@ -59,11 +59,11 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         logp_l = jax.vmap(jax.scipy.stats.norm.logpdf, (None, 0, 0))(L,mu,sigma) #(Kl, 6)
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
-
+        
         return logp_x + logp_aw + logp_l
 
-    def loss_fn(params, G, L, X, AW):
-        logp = logp_fn(params, G, L, X, AW)
+    def loss_fn(params, key, G, L, X, AW, dropout_rate):
+        logp = logp_fn(params, key, G, L, X, AW, dropout_rate)
         return -jnp.mean(logp)
         
     return loss_fn
@@ -72,13 +72,14 @@ if __name__=='__main__':
     from utils import GLXAW_from_file
     from transformer import make_transformer
     atom_types = 119
-    wyck_types = 10
     Nf = 5
-    n_max = 5
+    n_max = 20
+    wyck_types = 20
     Kx, Kl  = 8, 1
     dim = 3
+    dropout_rate = 0.1 
 
-    csv_file = '../data/mini.csv'
+    csv_file = './mini.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)
@@ -87,8 +88,9 @@ if __name__=='__main__':
 
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1], AW[:1])
+    key, subkey = jax.random.split(key)
+    value, grad = jax.value_and_grad(loss_fn)(params, subkey, G[:1], L[:1], X[:1], AW[:1], dropout_rate)
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn)(params, G[:1], L[:1], X[:1]-1.0, AW[:1])
+    value, grad = jax.value_and_grad(loss_fn)(params, subkey, G[:1], L[:1], X[:1]-1.0, AW[:1], dropout_rate)
     print (value)

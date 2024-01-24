@@ -43,6 +43,7 @@ group.add_argument('--transformer_layers', type=int, default=4, help='The number
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=32, help='The key size')
 group.add_argument('--model_size', type=int, default=8, help='The model size')
+group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
 
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
@@ -65,6 +66,7 @@ if args.optimizer != "none":
     train_data = GLXAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
     valid_data = GLXAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
 else:
+    assert (args.spacegroup is not None) # for inference we need to specify space group
     test_data = GLXAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.dim)
     
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
@@ -83,7 +85,7 @@ params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_ma
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.wyck_types)
-transformer_name = 'Nf_%d_K_%d_%d_h0_%d_l_%d_H_%d_k_%d_m_%d'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size)
+transformer_name = 'Nf_%d_K_%d_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
@@ -131,7 +133,7 @@ if args.optimizer != "none":
         pass 
  
     print("\n========== Start training ==========")
-    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path, args.dropout_rate)
 
 else:
     print("\n========== Inference on test data ==========")
@@ -161,7 +163,7 @@ else:
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print (aw_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, 0, 0, 0, 0, 0), (0))(params, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize])
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], 0.0)
     print ("outputs.shape", outputs.shape)
 
     outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)

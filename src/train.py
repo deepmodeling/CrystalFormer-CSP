@@ -8,12 +8,12 @@ import math
 from utils import shuffle
 import checkpoint
 
-def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
+def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path, dropout_rate):
            
     @jax.jit
-    def update(params, opt_state, data):
+    def update(params, key, opt_state, data):
         G, L, X, AW = data
-        value, grad = jax.value_and_grad(loss_fn)(params, G, L, X, AW)
+        value, grad = jax.value_and_grad(loss_fn)(params, key, G, L, X, AW, dropout_rate)
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
@@ -36,8 +36,9 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                    train_L[start_idx:end_idx], \
                    train_X[start_idx:end_idx], \
                    train_AW[start_idx:end_idx]
-
-            params, opt_state, loss = update(params, opt_state, data)
+            
+            key, subkey = jax.random.split(key)
+            params, opt_state, loss = update(params, subkey, opt_state, data)
             train_loss += loss 
         train_loss = train_loss/num_batches
 
@@ -53,7 +54,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                               valid_L[start_idx:end_idx], \
                               valid_X[start_idx:end_idx], \
                               valid_AW[start_idx:end_idx]
-                loss = loss_fn(params, G, L, X, AW)
+                key, subkey = jax.random.split(key)
+                loss = loss_fn(params, subkey, G, L, X, AW, 0.0) # dropout =0 in validation
                 valid_loss += loss 
             valid_loss = valid_loss/num_batches
 

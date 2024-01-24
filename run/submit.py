@@ -63,6 +63,7 @@ if __name__=='__main__':
                         'train_path' : train_path,  
                         'valid_path' : valid_path,  
                         'test_path' : test_path,  
+                        'dropout_rate' : dropout_rate,  
                         }
 
                 logname = jobdir 

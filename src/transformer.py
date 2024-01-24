@@ -7,9 +7,8 @@ import haiku as hk
 
 def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, widening_factor=4):
 
-    @hk.without_apply_rng
     @hk.transform
-    def network(G, X, A, W, M):
+    def network(G, X, A, W, M, dropout_rate):
         '''
         G: scalar integer for space group id 1-230
         X: (n, dim)
@@ -104,6 +103,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                               )
             h_norm = _layer_norm(h)
             h_attn = attn_block(h_norm, h_norm, h_norm, mask=mask)
+            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
             h = h + h_attn
 
             dense_block = hk.Sequential([hk.Linear(widening_factor * model_size, w_init=initializer),
@@ -112,6 +112,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                          )
             h_norm = _layer_norm(h)
             h_dense = dense_block(h_norm)
+            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
             h = h + h_dense
 
         h = _layer_norm(h)
@@ -160,7 +161,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
     W = jax.random.uniform(key, (n_max, )) 
     M = jax.random.uniform(key, (n_max, )) 
 
-    params = network.init(key, G, X, A, W, M)
+    params = network.init(key, G, X, A, W, M, 0.0)
     return params, network.apply
 
 def _layer_norm(x: jax.Array) -> jax.Array:
