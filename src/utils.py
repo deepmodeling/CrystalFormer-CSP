@@ -6,6 +6,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 from ast import literal_eval
+import multiprocessing
 
 from wyckoff import wyckoff_dict, mult_table
 
@@ -27,74 +28,77 @@ def shuffle(key, data):
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return G[idx], L[idx], X[idx], AW[idx]
 
-def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
-    G = [] # space group
-    L = [] # abc alpha beta gamma
-    X = [] # fractional coordinate 
-    AW = [] # atom type and wyck type; 0 for placeholder
-    for i, structure in enumerate(structures):
-        analyzer = SpacegroupAnalyzer(structure, symprec=0.01) 
-        # refined_structure = analyzer.get_refined_structure()
-        # analyzer = SpacegroupAnalyzer(refined_structure)
-        symmetrized_structure = analyzer.get_symmetrized_structure()
+def process_one(structure, atom_types, wyck_types, n_max, dim):
+    analyzer = SpacegroupAnalyzer(structure, symprec=0.01) 
+    # refined_structure = analyzer.get_refined_structure()
+    # analyzer = SpacegroupAnalyzer(refined_structure)
+    symmetrized_structure = analyzer.get_symmetrized_structure()
 
-        sg = analyzer.get_space_group_symbol()
-        g = analyzer.get_space_group_number()
-        G.append (g)
-        print (i, g, sg, structure.num_sites, symmetrized_structure.num_sites)
-        abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
-        L.append (abc + symmetrized_structure.lattice.angles) # scale length with number of total atoms
-        num_sites = len(symmetrized_structure.equivalent_sites)
-        assert (n_max >= num_sites)
+    sg = analyzer.get_space_group_symbol()
+    g = analyzer.get_space_group_number()
+    print (g, sg, structure.num_sites, symmetrized_structure.num_sites)
+    abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
+    l = abc + symmetrized_structure.lattice.angles # scale length with number of total atoms
+    num_sites = len(symmetrized_structure.equivalent_sites)
+    assert (n_max >= num_sites)
 
-        aw = []
-        ws = []
-        fc = []
-        for i, site in enumerate(symmetrized_structure.equivalent_sites):
-            a = site[0].specie.number # element number 
-            x = site[0].frac_coords
-            m = len(site)             # multiplicity
-            wyckoff_symbol = symmetrized_structure.wyckoff_symbols[i]
-            w = wyckoff_dict[g-1][wyckoff_symbol]
-            assert (a < atom_types)
-            assert (w < wyck_types)
-            aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
-            ws.append( wyckoff_symbol)
-            fc.append( x)
-            print ('g, a, w, m, symbol', g, a, w, m, wyckoff_symbol, x)
-        #sort atoms according to wyckoff symbol a-z,A
-        char_list = [''.join(filter(str.isalpha, s)) for s in ws]
-        idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
-        idx = np.array(idx)
-        ws = np.array(ws)[idx]
-        aw = jnp.array(aw)[idx]
-        fc = jnp.array(fc)[idx].reshape(num_sites, dim)
-        print (ws) 
-        
-        aw = jnp.concatenate([aw, 
-                              jnp.full((n_max - num_sites, ), 0)], 
-                              axis = 0)
-        fc = jnp.concatenate([fc, 
-                             jnp.full((n_max - num_sites, dim), 1e10)], 
-                             axis = 0)
+    aw = []
+    ws = []
+    fc = []
+    for i, site in enumerate(symmetrized_structure.equivalent_sites):
+        a = site[0].specie.number # element number 
+        x = site[0].frac_coords
+        m = len(site)             # multiplicity
+        wyckoff_symbol = symmetrized_structure.wyckoff_symbols[i]
+        w = wyckoff_dict[g-1][wyckoff_symbol]
+        assert (a < atom_types)
+        assert (w < wyck_types)
+        aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
+        ws.append( wyckoff_symbol)
+        fc.append( x)
+        print ('g, a, w, m, symbol', g, a, w, m, wyckoff_symbol, x)
+    #sort atoms according to wyckoff symbol a-z,A
+    char_list = [''.join(filter(str.isalpha, s)) for s in ws]
+    idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
+    idx = np.array(idx)
+    ws = np.array(ws)[idx]
+    aw = np.array(aw)[idx]
+    fc = np.array(fc)[idx].reshape(num_sites, dim)
+    print (ws) 
+    
+    aw = np.concatenate([aw, 
+                            np.full((n_max - num_sites, ), 0)], 
+                            axis = 0)
+    fc = np.concatenate([fc, 
+                            np.full((n_max - num_sites, dim), 1e10)], 
+                            axis = 0)
+    print ('===================================')
 
-        AW.append( aw )
-        X.append ( fc )  
- 
-        print ('===================================')
+    return g, l, fc, aw
+    
+def process_structure(cif):
+    try :
+        structure = Structure.from_dict(literal_eval(cif))
+    except:
+        structure = Structure.from_str(cif, fmt='cif')
+    return structure
 
-   
+def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=10):
+    data = pd.read_csv(csv_file)
+    cif_strings = data['cif']
+
+    p = multiprocessing.Pool(num_workers)
+    structures = p.map_async(process_structure, cif_strings).get()
+    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max, dim=dim)
+    results = p.map_async(partial_process_one, structures).get()
+    p.close()
+    p.join()
+
+    G, L, X, AW = zip(*results)
     G = jnp.array(G) 
     L = jnp.array(L).reshape(-1, 6)
     X = jnp.array(X).reshape(-1, n_max, dim)
     AW = jnp.array(AW).reshape(-1, n_max)
-    return G, L, X, AW
-    
-def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim):
-    data = pd.read_csv(csv_file)
-    cif_strings = data['cif']
-    structures = [Structure.from_dict(literal_eval(cif)) for cif in cif_strings]
-    G, L, X, AW = GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim)
     return G, L, X, AW
 
 if __name__=='__main__':
