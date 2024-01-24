@@ -5,10 +5,10 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, widening_factor=4):
+def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4):
 
     @hk.transform
-    def network(G, X, A, W, M, dropout_rate):
+    def network(G, X, A, W, M, is_train):
         '''
         G: scalar integer for space group id 1-230
         X: (n, dim)
@@ -36,7 +36,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                   )(G_one_hot)
         # normalization
         aw_logit -= jax.scipy.special.logsumexp(aw_logit) # (aw_types, )
-        
+               
         if n > 0: 
             hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                 jax.nn.gelu,
@@ -103,7 +103,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                               )
             h_norm = _layer_norm(h)
             h_attn = attn_block(h_norm, h_norm, h_norm, mask=mask)
-            h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
+            if is_train: 
+                h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
             h = h + h_attn
 
             dense_block = hk.Sequential([hk.Linear(widening_factor * model_size, w_init=initializer),
@@ -112,7 +113,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                          )
             h_norm = _layer_norm(h)
             h_dense = dense_block(h_norm)
-            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
+            if is_train:
+                h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense)
             h = h + h_dense
 
         h = _layer_norm(h)

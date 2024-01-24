@@ -3,12 +3,12 @@ import numpy as np
 import time 
 
 #nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-wyckoff-debug-sortx-sortw-fc_mask-aw-dropout'
+nickname = 'mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-perm'
 
 ###############################
 atom_types = 119
 
-Kx, Kl = 16, 1
+Kx, Kl = 16, 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8

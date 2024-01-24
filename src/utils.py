@@ -15,6 +15,10 @@ def to_A_W(AW, atom_types):
     W = jnp.where(AW==0, jnp.zeros_like(AW), (AW-1)//(atom_types-1)+1)
     return A, W
 
+@partial(jax.vmap, in_axes=(0, 0, None), out_axes=0) # n 
+def to_AW(A, W, atom_types):
+    return jnp.where(A==0, jnp.zeros_like(A), (W-1)*(atom_types-1) + (A-1) +1)
+
 def shuffle(key, data):
     '''
     shuffle data along batch dimension

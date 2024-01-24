@@ -5,7 +5,7 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 from lattice import make_lattice_mask
-from utils import to_A_W
+from utils import to_A_W, to_AW
 from wyckoff import mult_table
 from fc_mask import fc_mask_table
 
@@ -14,8 +14,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
     lattice_mask = make_lattice_mask()
     assert mult_table.shape[:2] == fc_mask_table.shape[:2] == (230, 28)
 
-    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, None), out_axes=0)
-    def logp_fn(params, key, G, L, X, AW, dropout_rate):
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, None), out_axes=0) # batch 
+    def logp_fn(params, key, G, L, X, AW, is_train):
         '''
         G: scalar 
         L: (6,) [a, b, c, alpha, beta, gamma] 
@@ -30,7 +30,23 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
 
-        h = transformer(params, key, G, X, A, W, M, dropout_rate)
+        if is_train:
+            #randomly permute atoms with the same wyckoff symbol for data augmentation
+            temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+            key, subkey = jax.random.split(key)
+            idx_perm = jax.random.permutation(subkey, jnp.arange(n_max))
+            temp = temp[idx_perm]
+            idx_sort = jnp.argsort(temp)
+            idx = idx_perm[idx_sort]
+
+            X = X[idx]
+            A = A[idx]
+            W = W[idx]
+            M = M[idx]
+
+            AW = to_AW(A, W, atom_types)
+
+        h = transformer(params, key, G, X, A, W, M, is_train)
         h = h.reshape(n_max+1, 2, -1)
         hAW, hXL = h[:, 0, :], h[:, 1, :]
 
@@ -62,8 +78,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         
         return logp_x + logp_aw + logp_l
 
-    def loss_fn(params, key, G, L, X, AW, dropout_rate):
-        logp = logp_fn(params, key, G, L, X, AW, dropout_rate)
+    def loss_fn(params, key, G, L, X, AW, is_train):
+        logp = logp_fn(params, key, G, L, X, AW, is_train)
         return -jnp.mean(logp)
         
     return loss_fn
@@ -84,13 +100,12 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types) 
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types, dropout_rate) 
 
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
-    key, subkey = jax.random.split(key)
-    value, grad = jax.value_and_grad(loss_fn)(params, subkey, G[:1], L[:1], X[:1], AW[:1], dropout_rate)
+    value, grad = jax.value_and_grad(loss_fn)(params, key, G[:1], L[:1], X[:1], AW[:1], True)
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn)(params, subkey, G[:1], L[:1], X[:1]-1.0, AW[:1], dropout_rate)
+    value, grad = jax.value_and_grad(loss_fn)(params, key, G[:1], L[:1], X[:1]-1.0, AW[:1], True)
     print (value)

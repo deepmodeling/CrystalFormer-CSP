@@ -1,6 +1,6 @@
 from config import * 
 
-from src.utils import to_A_M, GLXAM_from_file, mult_list
+from src.utils import to_A_W, to_AW 
 
 def test_utils():
 
@@ -28,6 +28,17 @@ def test_utils():
 
     assert jnp.all(N==5)
 
+def test_A_W():
+    A = jnp.array([1, 2, 3, 0])
+    W = jnp.array([4, 5, 6, 0])
+    atom_types = 119
 
-test_utils()
+    AW = to_AW(A[None, :], W[None, :], atom_types)
+
+    A_back, W_back = to_A_W(AW[None, :], atom_types)
+    
+    assert jnp.allclose(A, A_back)
+    assert jnp.allclose(W, W_back)
+
+test_A_W()
 

@@ -84,7 +84,8 @@ params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_ma
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types, args.wyck_types)
+                                      args.atom_types, args.wyck_types, 
+                                      args.dropout_rate)
 transformer_name = 'Nf_%d_K_%d_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
@@ -133,7 +134,7 @@ if args.optimizer != "none":
         pass 
  
     print("\n========== Start training ==========")
-    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path, args.dropout_rate)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
 
 else:
     print("\n========== Inference on test data ==========")
@@ -163,7 +164,7 @@ else:
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print (aw_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], 0.0)
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
     print ("outputs.shape", outputs.shape)
 
     outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)

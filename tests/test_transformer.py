@@ -44,5 +44,25 @@ def test_autoregressive():
     print_dependencey(jac_x_am)
     print ('jac_x_x')
     print_dependencey(jac_x_x)
- 
+
+def test_perm():
+
+    key = jax.random.PRNGKey(42)
+
+    W = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0])
+    n = len(W)
+    key = jax.random.PRNGKey(42)
+
+    temp = jnp.where(W>0, W, 9999)
+    idx_perm = jax.random.permutation(key, jnp.arange(n))
+    temp = temp[idx_perm]
+    idx_sort = jnp.argsort(temp)
+    idx = idx_perm[idx_sort]
+
+    print (W)
+    print (idx)
+    print (W[idx])
+    assert jnp.allclose(W, W[idx])
+
+test_perm()
 test_autoregressive()
