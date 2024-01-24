@@ -59,9 +59,9 @@ def GLXAW_from_structures(structures, atom_types, wyck_types, n_max, dim):
             fc.append( x)
             print ('g, a, w, m, symbol', g, a, w, m, wyckoff_symbol, x)
         #sort atoms according to wyckoff symbol a-z,A
-        char = [''.join(filter(str.isalpha, s)) for s in ws]
-        if 'A' in char: raise NotImplementedError("Have not consider the case of wyckoff letter A")
-        idx = np.argsort(char)  
+        char_list = [''.join(filter(str.isalpha, s)) for s in ws]
+        idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
+        idx = np.array(idx)
         ws = np.array(ws)[idx]
         aw = jnp.array(aw)[idx]
         fc = jnp.array(fc)[idx].reshape(num_sites, dim)

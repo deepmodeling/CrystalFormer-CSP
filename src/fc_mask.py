@@ -12,6 +12,7 @@ def convert_to_binary_list(s):
     Converts a list of strings into a list of binary lists based on the presence of 'x', 'y', or 'z'.
     """
     components = s.split(',')
+    #TODO a better translation can be xxx->100 but not 111 
     return  [1 if any(char in comp for char in ['x', 'y', 'z']) else 0 for comp in components]
 
 fc_mask_list = []
