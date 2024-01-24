@@ -13,7 +13,7 @@ import jax.numpy as jnp
 wyckoff_list = []
 wyckoff_dict = []
 for ws in wyckoff_symbols:
-    wyckoff_list.append( [0] +[0 if w == "" else int(w[0]) for w in ws] )
+    wyckoff_list.append( [0] +[0 if w == "" else int(''.join(filter(str.isdigit, w))) for w in ws] )
 
     ws = [""] + ws
     wyckoff_dict.append( {value: index for index, value in enumerate(ws)} )
@@ -28,6 +28,7 @@ if __name__=='__main__':
 
     print (wyckoff_dict[47-1]['1a']) # wyckoff symbol -> ordering 
     print (mult_table[25-1]) # space group id -> multiplicity table
+    print (mult_table[42-1])
     print (mult_table[47-1])
     print (mult_table[99-1])
     print (mult_table[123-1])

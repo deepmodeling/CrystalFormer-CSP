@@ -190,11 +190,11 @@ else:
  
     print("\n========== Start sampling ==========")
     X, A, W, M, L = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, am_mask, args.temperature)
-    print (X)
-    print (A)  # atom type
-    print (W)  # Wyckoff positions
-    print (M)
-    print (M.sum(axis=-1))
-    print (L)  # sampled lattice
+    print ("X:\n", X)
+    print ("A:\n", A)  # atom type
+    print ("W:\n", W)  # Wyckoff positions
+    print ("M:\n", M)
+    print ("N:\n", M.sum(axis=-1))
+    print ("L:\n", L)  # sampled lattice
     for a in A: 
        print([element_list[i] for i in a])
