@@ -83,7 +83,7 @@ def process_structure(cif):
         structure = Structure.from_str(cif, fmt='cif')
     return structure
 
-def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=10):
+def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
 
