@@ -1,6 +1,6 @@
 from config import * 
 
-from src.utils import to_A_W, to_AW 
+from utils import to_A_W, to_AW 
 
 def test_utils():
 
