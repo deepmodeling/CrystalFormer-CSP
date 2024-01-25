@@ -2,11 +2,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-from pymatgen.core import Structure
+from pymatgen.core import Structure, Lattice
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 from ast import literal_eval
 import multiprocessing
+import itertools
 
 from wyckoff import wyckoff_dict, mult_table
 
@@ -66,12 +67,12 @@ def process_one(structure, atom_types, wyck_types, n_max, dim):
     fc = np.array(fc)[idx].reshape(num_sites, dim)
     print (ws) 
     
-    aw = np.concatenate([aw, 
-                            np.full((n_max - num_sites, ), 0)], 
-                            axis = 0)
+    aw = np.concatenate([aw,
+                         np.full((n_max - num_sites, ), 0)],
+                        axis=0)
     fc = np.concatenate([fc, 
-                            np.full((n_max - num_sites, dim), 1e10)], 
-                            axis = 0)
+                         np.full((n_max - num_sites, dim), 1e10)],
+                        axis=0)
     print ('===================================')
 
     return g, l, fc, aw
@@ -100,6 +101,34 @@ def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1)
     X = jnp.array(X).reshape(-1, n_max, dim)
     AW = jnp.array(AW).reshape(-1, n_max)
     return G, L, X, AW
+
+def LXA_to_structure_single(L, X, A):
+
+    lattice = Lattice.from_parameters(*L)
+    # filter out zero
+    zero_idx = np.where(A == 0)[0]
+    if zero_idx is not None:
+        idx = zero_idx[0]
+        A = A[:idx]
+        X = X[:idx]
+    structure = Structure(lattice=lattice, species=A, coords=X, coords_are_cartesian=False).as_dict()
+
+    return structure
+
+def LXA_to_csv(L, X, A, num_worker=1, filename='out_structure.csv'):
+
+    L = np.array(L)
+    X = np.array(X)
+    A = np.array(A)
+    p = multiprocessing.Pool(num_worker)
+    structures = p.starmap_async(LXA_to_structure_single, zip(L, X, A)).get()
+    p.close()
+    p.join()
+
+    data = pd.DataFrame()
+    data['cif'] = structures
+    data.to_csv(filename, index=False)
+
 
 if __name__=='__main__':
     atom_types = 119
@@ -130,6 +159,7 @@ if __name__=='__main__':
     A, W = to_A_W(AW, atom_types)
     print ('A:\n', A)
     print ('W:\n', W)
+    print(A.shape)
     
     @jax.vmap
     def lookup(G, W):
