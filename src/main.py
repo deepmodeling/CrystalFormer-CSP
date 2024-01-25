@@ -72,12 +72,12 @@ else:
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     if args.elements is not None:
         idx = [element_dict[e] for e in args.elements]
-        aw_mask = [1] + [1 if ((i-1)%(args.atom_types-1)+1 in idx) else 0 for i in range(1, aw_types)]
+        aw_mask = [1] + [1 if ((aw-1)%(args.atom_types-1)+1 in idx) else 0 for aw in range(1, aw_types)]
         aw_mask = jnp.array(aw_mask)
+        print ('sampling strucrure formed by these elements:', args.elements)
+        print (aw_mask)
     else:
-        am_mask = jnp.zeros((aw_types), dtype=int)
-    print (args.elements)
-    print (am_mask)
+        aw_mask = jnp.zeros((aw_types), dtype=int) # we will do nothing to aw_logit in sampling
 
 ################### Model #############################
 params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, args.dim, 
@@ -144,16 +144,16 @@ else:
     from utils import to_A_W
     A, W = jax.vmap(to_A_W, (0, None))(AW, args.atom_types)
     num_sites = jnp.sum(A!=0, axis=1)
-    print (num_sites)
+    print ("num_sites:", num_sites)
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )
     M = lookup(G, W) # (batchsize, n_max)
     num_atoms = M.sum(axis=-1)
-    print (num_atoms)
+    print ("num_atoms:", num_atoms)
 
     batchsize = args.batchsize
-    print (G[:batchsize])
+    print ("G:", G[:batchsize])
     print ("A\n", A[:batchsize])
     for a in A[:batchsize]: 
        print([element_list[i] for i in a])
@@ -162,14 +162,14 @@ else:
 
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
-    print (aw_types, xl_types)
+    print ("aw_types, xl_types:", aw_types, xl_types)
 
     outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
     print ("outputs.shape", outputs.shape)
 
     outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
     aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
-    print (aw_logit.shape)
+    print ("aw_logit.shape", aw_logit.shape)
 
     # sample given ground truth
     key, key_aw = jax.random.split(key)
@@ -189,7 +189,7 @@ else:
     print (sigma.reshape(batchsize, args.Kl, 6))
  
     print("\n========== Start sampling ==========")
-    X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, am_mask, args.temperature)
+    X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
     print ("X:\n", X)
     print ("A:\n", A)  # atom type
     print ("W:\n", W)  # Wyckoff positions

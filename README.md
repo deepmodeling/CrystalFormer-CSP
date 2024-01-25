@@ -12,7 +12,7 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] move code from notebook to script 
 - [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
-- [ ] find out a way to evaluate the model, see whether this is indeed promising.
+- [ ] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
 - [ ] write samples back to CIF file
 
 enhancement
@@ -29,6 +29,7 @@ enhancement
 - [X] implement more wyckoff symbols in `wyckoff.py`
 - [X] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
 - [X] build up (230, 28, 3) fc mask
+- [ ] `pmap` the code for multi-gpu training
 
 always welcome
 - [ ] write more tests 
@@ -91,10 +92,10 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 119 --wyck_types 10 --folder /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-30bb2/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 100000 --optimizer adamw --train_path /home/wanglei/cdvae/data/perov_5/train.csv --valid_path /home/wanglei/cdvae/data/perov_5/val.csv --test_path /home/wanglei/cdvae/data/perov_5/test.csv 
+python ../src/main.py --n_max 20 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer adamw --train_path /home/wanglei/crystal_gpt/data/symm_data/train.csv --valid_path /home/wanglei/crystal_gpt/data/symm_data/val.csv --test_path /home/wanglei/crystal_gpt/data/symm_data/test.csv --dropout_rate 0.0 
 ```
 
 sample
 ```bash 
-python ../src/main.py --n_max 5 --atom_types 119 --folder /data/wanglei/crystalgpt/mp-perov/ --Kx 16 --Kl 16  --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 8 --lr 0.0001 --weight_decay 0.001 --batchsize 20 --epochs 100000 --optimizer none --restore_path /data/wanglei/crystalgpt/mp-perov-wyckoff-debug-sortx/mp-e4c88/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_10_N_5_wd_0_Nf_5_K_16_16_h0_256_l_4_H_8_k_32_m_8/   --test_path /home/wanglei/crystal_gpt/data/mini.csv   --spacegroup 25  --wyck_types 10 --temperature 1.0
+python ../src/main.py --n_max 20 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer none --train_path /home/wanglei/crystal_gpt/data/symm_data/train.csv --valid_path /home/wanglei/crystal_gpt/data/symm_data/val.csv --test_path /home/wanglei/crystal_gpt/data/symm_data/test.csv --dropout_rate 0.0 --restore_path /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_20_wd_0_Nf_5_K_16_16_h0_256_l_4_H_8_k_16_m_16_drop_0/ --spacegroup 123 
 ```
