@@ -115,7 +115,7 @@ if args.optimizer != "none":
     os.makedirs(output_path, exist_ok=True)
     print("Create directory for output: %s" % output_path)
 else:
-    output_path = args.restore_path
+    output_path = os.path.dirname(args.restore_path)
     print("Will output samples to: %s" % output_path)
 
 
