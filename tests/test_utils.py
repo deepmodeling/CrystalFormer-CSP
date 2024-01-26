@@ -1,6 +1,6 @@
 from config import *
 
-from src.utils import to_A_W, to_AW, GLXAW_from_file, LXA_to_csv
+from utils import to_A_W, to_AW, GLXAW_from_file, LXA_to_csv
 
 
 def test_utils():

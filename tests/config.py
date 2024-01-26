@@ -1,6 +1,6 @@
 import os, sys
 testdir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(testdir, ".."))
+sys.path.append(os.path.join(testdir, "../src"))
 
 import jax
 jax.config.update("jax_enable_x64", True)

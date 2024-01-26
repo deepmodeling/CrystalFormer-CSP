@@ -232,7 +232,7 @@ wyckoff_list = [[1],                          # 1
 
 from config import *
 
-from src.wyckoff import wyckoff_table
+from wyckoff import mult_table
 
 def test_wyckoff():
 
@@ -241,7 +241,7 @@ def test_wyckoff():
         return arr[nonzero_indices]
 
     def match(g):
-        jnp.allclose( nonzero_part(wyckoff_table[g-1]) , jnp.array(wyckoff_list[g-1]))
+        jnp.allclose( nonzero_part(mult_table[g-1]) , jnp.array(wyckoff_list[g-1]))
 
     match(25)
     match(47)

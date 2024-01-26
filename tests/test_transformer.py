@@ -1,7 +1,7 @@
 from config import * 
 
-from src.utils import GLXAM_from_file
-from src.transformer import make_transformer
+from utils import GLXAM_from_file
+from transformer import make_transformer
 
 def test_autoregressive():
     atom_types = 119
