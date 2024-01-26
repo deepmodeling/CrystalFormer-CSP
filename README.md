@@ -30,10 +30,14 @@ enhancement
 - [X] implement more symmetrize function in `symmetrize.py`, or consider call an external library when sampling
 - [X] build up (230, 28, 3) fc mask
 - [ ] `pmap` the code for multi-gpu training
+- [ ] use pyxtal to load csv file (avoid build our own dataset)
 
 always welcome
 - [ ] write more tests 
 - [ ] polishing the code
+
+side project
+- [ ] symmetry constrainted flow-matching [this](https://github.com/wangleiphy/jax-flow-matching/) and spacegroup utils maybe useful
 
 production
 - [ ] high pressure dataset 

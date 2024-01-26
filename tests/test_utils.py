@@ -1,33 +1,33 @@
 from config import *
 
 from utils import to_A_W, to_AW, GLXAW_from_file, LXA_to_csv
+from wyckoff import mult_table
 
 
 def test_utils():
 
-    return
-
-    atom_types = 118
+    atom_types = 119
     mult_types = 10
     n_max = 10
     dim = 3
     csv_file = '../data/mini.csv'
-    mult_table = jnp.array(mult_list[:mult_types])
 
-    G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
+    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, mult_types, n_max, dim)
     
-    assert G.ndim == 2 
-    assert G.shape[-1] == 230
+    assert G.ndim == 1
     assert L.ndim == 2 
     assert L.shape[-1] == 6
-
-    AM_flat = jnp.argmax(AM, axis=-1)
 
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
-    A, M = jax.vmap(to_A_M, (0, None))(AM, atom_types)
-    N = mult_table[M].sum(axis=1)
+    A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
+    print ("A:\n", A)
+    @jax.vmap
+    def lookup(G, W):
+        return mult_table[G-1, W] # (n_max, )
+    M = lookup(G, W) # (batchsize, n_max)
+    N = M.sum(axis=-1)
 
     assert jnp.all(N==5)
 
@@ -74,7 +74,7 @@ def test_io():
 
 if __name__ == '__main__':
 
-    #test_utils()
+    test_utils()
     test_A_W()
     test_io()
 
