@@ -64,6 +64,7 @@ if __name__=='__main__':
                         'valid_path' : valid_path,  
                         'test_path' : test_path,  
                         'dropout_rate' : dropout_rate,  
+                        'num_io_process' : num_io_process 
                         }
 
                 logname = jobdir 

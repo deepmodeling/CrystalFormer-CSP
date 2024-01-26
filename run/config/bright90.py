@@ -2,7 +2,7 @@ import subprocess
 import numpy as np 
 import time 
 
-dataset = 'carbon'
+dataset = 'mp'
 nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params'
 
 ###############################
@@ -13,7 +13,7 @@ h0_size = 256
 transformer_layers = 4
 num_heads = 8
 key_size = 16
-model_size = 32
+model_size = 64
 dropout_rate = 0.0
 
 optimizer = 'adamw'
@@ -22,7 +22,9 @@ lr = 1e-4
 lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
-epochs = 10000
+epochs = 50000
+
+num_io_process = 40
 
 if dataset == 'perov':
     n_max = 5 
@@ -50,7 +52,7 @@ elif dataset == "mp_symm":
 
 elif dataset == 'carbon':
     n_max = 24
-    wyck_types = 2
+    wyck_types = 28
 
     train_path = '/home/wanglei/cdvae/data/carbon_24/train.csv'
     valid_path = '/home/wanglei/cdvae/data/carbon_24/val.csv'
@@ -67,13 +69,14 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a800
+#SBATCH --partition=a100
 #SBATCH --nodes=1
+#SBATCH --cpus-per-task=%g
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
-#SBATCH --error=%s'''%(jobname,logname,logname)
+#SBATCH --error=%s'''%(num_io_process,jobname,logname,logname)
 
     if wait is not None:
         dependency ='''
@@ -82,6 +85,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     job += '''
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
+conda activate py310
 echo "The current job ID is $SLURM_JOB_ID"
 echo "Running on $SLURM_JOB_NUM_NODES nodes:"
 echo $SLURM_JOB_NODELIST

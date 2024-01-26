@@ -31,12 +31,12 @@ if __name__=="__main__":
     print (element_dict["H"])
         
     atom_types = 119
-    mult_types = 3
-    am_types = (atom_types -1)*(mult_types -1) + 1
-    print (am_types)
+    wyck_types = 3
+    aw_types = (atom_types -1)*(wyck_types -1) + 1
+    print (aw_types)
     idx = [element_dict[e] for e in ['H', 'C', 'O']]
-    am_mask = [0] + [0 if ((i-1)%(atom_types-1)+1 in idx) else 1 for i in range(1, am_types)]
+    aw_mask = [1] + [1 if ((i-1)%(atom_types-1)+1 in idx) else 0 for i in range(1, aw_types)] # 1 for possible elements
     print (idx )
-    print (am_mask)
+    print (aw_mask)
 
 

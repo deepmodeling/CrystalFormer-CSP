@@ -67,7 +67,6 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
         logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
 
-        # first convert one-hot to integer, then look for mask
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
                                            Kx+2*Kx*dim:Kx+2*Kx*dim+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1)
         mu = mu.reshape(Kl, 6)
