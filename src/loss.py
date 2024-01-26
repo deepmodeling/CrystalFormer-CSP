@@ -95,7 +95,7 @@ if __name__=='__main__':
     dim = 3
     dropout_rate = 0.1 
 
-    csv_file = './mini.csv'
+    csv_file = '../data/mini.csv'
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)

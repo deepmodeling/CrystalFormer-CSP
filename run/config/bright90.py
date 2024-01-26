@@ -2,8 +2,8 @@ import subprocess
 import numpy as np 
 import time 
 
-#nickname = 'perov-mixture-spacegroup'
-nickname = 'mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-perm'
+dataset = 'carbon'
+nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params'
 
 ###############################
 atom_types = 119
@@ -13,18 +13,16 @@ h0_size = 256
 transformer_layers = 4
 num_heads = 8
 key_size = 16
-model_size = 8
-dropout_rate = 0.1 
+model_size = 32
+dropout_rate = 0.0
 
 optimizer = 'adamw'
-weight_decay = 0.0
+weight_decay = 0.0 
 lr = 1e-4
 lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
 epochs = 10000
-
-dataset = 'mp_symm'
 
 if dataset == 'perov':
     n_max = 5 
@@ -69,7 +67,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a100
+#SBATCH --partition=a800
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --time=24:00:00

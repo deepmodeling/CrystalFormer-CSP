@@ -13,7 +13,7 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
 - [ ] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
-- [ ] write samples back to CIF file
+- [X] write samples back to CIF file
 
 enhancement
 - [X] extend the code to multiple atom species
@@ -21,7 +21,7 @@ enhancement
 - [X] consider perov_5 dataset
 - [X] consider space group as a pre-condition 
 - [ ] experiment with training with condition y, and conditional generation. 
-~~- [X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities~~
+~~[X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities~~
 - [X] fix the primitive versus conventional cell issue when loading the mp_20 dataset
 - [ ] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 

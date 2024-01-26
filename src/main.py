@@ -221,7 +221,7 @@ else:
         print ("L:\n", L)  # sampled lattice
         for a in A:
            print([element_list[i] for i in a])
-        print ("AW:\n", AW)
+        #print ("AW:\n", AW)
 
         LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

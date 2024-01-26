@@ -163,10 +163,7 @@ if __name__=='__main__':
 
     #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    #csv_file = '../data/mini.csv'
-    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
-    csv_file = './mini.csv'
-    #csv_file = '../data/symm_data/train.csv'
+    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
