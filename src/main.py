@@ -5,8 +5,9 @@ from jax.flatten_util import ravel_pytree
 import optax
 import os
 import multiprocessing
+import math
 
-from utils import GLXAW_from_file
+from utils import GLXAW_from_file, LXA_to_csv
 from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
@@ -57,6 +58,8 @@ group.add_argument('--spacegroup', type=int, help='The space group id to be samp
 group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
 group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 group.add_argument('--num_io_process', type=int, default=10, help='number of process used in multiprocessing io')
+group.add_argument('--num_test_sample', type=int, default=1, help='number of test samples')
+group.add_argument('--out_filename', type=str, default='output.csv', help='outfile to save sampled structures')
 
 args = parser.parse_args()
 
@@ -197,14 +200,21 @@ else:
     print (sigma.reshape(batchsize, args.Kl, 6))
  
     print("\n========== Start sampling ==========")
-    X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
-    print ("X:\n", X)
-    print ("A:\n", A)  # atom type
-    print ("W:\n", W)  # Wyckoff positions
-    print ("M:\n", M)
-    print ("N:\n", M.sum(axis=-1))
-    print ("L:\n", L)  # sampled lattice
-    for a in A: 
-       print([element_list[i] for i in a])
+    num_batches = math.ceil(args.num_test_sample / batchsize)
+    filename = os.path.join(args.test_path+args.out_filename)
+    for batch_idx in range(num_batches):
+        start_idx = batch_idx * batchsize
+        end_idx = min(start_idx + batchsize, args.num_test_sample)
+        n_sample = end_idx - start_idx
+        X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
+        LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
+        print ("X:\n", X)
+        print ("A:\n", A)  # atom type
+        print ("W:\n", W)  # Wyckoff positions
+        print ("M:\n", M)
+        print ("N:\n", M.sum(axis=-1))
+        print ("L:\n", L)  # sampled lattice
+        for a in A:
+           print([element_list[i] for i in a])
 
-    print ("AW:\n", AW)
+        print ("AW:\n", AW)

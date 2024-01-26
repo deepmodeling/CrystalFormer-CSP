@@ -8,6 +8,7 @@ from functools import partial
 from ast import literal_eval
 import multiprocessing
 import itertools
+import os
 
 from wyckoff import wyckoff_dict, mult_table
 
@@ -127,7 +128,8 @@ def LXA_to_csv(L, X, A, num_worker=1, filename='out_structure.csv'):
 
     data = pd.DataFrame()
     data['cif'] = structures
-    data.to_csv(filename, index=False)
+    header = False if os.path.exists(filename) else True
+    data.to_csv(filename, mode='a', index=False, header=header)
 
 
 if __name__=='__main__':
