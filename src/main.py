@@ -106,16 +106,21 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
 
 print("\n========== Prepare logs ==========")
-path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
+if args.optimizer != "none":
+    output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    +  "_" + transformer_name 
-os.makedirs(path, exist_ok=True)
-print("Create directory: %s" % path)
+
+    os.makedirs(output_path, exist_ok=True)
+    print("Create directory for output: %s" % output_path)
+else:
+    output_path = args.restore_path
+    print("Will output samples to: %s" % output_path)
 
 
 print("\n========== Load checkpoint==========")
-ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or path) 
+ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or output_path) 
 if ckpt_filename is not None:
     print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
     ckpt = checkpoint.load_data(ckpt_filename)
@@ -145,7 +150,7 @@ if args.optimizer != "none":
         pass 
  
     print("\n========== Start training ==========")
-    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, path)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
 
 else:
     print("\n========== Inference on test data ==========")
@@ -201,12 +206,13 @@ else:
  
     print("\n========== Start sampling ==========")
     num_batches = math.ceil(args.num_test_sample / batchsize)
-    filename = os.path.join(args.test_path+args.out_filename)
+    filename = os.path.join(output_path+'/'+args.out_filename)
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batchsize
         end_idx = min(start_idx + batchsize, args.num_test_sample)
         n_sample = end_idx - start_idx
-        X, A, W, M, L, AW = sample_crystal(key, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
+        key, subkey = jax.split(key)
+        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
         LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("X:\n", X)
         print ("A:\n", A)  # atom type
@@ -216,5 +222,5 @@ else:
         print ("L:\n", L)  # sampled lattice
         for a in A:
            print([element_list[i] for i in a])
-
         print ("AW:\n", AW)
+        print ("Wrote samples to %s"%filename)
