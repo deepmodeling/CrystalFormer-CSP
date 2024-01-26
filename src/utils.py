@@ -2,10 +2,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+from pyxtal import pyxtal
 from pymatgen.core import Structure, Lattice
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
-from ast import literal_eval
 import multiprocessing
 import itertools
 import os
@@ -78,12 +78,35 @@ def process_one(structure, atom_types, wyck_types, n_max, dim):
 
     return g, l, fc, aw
     
-def process_structure(cif):
-    try :
-        structure = Structure.from_dict(literal_eval(cif))
+def process_structure(cif, tol=0.01):
+    # Take from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
+    # get_symmetry_info
+    crystal = Structure.from_str(cif, fmt='cif')
+    spga = SpacegroupAnalyzer(crystal, symprec=tol)
+    crystal = spga.get_refined_structure()
+    c = pyxtal()
+    try:
+        c.from_seed(crystal, tol=0.01)
     except:
-        structure = Structure.from_str(cif, fmt='cif')
-    return structure
+        c.from_seed(crystal, tol=0.0001)
+
+    species = []
+    coords = []
+    for site in c.atom_sites:
+        specie = site.specie
+        coord = site.position
+        for syms in site.wp:
+            species.append(specie)
+            coords.append(syms.operate(coord))
+
+    crystal = Structure(
+        lattice=Lattice.from_parameters(*np.array(c.lattice.get_para(degree=True))),
+        species=species,
+        coords=coords,
+        coords_are_cartesian=False,
+    )
+
+    return crystal
 
 def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
     data = pd.read_csv(csv_file)
