@@ -108,7 +108,7 @@ def LXA_to_structure_single(L, X, A):
     lattice = Lattice.from_parameters(*L)
     # filter out zero
     zero_idx = np.where(A == 0)[0]
-    if zero_idx is not None:
+    if zero_idx is not None and len(zero_idx) > 0:
         idx = zero_idx[0]
         A = A[:idx]
         X = X[:idx]
