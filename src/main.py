@@ -211,9 +211,8 @@ else:
         start_idx = batch_idx * batchsize
         end_idx = min(start_idx + batchsize, args.num_test_sample)
         n_sample = end_idx - start_idx
-        key, subkey = jax.split(key)
+        key, subkey = jax.random.split(key)
         X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
-        LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("X:\n", X)
         print ("A:\n", A)  # atom type
         print ("W:\n", W)  # Wyckoff positions
@@ -223,4 +222,6 @@ else:
         for a in A:
            print([element_list[i] for i in a])
         print ("AW:\n", AW)
+
+        LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)
