@@ -32,9 +32,10 @@ def shuffle(key, data):
 
 def process_one(structure, atom_types, wyck_types, n_max, dim):
     analyzer = SpacegroupAnalyzer(structure, symprec=0.01) 
-    # refined_structure = analyzer.get_refined_structure()
-    # analyzer = SpacegroupAnalyzer(refined_structure)
+    refined_structure = analyzer.get_refined_structure()
+    analyzer = SpacegroupAnalyzer(refined_structure)
     symmetrized_structure = analyzer.get_symmetrized_structure()
+    # assert symmetrized_structure.matches(structure, stol=0.5, angle_tol=10, ltol=0.3)
 
     sg = analyzer.get_space_group_symbol()
     g = analyzer.get_space_group_number()
