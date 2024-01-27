@@ -103,3 +103,8 @@ sample
 ```bash 
 python ../src/main.py --n_max 20 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer none --train_path /home/wanglei/crystal_gpt/data/symm_data/train.csv --valid_path /home/wanglei/crystal_gpt/data/symm_data/val.csv --test_path /home/wanglei/crystal_gpt/data/symm_data/test.csv --dropout_rate 0.0 --restore_path /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_20_wd_0_Nf_5_K_16_16_h0_256_l_4_H_8_k_16_m_16_drop_0/ --spacegroup 123 
 ```
+
+evaluate
+```bash
+python ../scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset/mp_20/symm_data/ --filename out_structure.csv --output_path ./ --num_io_process 40
+```
