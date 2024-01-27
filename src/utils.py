@@ -10,7 +10,14 @@ import multiprocessing
 import itertools
 import os
 
-from wyckoff import wyckoff_dict, mult_table
+from wyckoff import mult_table
+from elements import element_list
+
+def letter_to_number(letter):
+    '''
+    'a' to 1 , 'b' to 2 , 'z' to 26, and 'A' to 27 
+    '''
+    return ord(letter) - ord('a') + 1 if 'a' <= letter <= 'z' else 27 if letter == 'A' else None
 
 @partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
 def to_A_W(AW, atom_types):
@@ -29,59 +36,9 @@ def shuffle(key, data):
     G, L, X, AW = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return G[idx], L[idx], X[idx], AW[idx]
-
-def process_one(structure, atom_types, wyck_types, n_max, dim):
-    analyzer = SpacegroupAnalyzer(structure, symprec=0.01) 
-    refined_structure = analyzer.get_refined_structure()
-    analyzer = SpacegroupAnalyzer(refined_structure)
-    symmetrized_structure = analyzer.get_symmetrized_structure()
-    # assert symmetrized_structure.matches(structure, stol=0.5, angle_tol=10, ltol=0.3)
-
-    sg = analyzer.get_space_group_symbol()
-    g = analyzer.get_space_group_number()
-    print (g, sg, structure.num_sites, symmetrized_structure.num_sites)
-    abc = tuple([l/symmetrized_structure.num_sites**(1./3.) for l in symmetrized_structure.lattice.abc])
-    l = abc + symmetrized_structure.lattice.angles # scale length with number of total atoms
-    num_sites = len(symmetrized_structure.equivalent_sites)
-    assert (n_max >= num_sites)
-
-    aw = []
-    ws = []
-    fc = []
-    for i, site in enumerate(symmetrized_structure.equivalent_sites):
-        a = site[0].specie.number # element number 
-        x = site[0].frac_coords
-        m = len(site)             # multiplicity
-        wyckoff_symbol = symmetrized_structure.wyckoff_symbols[i]
-        w = wyckoff_dict[g-1][wyckoff_symbol]
-        assert (a < atom_types)
-        assert (w < wyck_types)
-        aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
-        ws.append( wyckoff_symbol)
-        fc.append( x)
-        print ('g, a, w, m, symbol', g, a, w, m, wyckoff_symbol, x)
-    #sort atoms according to wyckoff symbol a-z,A
-    char_list = [''.join(filter(str.isalpha, s)) for s in ws]
-    idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
-    idx = np.array(idx)
-    ws = np.array(ws)[idx]
-    aw = np.array(aw)[idx]
-    fc = np.array(fc)[idx].reshape(num_sites, dim)
-    print (ws) 
     
-    aw = np.concatenate([aw,
-                         np.full((n_max - num_sites, ), 0)],
-                        axis=0)
-    fc = np.concatenate([fc, 
-                         np.full((n_max - num_sites, dim), 1e10)],
-                        axis=0)
-    print ('===================================')
-
-    return g, l, fc, aw
-    
-def process_structure(cif, tol=0.01):
-    # Take from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
-    # get_symmetry_info
+def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
+    # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
     crystal = Structure.from_str(cif, fmt='cif')
     spga = SpacegroupAnalyzer(crystal, symprec=tol)
     crystal = spga.get_refined_structure()
@@ -90,33 +47,61 @@ def process_structure(cif, tol=0.01):
         c.from_seed(crystal, tol=0.01)
     except:
         c.from_seed(crystal, tol=0.0001)
+    
+    g = c.group.number
+    num_sites = len(c.atom_sites)
+    assert (n_max >= num_sites)
 
-    species = []
-    coords = []
+    print (g, c.group.symbol, num_sites)
+    natoms = 0
+    aw = []
+    ws = []
+    fc = []
     for site in c.atom_sites:
-        specie = site.specie
-        coord = site.position
-        for syms in site.wp:
-            species.append(specie)
-            coords.append(syms.operate(coord))
+        a = element_list.index(site.specie) 
+        x = site.position
+        m = site.wp.multiplicity
+        w = letter_to_number(site.wp.letter)
+        symbol = str(m) + site.wp.letter
+        natoms += site.wp.multiplicity
+        assert (a < atom_types)
+        assert (w < wyck_types)
+        aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
+        ws.append( symbol )
+        fc.append( site.wp[0].operate(x))
+        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
+    #sort atoms according to wyckoff symbol a-z,A
+    char_list = [''.join(filter(str.isalpha, s)) for s in ws]
+    idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
+    idx = np.array(idx)
+    ws = np.array(ws)[idx]
+    aw = np.array(aw)[idx]
+    fc = np.array(fc)[idx].reshape(num_sites, dim)
+    print (ws, natoms) 
 
-    crystal = Structure(
-        lattice=Lattice.from_parameters(*np.array(c.lattice.get_para(degree=True))),
-        species=species,
-        coords=coords,
-        coords_are_cartesian=False,
-    )
+    aw = np.concatenate([aw,
+                         np.full((n_max - num_sites, ), 0)],
+                        axis=0)
+    fc = np.concatenate([fc, 
+                         np.full((n_max - num_sites, dim), 1e10)],
+                        axis=0)
+    
+    deg = 180.0 / np.pi 
+    abc = np.array([c.lattice.a, c.lattice.b, c.lattice.c])/natoms**(1./3.)
+    angles = np.array([c.lattice.alpha, c.lattice.beta, c.lattice.gamma])*deg
+    l = np.concatenate([abc, angles])
+    
+    print ('===================================')
 
-    return crystal
+    return g, l, fc, aw
 
 def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
 
     p = multiprocessing.Pool(num_workers)
-    structures = p.map_async(process_structure, cif_strings).get()
     partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max, dim=dim)
-    results = p.map_async(partial_process_one, structures).get()
+    results = p.map_async(partial_process_one, cif_strings).get()
     p.close()
     p.join()
 
@@ -158,13 +143,14 @@ def LXA_to_csv(L, X, A, num_worker=1, filename='out_structure.csv'):
 
 if __name__=='__main__':
     atom_types = 119
-    wyck_types = 30
+    wyck_types = 28
     n_max = 24
     dim = 3
-
-    #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    
+    #csv_file = './mini.csv'
+    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     

@@ -50,7 +50,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         h = h.reshape(n_max+1, 2, -1)
         hAW, hXL = h[:, 0, :], h[:, 1, :]
 
-        aw_logit = hAW[:-1] # (n_max, am_types)
+        aw_logit = hAW[:-1] # (n_max, aw_types)
         x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [Kx, 
                                                       Kx+Kx*dim, 
                                                       Kx+2*Kx*dim, 
