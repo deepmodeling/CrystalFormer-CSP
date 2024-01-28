@@ -31,6 +31,7 @@ enhancement
 - [X] build up (230, 28, 3) fc mask
 - [ ] `pmap` the code for multi-gpu training
 - [X] use pyxtal to load csv file (avoid build our own dataset)
+- [X] use dropout for the attention weights [flax example](https://github.com/google/flax/blob/main/flax/linen/attention.py), [haiku code we use](https://github.com/google-deepmind/dm-haiku/blob/main/haiku/_src/attention.py)
 
 always welcome
 - [ ] write more tests 

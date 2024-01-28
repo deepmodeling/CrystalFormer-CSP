@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import haiku as hk
 
 from wyckoff import wmax_table
+from attention import MultiHeadAttention
 
 def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4):
 
@@ -98,13 +99,15 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         del hX
 
         for _ in range(num_layers):
-            attn_block = hk.MultiHeadAttention(num_heads=num_heads,
+            attn_block = MultiHeadAttention(num_heads=num_heads,
                                                key_size=key_size,
                                                model_size=model_size,
-                                               w_init =initializer
+                                               w_init =initializer, 
+                                               dropout_rate =dropout_rate
                                               )
             h_norm = _layer_norm(h)
-            h_attn = attn_block(h_norm, h_norm, h_norm, mask=mask)
+            h_attn = attn_block(h_norm, h_norm, h_norm, 
+                                mask=mask, is_train=is_train)
             if is_train: 
                 h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
             h = h + h_attn
