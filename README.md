@@ -32,10 +32,13 @@ enhancement
 - [ ] `pmap` the code for multi-gpu training
 - [X] use pyxtal to load csv file (avoid build our own dataset)
 - [X] impose the order constraint W_0 <= W_1 <= W_2  ... <= W_n
+- [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions
+
 
 always welcome
 - [ ] write more tests 
 - [ ] polishing the code
+- [ ] more data!
 
 side project
 - [ ] symmetry constrainted flow-matching [this](https://github.com/wangleiphy/jax-flow-matching/) and spacegroup utils maybe useful
