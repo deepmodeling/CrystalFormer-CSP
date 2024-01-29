@@ -154,7 +154,10 @@ if args.optimizer != "none":
 
 else:
 
-    print("\n========== Inference on test data ==========")
+    print("\n========== Print out some test data ==========")
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
+
     G, L, X, AW = test_data
     print (G.shape, L.shape, X.shape, AW.shape)
     
@@ -181,34 +184,7 @@ else:
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print ("aw_types, xl_types:", aw_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
-    print ("outputs.shape", outputs.shape)
-
-    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
-    aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
-    print ("aw_logit.shape", aw_logit.shape)
-
-    # sample given ground truth
-    key, key_aw = jax.random.split(key)
-    AW_sample = jax.random.categorical(key_aw, aw_logit, axis=-1) # (batchsize, n_max+1, )
-    A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
-    print ("A_sample\n", A_sample)
-    print ("W_sample\n", W_sample)
-
-    outputs = outputs.reshape(batchsize, args.n_max+1, 2, aw_types)[:, :, 1, :]
-    offset = args.Kx+2*args.Kx*args.dim 
-    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
-                                                      offset:offset+args.Kl+2*6*args.Kl], 
-                                                      [args.Kl, args.Kl+6*args.Kl], axis=-1)
-    print (L[:batchsize])
-    print (jnp.exp(l_logit))
-    print (mu.reshape(batchsize, args.Kl, 6))
-    print (sigma.reshape(batchsize, args.Kl, 6))
- 
     print("\n========== Start sampling ==========")
-    import numpy as np 
-    np.set_printoptions(threshold=np.inf)
-
     num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
     filename = os.path.join(output_path, 
