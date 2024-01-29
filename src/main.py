@@ -106,7 +106,7 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
 
 print("\n========== Prepare logs ==========")
-if args.optimizer != "none":
+if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -153,6 +153,7 @@ if args.optimizer != "none":
     params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
 
 else:
+
     print("\n========== Inference on test data ==========")
     G, L, X, AW = test_data
     print (G.shape, L.shape, X.shape, AW.shape)
@@ -205,13 +206,16 @@ else:
     print (sigma.reshape(batchsize, args.Kl, 6))
  
     print("\n========== Start sampling ==========")
-    num_batches = math.ceil(args.num_samples / batchsize)
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
+
+    num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
     filename = os.path.join(output_path, 
                             f"{name}_{args.spacegroup}.{extension}")
     for batch_idx in range(num_batches):
-        start_idx = batch_idx * batchsize
-        end_idx = min(start_idx + batchsize, args.num_samples)
+        start_idx = batch_idx * args.batchsize
+        end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
         X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)

@@ -38,6 +38,7 @@ if __name__=='__main__':
     print (mult_table[221-1])
 
     print (wmax_table[47-1])
+    print (wmax_table[123-1])
 
     print (wmax_table)
     

@@ -26,7 +26,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         aw_types = (atom_types -1)*(wyck_types-1) + 1
         xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
         assert (aw_types > xl_types)
-        aw_max = wmax_table[G-1]*(atom_types-1)
+        aw_max = wmax_table[G-1]*(atom_types-1) #  (wmax-1) * (atom_types-1)+ (atom_types-1-1) +1  
 
         initializer = hk.initializers.TruncatedNormal(0.01)
 
@@ -125,13 +125,21 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = h.reshape(n, 2, -1)
         aw_logit, hXL = h[:, 0, :], h[:, 1, :]
         
+        # (1) impose W_0 <= W_1 <= W_2 ...
+        aw_mask = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:,None]-1)*(atom_types-1)+1 # (n, aw_types-1)
+        aw_mask = jnp.concatenate([jnp.zeros((n, 1)), aw_mask], axis=1) # (n, aw_types)
+        aw_logit = aw_logit - jnp.where(aw_mask, 1e10, 0.0)
+        aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
+
+        # (2) # enhance the probability of pad atoms if there is already a type 0 atom 
         aw_mask = jnp.concatenate(
                 [ jnp.where(A==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, aw_types-1))
                 ], axis = 1 )  # (n, aw_types) mask = 1 for those locations to place pad atoms of type 0
-        aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of pad atoms
+        aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0)
         aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
-        # mask out unavaiable position for the given spacegroup
+
+        # (3) mask out unavaiable position after aw_max for the given spacegroup
         aw_logit = jnp.where(jnp.arange(aw_types)<=aw_max, aw_logit,aw_logit-1e10)
         aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
 

@@ -10,7 +10,7 @@ import multiprocessing
 import itertools
 import os
 
-from wyckoff import mult_table
+from wyckoff import mult_table, wyckoff_dict
 from elements import element_list
 
 def letter_to_number(letter):
@@ -66,6 +66,7 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         natoms += site.wp.multiplicity
         assert (a < atom_types)
         assert (w < wyck_types)
+        assert (w == wyckoff_dict[g-1][symbol])
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
         ws.append( symbol )
         fc.append( site.wp[0].operate(x))
@@ -148,9 +149,9 @@ if __name__=='__main__':
     dim = 3
     
     #csv_file = './mini.csv'
-    csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
