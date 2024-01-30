@@ -6,7 +6,13 @@ from von_mises import sample_von_mises
 from utils import to_A_W
 from lattice import symmetrize_lattice
 from wyckoff import mult_table
-from symmetrize import apply_wyckoff_condition
+from symops import symops 
+
+@partial(jax.vmap, in_axes=(None, 0, 0, 0), out_axes=0)      # batch
+def map_x(G, w, x, idx):
+    op = symops[G-1, w-1, idx].reshape(3, 4)
+    affine_point = jnp.array([*x, 1]) # (4, )
+    return jnp.dot(op, affine_point)  # (3, )
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
 def inference(model, params, atom_types, G, X, AW):
@@ -53,7 +59,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
                                                                     ], axis=-1)
             #sample coordinate from mixture of von-mises distribution 
             # k is (batchsize, ) integer array whose value in [0, Kx) 
-            key, key_k, key_x = jax.random.split(key, 3)
+            key, key_k, key_x, key_op = jax.random.split(key, 4)
             k = jax.random.categorical(key_k, x_logit/temperature, axis=1)  # x_logit.shape : (batchsize, Kx)
 
             loc = loc.reshape(batchsize, Kx, dim)
@@ -64,9 +70,11 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
-            # impose constrain based on space group and wyckhoff index
+            # randomly project to a wyckoff position according to G and w
             w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
-            x = jax.vmap(apply_wyckoff_condition, (None, 0, 0))(G, w-1, x) 
+            idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
+            x = map_x(G, w, x, idx)
+
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
