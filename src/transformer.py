@@ -18,10 +18,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         W: (n, )  wyckoff position index
         M: (n, )  multiplicities
         '''
-    
+        
+        assert (X.ndim == 2 )
         assert (X.shape[0] == A.shape[0])
-        n = X.shape[0]
         assert (X.shape[1] == dim)
+        n = X.shape[0]
         
         aw_types = (atom_types -1)*(wyck_types-1) + 1
         xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
