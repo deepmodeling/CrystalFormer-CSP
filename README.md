@@ -33,7 +33,7 @@ enhancement
 - [X] use pyxtal to load csv file (avoid build our own dataset)
 - [X] impose the order constraint W_0 <= W_1 <= W_2  ... <= W_n
 - [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions. break autoregressive !
-- [ ] for those zero-dimensional wyckoff point impose the single occupy condition, e.g. a,b,c,d can only occur once in space group 225. one can detect dof via fc_mask ~~`np.linalg.matrix_rank(self.ops[0].rotation_matrix)`~~
+- [X] for those zero-dimensional wyckoff point impose the single occupy condition, e.g. a,b,c,d can only occur once in space group 225. one can detect dof via `np.linalg.matrix_rank(self.ops[0].rotation_matrix)` or fc_mask
 
 
 always welcome

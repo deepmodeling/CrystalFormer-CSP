@@ -66,7 +66,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             kappa = kappa.reshape(batchsize, Kx, dim)
             kappa = kappa[jnp.arange(batchsize), k]
 
-            x = sample_von_mises(key_x, loc, kappa*jnp.sqrt(temperature), (batchsize, dim)) # [-pi, pi]
+            x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
             # randomly project to a wyckoff position according to G and w
@@ -93,7 +93,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     mu = mu[jnp.arange(batchsize), k]
     sigma = sigma.reshape(batchsize, Kl, 6)
     sigma = sigma[jnp.arange(batchsize), k]
-    L = jax.random.normal(key_l, (batchsize, 6)) * sigma/temperature + mu # (batchsize, 6)
+    L = jax.random.normal(key_l, (batchsize, 6)) * sigma/jnp.sqrt(temperature) + mu # (batchsize, 6)
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)
