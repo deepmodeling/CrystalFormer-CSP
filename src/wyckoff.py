@@ -74,8 +74,6 @@ if __name__=='__main__':
     print (op)
     print ((op.sum(axis=1)!=0)) # fc_mask
 
-    sys.exit(1)
-
     print (mult_table[25-1]) # space group id -> multiplicity table
     print (mult_table[42-1])
     print (mult_table[47-1])
@@ -86,7 +84,7 @@ if __name__=='__main__':
     print (wmax_table[47-1])
     print (wmax_table[123-1])
 
-    print (wmax_table)
+    print ('wmax_table', wmax_table)
     
     atom_types = 119 
     aw_max = wmax_table*(atom_types-1)    # the maximum value of aw
