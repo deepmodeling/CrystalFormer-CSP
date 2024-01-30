@@ -36,7 +36,7 @@ df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/wyckoff_list.c
 df['Wyckoff Positions'] = df['Wyckoff Positions'].apply(eval)  # convert string to list
 wyckoff_positions = df['Wyckoff Positions'].tolist()
 
-symops = np.zeros((230, 27, 576, 3, 4)) # 576 is the least common multiple for all possible mult
+symops = np.zeros((230, 28, 576, 3, 4)) # 576 is the least common multiple for all possible mult
 mult_table = np.zeros((230, 28), dtype=int) # mult_table[g-1, w] = multiplicity , 28 because we had pad 0 
 wmax_table = np.zeros((230,), dtype=int)    # wmax_table[g-1] = number of possible wyckoff letters for g 
 
@@ -56,7 +56,7 @@ for g in range(230):
     for w, wyckoff in enumerate(wyckoffs):
         wyckoff = np.array(wyckoff)
         repeats = symops.shape[2] // wyckoff.shape[0]
-        symops[g, w, :, :, :] = np.tile(wyckoff, (repeats, 1, 1))
+        symops[g, w+1, :, :, :] = np.tile(wyckoff, (repeats, 1, 1))
 
 symops = jnp.array(symops)
 mult_table = jnp.array(mult_table)
@@ -69,7 +69,12 @@ if __name__=='__main__':
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
-    print (symops[195-1, 8, :12])
+    print (symops[225-1, 5, :4])
+    op = symops[225-1, 5, 2]
+    print (op)
+    print ((op.sum(axis=1)!=0)) # fc_mask
+
+    sys.exit(1)
 
     print (mult_table[25-1]) # space group id -> multiplicity table
     print (mult_table[42-1])
