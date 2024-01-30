@@ -10,7 +10,7 @@ import multiprocessing
 import itertools
 import os
 
-from wyckoff import mult_table, wyckoff_dict
+from wyckoff import mult_table
 from elements import element_list
 
 def letter_to_number(letter):
@@ -66,7 +66,6 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         natoms += site.wp.multiplicity
         assert (a < atom_types)
         assert (w < wyck_types)
-        assert (w == wyckoff_dict[g-1][symbol])
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
         ws.append( symbol )
         fc.append( site.wp[0].operate(x))

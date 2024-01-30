@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from utils import to_AW
-from symops import symops
+from wyckoff import symops
 
 def perm_augmentation(key, atom_types, X, A, W, M):
     '''

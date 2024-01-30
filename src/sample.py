@@ -5,8 +5,7 @@ from functools import partial
 from von_mises import sample_von_mises
 from utils import to_A_W
 from lattice import symmetrize_lattice
-from wyckoff import mult_table
-from symops import symops 
+from wyckoff import mult_table, symops
 
 @partial(jax.vmap, in_axes=(None, 0, 0, 0), out_axes=0)      # batch
 def map_x(G, w, x, idx):
