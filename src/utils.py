@@ -112,7 +112,7 @@ def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1)
     AW = jnp.array(AW).reshape(-1, n_max)
     return G, L, X, AW
 
-def LXA_to_structure_single(L, X, A):
+def GLXA_to_structure_single(G, L, X, A):
 
     lattice = Lattice.from_parameters(*L)
     # filter out zero
@@ -121,17 +121,19 @@ def LXA_to_structure_single(L, X, A):
         idx = zero_idx[0]
         A = A[:idx]
         X = X[:idx]
-    structure = Structure(lattice=lattice, species=A, coords=X, coords_are_cartesian=False).as_dict()
+    structure = Structure.from_spacegroup(sg=G, lattice=lattice, species=A, coords=X).as_dict()
 
     return structure
 
-def LXA_to_csv(L, X, A, num_worker=1, filename='out_structure.csv'):
+def GLXA_to_csv(G, L, X, A, num_worker=1, filename='out_structure.csv'):
 
     L = np.array(L)
     X = np.array(X)
     A = np.array(A)
     p = multiprocessing.Pool(num_worker)
-    structures = p.starmap_async(LXA_to_structure_single, zip(L, X, A)).get()
+    if isinstance(G, int):
+        G = np.array([G] * len(L))
+    structures = p.starmap_async(GLXA_to_structure_single, zip(G, L, X, A)).get()
     p.close()
     p.join()
 
