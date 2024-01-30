@@ -39,6 +39,7 @@ wyckoff_positions = df['Wyckoff Positions'].tolist()
 symops = np.zeros((230, 28, 576, 3, 4)) # 576 is the least common multiple for all possible mult
 mult_table = np.zeros((230, 28), dtype=int) # mult_table[g-1, w] = multiplicity , 28 because we had pad 0 
 wmax_table = np.zeros((230,), dtype=int)    # wmax_table[g-1] = number of possible wyckoff letters for g 
+dof0_table = np.ones((230, 28), dtype=bool)  # dof0_table[g-1, w] = True for those wyckoff points with dof = 0 (no continuous dof)
 
 for g in range(230):
     wyckoffs = []
@@ -57,10 +58,12 @@ for g in range(230):
         wyckoff = np.array(wyckoff)
         repeats = symops.shape[2] // wyckoff.shape[0]
         symops[g, w+1, :, :, :] = np.tile(wyckoff, (repeats, 1, 1))
+        dof0_table[g, w+1] = np.linalg.matrix_rank(wyckoff[0, :3, :3]) == 0
 
 symops = jnp.array(symops)
 mult_table = jnp.array(mult_table)
 wmax_table = jnp.array(wmax_table)
+dof0_table = jnp.array(dof0_table)
 
 if __name__=='__main__':
     print (symops.shape)
@@ -74,12 +77,19 @@ if __name__=='__main__':
     print (op)
     print ((op.sum(axis=1)!=0)) # fc_mask
 
+
     print (mult_table[25-1]) # space group id -> multiplicity table
     print (mult_table[42-1])
     print (mult_table[47-1])
     print (mult_table[99-1])
     print (mult_table[123-1])
     print (mult_table[221-1])
+
+    print ('dof0_table')
+    print (dof0_table[25-1])
+    print (dof0_table[42-1])
+    print (dof0_table[47-1])
+    print (dof0_table[225-1])
 
     print (wmax_table[47-1])
     print (wmax_table[123-1])
