@@ -8,8 +8,8 @@ from lattice import symmetrize_lattice
 from wyckoff import mult_table, symops
 
 @partial(jax.vmap, in_axes=(None, 0, 0, 0), out_axes=0)      # batch
-def map_x(G, w, x, idx):
-    op = symops[G-1, w-1, idx].reshape(3, 4)
+def map_x(g, w, x, idx):
+    op = symops[g-1, w-1, idx].reshape(3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
     return jnp.dot(op, affine_point)  # (3, )
 

@@ -37,8 +37,8 @@ df['Wyckoff Positions'] = df['Wyckoff Positions'].apply(eval)  # convert string 
 wyckoff_positions = df['Wyckoff Positions'].tolist()
 
 symops = np.zeros((230, 27, 576, 3, 4)) # 576 is the least common multiple for all possible mult
-mult_table = np.zeros((230, 28), dtype=int) # mult_table[g-1, w] = multiplicity 
-wmax_table = np.zeros((230,), dtype=int)    # wmax_table[g-1] = number of possible wyckoff letters 
+mult_table = np.zeros((230, 28), dtype=int) # mult_table[g-1, w] = multiplicity , 28 because we had pad 0 
+wmax_table = np.zeros((230,), dtype=int)    # wmax_table[g-1] = number of possible wyckoff letters for g 
 
 for g in range(230):
     wyckoffs = []
@@ -71,9 +71,6 @@ if __name__=='__main__':
 
     print (symops[195-1, 8, :12])
 
-
-    sys.exit(1)
-    
     print (mult_table[25-1]) # space group id -> multiplicity table
     print (mult_table[42-1])
     print (mult_table[47-1])
@@ -90,5 +87,3 @@ if __name__=='__main__':
     aw_max = wmax_table*(atom_types-1)    # the maximum value of aw
     print ( (aw_max-1)%(atom_types-1)+1 ) # = 118 
     print ( (aw_max-1)//(atom_types-1)+1 ) # = wmax
- 
-

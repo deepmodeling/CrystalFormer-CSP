@@ -231,10 +231,8 @@ wyckoff_list = [[1],                          # 1
                 ]
 
 from config import *
-
-from wyckoff import mult_table
-
-def test_wyckoff():
+def test_mult_table():
+    from wyckoff import mult_table
 
     def nonzero_part(arr):
         nonzero_indices = jnp.nonzero(arr)
@@ -249,4 +247,37 @@ def test_wyckoff():
     match(123)
     match(221)
 
+def test_wyckoff():
+    import pandas as pd
+    import os
+
+    df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/wyckoff_symbols.csv'))
+    df['Wyckoff Positions'] = df['Wyckoff Positions'].apply(eval)  # convert string to list
+
+    wyckoff_symbols = df['Wyckoff Positions'].tolist()
+
+    import numpy as np
+    import jax.numpy as jnp
+
+    wyckoff_list = []
+    wyckoff_dict = []
+    for ws in wyckoff_symbols:
+        wyckoff_list.append( [0] +[0 if w == "" else int(''.join(filter(str.isdigit, w))) for w in ws] )
+
+        ws = [""] + ws
+        wyckoff_dict.append( {value: index for index, value in enumerate(ws)} )
+
+    max_len = max(len(sublist) for sublist in wyckoff_list)
+    mult_table = np.zeros((len(wyckoff_list), max_len), dtype=int) # mult_table[g-1, w] = multiplicity 
+    wmax_table = np.zeros((len(wyckoff_list),), dtype=int)   # wmax_table[g-1] = number of wyckoff letters 
+    for i, sublist in enumerate(wyckoff_list):
+        mult_table[i, :len(sublist)] = sublist
+        wmax_table[i] = len(sublist)-1
+    mult_table = jnp.array(mult_table)
+    wmax_table = jnp.array(wmax_table)
+    
+    import wyckoff
+    assert jnp.allclose(mult_table, wyckoff.mult_table)
+    assert jnp.allclose(wmax_table, wyckoff.wmax_table)
+        
 test_wyckoff()
