@@ -12,7 +12,7 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] move code from notebook to script 
 - [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
-- [ ] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
+- [X] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
 - [X] write samples back to CIF file
 
 enhancement
@@ -23,7 +23,7 @@ enhancement
 - [ ] experiment with training with condition y, and conditional generation. 
 ~~[X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities~~
 - [X] fix the primitive versus conventional cell issue when loading the mp_20 dataset
-- [ ] train for MP20 and evaluate the model again
+- [X] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
 - [X] specify possible elements at sampling time
 - [X] implement more wyckoff symbols in `wyckoff.py`
@@ -32,7 +32,7 @@ enhancement
 - [ ] `pmap` the code for multi-gpu training
 - [X] use pyxtal to load csv file (avoid build our own dataset)
 - [X] impose the order constraint W_0 <= W_1 <= W_2  ... <= W_n
-- [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions
+- [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions. break autoregressive !
 
 
 always welcome
@@ -72,12 +72,12 @@ there is an associated data `M` stands for multiplicity, which can be read out b
 
 Sec. A2 of [MatterGen paper](https://arxiv.org/abs/2312.03687) contains a discussion of the relevant symmetries between them. 
 
-For X we consider to use a distributuion with periodic variables (e.g., wrapped Gaussuan, wrapped Cauchy, von Mises, ...). Here are some useful codes. In particular, we use mixture of von Mises distribution as the atom position is multi-modal. 
+For X we consider to use a distributuion with periodic variables (e.g., wrapped Gaussuan, wrapped Cauchy, von Mises, ...). Here are some useful codes. In particular, we use mixture of von Mises distribution as the atom position is multi-modal. von Mises might be the reason that we need to use float64 in the training. 
 
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/sampler.py
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
-For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
+For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate, and Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
 In practice, the space group label `G` plays three effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the lattice_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `symmetrize_lattice`  function.  3) G and W together constraints on the factional coordinate that is currenly used in training (via fc_mask and sym_ops data augmentation) and sampling (via symops projection)
 

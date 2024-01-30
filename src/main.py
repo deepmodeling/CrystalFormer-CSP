@@ -1,4 +1,5 @@
 import jax 
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp 
 from jax.flatten_util import ravel_pytree
 import optax
