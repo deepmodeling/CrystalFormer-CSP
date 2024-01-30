@@ -7,7 +7,7 @@ import os
 import multiprocessing
 import math
 
-from utils import GLXAW_from_file, LXA_to_csv
+from utils import GLXAW_from_file, GLXA_to_csv
 from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
@@ -205,5 +205,5 @@ else:
            print([element_list[i] for i in a])
         #print ("AW:\n", AW)
 
-        LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
+        GLXA_to_csv(args.spacegroup, L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

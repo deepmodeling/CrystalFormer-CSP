@@ -1,6 +1,6 @@
 from config import *
 
-from utils import to_A_W, to_AW, GLXAW_from_file, LXA_to_csv
+from utils import to_A_W, to_AW, GLXAW_from_file, GLXA_to_csv
 from wyckoff import mult_table
 
 
@@ -57,7 +57,7 @@ def test_io():
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     A, W = to_A_W(AW, atom_types)
 
-    LXA_to_csv(L[:num_test], X[:num_test], A[:num_test], num_worker=2, filename=out_file)
+    GLXA_to_csv(G[:num_test], L[:num_test], X[:num_test], A[:num_test], num_worker=2, filename=out_file)
     G_io, L_io, X_io, AW_io = GLXAW_from_file(out_file, atom_types, wyck_types, n_max, dim)
     A_io, W_io = to_A_W(AW_io, atom_types)
     if True:
