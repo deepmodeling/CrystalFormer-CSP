@@ -44,7 +44,7 @@ def map_augmentation(key, G, X, W):
     
     idx = jax.random.randint(key, (1,), 0, symops.shape[2]) # randomly sample an operation
     op = symops[G-1, W, idx].reshape(3, 4)
-    fc_mask = jnp.sum(op[:3, :3],axis=1)!=0 # fc_mask depends on the rotational matrix. True means active
+    fc_mask = jnp.sum(jnp.abs(op[:3, :3]),axis=1)!=0 # fc_mask depends on the rotational matrix. True means active
 
     affine_point = jnp.array([*X, 1]) # (4, )
     return jnp.dot(op, affine_point), fc_mask # (3, ), (3, )

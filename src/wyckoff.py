@@ -72,10 +72,11 @@ if __name__=='__main__':
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
-    print (symops[225-1, 5, :4])
-    op = symops[225-1, 5, 2]
+    print (symops[225-1, 8, :4])
+    op = symops[225-1, 8, 2]
     print (op)
-    print ((op.sum(axis=1)!=0)) # fc_mask
+    print ((jnp.abs(op[:3, :3]).sum(axis=1)!=0)) # fc_mask
+    sys.exit(1)
 
 
     print (mult_table[25-1]) # space group id -> multiplicity table
