@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from wyckoff import wmax_table
+from wyckoff import wmax_table, dof0_table
 
 def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4):
 
@@ -18,10 +18,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         W: (n, )  wyckoff position index
         M: (n, )  multiplicities
         '''
-    
+        
+        assert (X.ndim == 2 )
         assert (X.shape[0] == A.shape[0])
-        n = X.shape[0]
         assert (X.shape[1] == dim)
+        n = X.shape[0]
         
         aw_types = (atom_types -1)*(wyck_types-1) + 1
         xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
@@ -125,8 +126,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = h.reshape(n, 2, -1)
         aw_logit, hXL = h[:, 0, :], h[:, 1, :]
         
-        # (1) impose W_0 <= W_1 <= W_2 ...
-        aw_mask = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:,None]-1)*(atom_types-1)+1 # (n, aw_types-1)
+        # (1) impose W_0 < W_1 <= W_2 ... less for wyckoff points with zero dof, less euqal otherwise
+        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:, None]-1)*(atom_types-1)+1 
+        aw_mask_less = jnp.arange(1, aw_types).reshape(1, aw_types-1) < W[:, None]*(atom_types-1) + 1
+        aw_mask = jnp.where((dof0_table[G-1, W])[:, None], aw_mask_less, aw_mask_less_equal) # (n, aw_types-1)
+
         aw_mask = jnp.concatenate([jnp.zeros((n, 1)), aw_mask], axis=1) # (n, aw_types)
         aw_logit = aw_logit - jnp.where(aw_mask, 1e10, 0.0)
         aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
@@ -172,11 +176,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
     G = jnp.array(123)
     X = jax.random.uniform(key, (n_max, dim))
-    A = jax.random.uniform(key, (n_max, )) 
-    W = jax.random.uniform(key, (n_max, )) 
-    M = jax.random.uniform(key, (n_max, )) 
+    A = jnp.zeros((n_max, ), dtype=int) 
+    W = jnp.zeros((n_max, ), dtype=int) 
+    M = jnp.zeros((n_max, ), dtype=int) 
 
-    params = network.init(key, G, X, A, W, M, 0.0)
+    params = network.init(key, G, X, A, W, M, True)
     return params, network.apply
 
 def _layer_norm(x: jax.Array) -> jax.Array:

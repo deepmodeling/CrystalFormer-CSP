@@ -7,12 +7,11 @@ from von_mises import von_mises_logpdf
 from lattice import make_lattice_mask
 from utils import to_A_W, to_AW
 from wyckoff import mult_table
-from fc_mask import fc_mask_table
+from augmentation import perm_augmentation, map_augmentation
 
 def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
     lattice_mask = make_lattice_mask()
-    assert mult_table.shape[:2] == fc_mask_table.shape[:2] == (230, 28)
 
     @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, None), out_axes=0) # batch 
     def logp_fn(params, key, G, L, X, AW, is_train):
@@ -29,22 +28,10 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         num_sites = jnp.sum(A!=0)
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
-
-        if is_train:
-            #randomly permute atoms with the same wyckoff symbol for data augmentation
-            temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
-            key, subkey = jax.random.split(key)
-            idx_perm = jax.random.permutation(subkey, jnp.arange(n_max))
-            temp = temp[idx_perm]
-            idx_sort = jnp.argsort(temp)
-            idx = idx_perm[idx_sort]
-
-            X = X[idx]
-            A = A[idx]
-            W = W[idx]
-            M = M[idx]
-
-            AW = to_AW(A, W, atom_types)
+    
+        key, key_perm, key_map = jax.random.split(key, 3)
+        X, A, W, M, AM = perm_augmentation(key_perm, atom_types, X, A, W, M)
+        X, fc_mask = map_augmentation(key_map, G, X, W) # (n, dim) , (n, dim)
 
         h = transformer(params, key, G, X, A, W, M, is_train)
         h = h.reshape(n_max+1, 2, -1)
@@ -62,7 +49,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
 
-        fc_mask = jnp.logical_and((AW>0)[:, None], (fc_mask_table[G-1, W]>0)[None, :])
+        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask)
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
         logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  

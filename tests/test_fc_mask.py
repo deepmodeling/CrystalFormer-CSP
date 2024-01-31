@@ -30,5 +30,15 @@ for i, sub_list in enumerate(fc_mask_list):
         fc_mask_table[i, j+1, : ] = l   # we have added a padding of W=0
 fc_mask_table = jnp.array(fc_mask_table) # 1 in the fc_mask_table select those active fractional  coordinate  
 
-if __name__=='__main__':
-    print (fc_mask_table[25-1])
+from config import *
+
+def test_fc_mask():
+    from wyckoff import symops, wmax_table
+
+    for g in range(1, 231):
+        for w in range(1, wmax_table[g]+1):
+            op = symops[g-1, w, 0] # 0 since we conly consider the first wyckoff point in the equivalent class when building fc_mask_table
+            fc_mask = (op[:3, :3].sum(axis=1)!=0)
+            assert jnp.allclose(fc_mask, fc_mask_table[g-1, w])
+
+test_fc_mask() 

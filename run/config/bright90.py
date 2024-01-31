@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params'
+nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal'
 
 ###############################
 atom_types = 119
@@ -13,10 +13,11 @@ h0_size = 256
 transformer_layers = 4
 num_heads = 8
 key_size = 16
-model_size = 64
-dropout_rate = 0.0
+model_size = 32
+dropout_rate = 0.5
+Nf = 10 
 
-optimizer = 'adamw'
+optimizer = 'adam'
 weight_decay = 0.0 
 lr = 1e-4
 lr_decay = 0.0
