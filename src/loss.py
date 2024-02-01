@@ -62,11 +62,15 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
         
-        return logp_x + logp_aw + logp_l
+        return logp_x, logp_aw, logp_l
 
     def loss_fn(params, key, G, L, X, AW, is_train):
-        logp = logp_fn(params, key, G, L, X, AW, is_train)
-        return -jnp.mean(logp)
+        logp_x, logp_aw, logp_l = logp_fn(params, key, G, L, X, AW, is_train)
+        loss_x = -jnp.mean(logp_x)
+        loss_aw = -jnp.mean(logp_aw)
+        loss_l = -jnp.mean(logp_l)
+
+        return loss_x + loss_aw + loss_l, (loss_x, loss_aw, loss_l)
         
     return loss_fn
 
@@ -90,8 +94,8 @@ if __name__=='__main__':
 
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
-    value, grad = jax.value_and_grad(loss_fn)(params, key, G[:1], L[:1], X[:1], AW[:1], True)
+    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1], AW[:1], True)
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn)(params, key, G[:1], L[:1], X[:1]-1.0, AW[:1], True)
+    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1]-1.0, AW[:1], True)
     print (value)
