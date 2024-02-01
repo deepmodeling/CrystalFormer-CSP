@@ -7,7 +7,7 @@ import haiku as hk
 
 from wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4):
+def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
 
     @hk.transform
     def network(G, X, A, W, M, is_train):
@@ -58,7 +58,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                                                       ])
             # ensure positivity
             kappa = jax.nn.softplus(kappa) 
-            sigma = jax.nn.softplus(sigma)
+            sigma = jax.nn.softplus(sigma) + sigmamin
             # normalization
             x_logit -= jax.scipy.special.logsumexp(x_logit)
             l_logit -= jax.scipy.special.logsumexp(l_logit) 
@@ -155,7 +155,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                                                   ], axis=-1)
         # ensure positivity
         kappa = jax.nn.softplus(kappa) 
-        sigma = jax.nn.softplus(sigma)
+        sigma = jax.nn.softplus(sigma) + sigmamin
 
         # normalization
         x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
