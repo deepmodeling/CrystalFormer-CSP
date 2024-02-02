@@ -50,7 +50,7 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     
     g = c.group.number
     num_sites = len(c.atom_sites)
-    assert (n_max >= num_sites)
+    assert (n_max > num_sites) # we will need at least one empty site for output of L params
 
     print (g, c.group.symbol, num_sites)
     natoms = 0
