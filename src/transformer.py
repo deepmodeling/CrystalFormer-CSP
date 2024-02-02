@@ -100,7 +100,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = hk.Linear(aw_types, w_init=initializer)(h) # (2*n, aw_types)
         
         h = h.reshape(n, 2, -1)
-        aw_logit, hXL = h[:, 0, :], h[:, 1, :]
+        hXL, aw_logit = h[:, 0, :], h[:, 1, :]
         
         # (1) impose W_0 < W_1 <= W_2 ... less for wyckoff points with zero dof, less euqal otherwise
         aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:, None]-1)*(atom_types-1)+1 
