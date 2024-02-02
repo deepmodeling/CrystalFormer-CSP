@@ -20,7 +20,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
             M: (n, )  multiplicities
             is_train: bool 
         Returns: 
-            h: (2n+1, aw_types) it contains params [aw_1, xl_1, aw_1, ..., xl_{n-1}, aw_n]
+            h: (2n+1, aw_types) it contains params [aw_1, xl_1, aw_1, ..., xl_n, aw_{n+1}]
         '''
         
         assert (X.ndim == 2 )
