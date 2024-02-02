@@ -33,15 +33,15 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         X, A, W, M, AM = perm_augmentation(key_perm, atom_types, X, A, W, M)
         X, fc_mask = map_augmentation(key_map, G, X, W) # (n, dim) , (n, dim)
 
-        h = transformer(params, key, G, X, A, W, M, is_train)
-        h = h.reshape(n_max+1, 2, -1)
-        hAW, hXL = h[:, 0, :], h[:, 1, :]
+        h = transformer(params, key, G, X, A, W, M, is_train) # (2*n_max+1, ...)
+        hAW = h[::2, :] # (n_max+1, aw_types) 
+        hXL = h[1::2, :] # (n_max, aw_types)
 
         aw_logit = hAW[:-1] # (n_max, aw_types)
-        x_logit, loc, kappa, _ = jnp.split(hXL[:-1], [Kx, 
-                                                      Kx+Kx*dim, 
-                                                      Kx+2*Kx*dim, 
-                                                      ], axis=-1) 
+        x_logit, loc, kappa, _ = jnp.split(hXL, [Kx, 
+                                                 Kx+Kx*dim, 
+                                                 Kx+2*Kx*dim, 
+                                                 ], axis=-1) 
 
         loc = loc.reshape(n_max, Kx, dim)
         kappa = kappa.reshape(n_max, Kx, dim)

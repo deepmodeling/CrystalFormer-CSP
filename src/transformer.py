@@ -12,11 +12,15 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
     @hk.transform
     def network(G, X, A, W, M, is_train):
         '''
-        G: scalar integer for space group id 1-230
-        X: (n, dim)
-        A: (n, )  element type 
-        W: (n, )  wyckoff position index
-        M: (n, )  multiplicities
+        Args:
+            G: scalar integer for space group id 1-230
+            X: (n, dim)
+            A: (n, )  element type 
+            W: (n, )  wyckoff position index
+            M: (n, )  multiplicities
+            is_train: bool 
+        Returns: 
+            h: (2n+1, aw_types) it contains params [aw_1, xl_1, aw_1, ..., xl_n, aw_{n+1}]
         '''
         
         assert (X.ndim == 2 )
@@ -39,39 +43,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         # normalization
         aw_logit -= jax.scipy.special.logsumexp(aw_logit) # (aw_types, )
                
-        if n > 0: 
-            G_one_hot = jax.nn.one_hot(G-1, 230)
-            hXL = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
-                                jax.nn.gelu,
-                                hk.Linear(xl_types, w_init=initializer)]
-                                )(jnp.concatenate([G_one_hot,              
-                                                   jax.nn.one_hot(A[0], atom_types), 
-                                                   jax.nn.one_hot(W[0], wyck_types), 
-                                                   M[0, None]
-                                                   ],axis=0)) #(230+atom_types+wyck_types+1, ) -> (xl_types, )
-     
-            x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL, [Kx, 
-                                                                      Kx+Kx*dim, 
-                                                                      Kx+2*Kx*dim, 
-                                                                      Kx+2*Kx*dim+Kl, 
-                                                                      Kx+2*Kx*dim+Kl+Kl*6, 
-                                                                      ])
-            # ensure positivity
-            kappa = jax.nn.softplus(kappa) 
-            sigma = jax.nn.softplus(sigma) + sigmamin
-            # normalization
-            x_logit -= jax.scipy.special.logsumexp(x_logit)
-            l_logit -= jax.scipy.special.logsumexp(l_logit) 
-            # make it up to aw_types
-            hXL = jnp.concatenate([x_logit, loc, kappa, 
-                                   l_logit, mu, sigma, 
-                                   jnp.zeros(aw_types-xl_types)])  # (aw_types,)
-        else:
-            hXL = jnp.zeros((aw_types,))
-        h0 = jnp.concatenate([aw_logit[None, :], hXL[None, :]], axis=0) # (2, aw_types)
+        h0 = aw_logit[None, :]  # (1, aw_types)
         if n == 0: return h0
 
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
+        G_one_hot = jax.nn.one_hot(G-1, 230)
 
         hAM = jnp.concatenate([G_one_hot.reshape(1, 230).repeat(n, axis=0),  # (n, 230)
                                jax.nn.one_hot(A, atom_types), # (n, atom_types)
@@ -124,7 +100,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = hk.Linear(aw_types, w_init=initializer)(h) # (2*n, aw_types)
         
         h = h.reshape(n, 2, -1)
-        aw_logit, hXL = h[:, 0, :], h[:, 1, :]
+        hXL, aw_logit = h[:, 0, :], h[:, 1, :]
         
         # (1) impose W_0 < W_1 <= W_2 ... less for wyckoff points with zero dof, less euqal otherwise
         aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:, None]-1)*(atom_types-1)+1 
@@ -166,10 +142,12 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                jnp.zeros((n, aw_types - xl_types))
                                ], axis=-1) # (n, aw_types)
         
-        h = jnp.concatenate([aw_logit[:, None, :], hXL[:, None, :]], axis=1) # (n, 2, aw_types)
+        h = jnp.concatenate([hXL[:, None, :], 
+                             aw_logit[:, None, :]
+                             ], axis=1) # (n, 2, aw_types)
         h = h.reshape(2*n, aw_types) # (2*n, aw_types)
 
-        h = jnp.concatenate( [h0, h], axis = 0) # (2*n+2, aw_types)
+        h = jnp.concatenate( [h0, h], axis = 0) # (2*n+1, aw_types)
 
         return h
  
