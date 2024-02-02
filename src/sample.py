@@ -33,10 +33,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     for i in range(2*n_max):
 
         if i%2 ==0: # AW_n ~ p(AW_n | AW_1, X_1, ..., AW_(n-1), X_(n-1))
-            outputs = inference(transformer, params, atom_types, G, X, AW)[:, -2:]
-            outputs = outputs.reshape(batchsize, 2, aw_types)
-            aw_logit = outputs[:, 0, :] # (batchsize, aw_types)
-
+            aw_logit = inference(transformer, params, atom_types, G, X, AW)[:, -1] # (batchsize, aw_types)
             key, key_aw = jax.random.split(key)
 
             aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sawpling, not computing logp)
@@ -47,9 +44,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             # pad another zero to match the dimensionality of AW
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
-            outputs = inference(transformer, params, atom_types, G, Xpad, AW)[:, -4:-2]
-            outputs = outputs.reshape(batchsize, 2, aw_types)
-            hXL = outputs[:, 1, :] # (batchsize, aw_types)
+            hXL = inference(transformer, params, atom_types, G, Xpad, AW)[:, -2] # (batchsize, aw_types)
 
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
                                                                      [Kx, 
