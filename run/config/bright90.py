@@ -3,19 +3,19 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal'
+nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal-aug-sigmamin'
 
 ###############################
 atom_types = 119
 
-Kx, Kl = 16, 16
+Kx, Kl = 48, 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
-key_size = 16
-model_size = 32
-dropout_rate = 0.5
-Nf = 10 
+key_size = 32
+model_size = 512
+dropout_rate = 0.1
+Nf = 5
 
 optimizer = 'adam'
 weight_decay = 0.0 
@@ -28,7 +28,7 @@ epochs = 50000
 num_io_process = 40
 
 if dataset == 'perov':
-    n_max = 5 
+    n_max = 6
     wyck_types = 10
 
     train_path = '/home/wanglei/cdvae/data/perov_5/train.csv'
@@ -36,23 +36,15 @@ if dataset == 'perov':
     test_path = '/home/wanglei/cdvae/data/perov_5/test.csv'
 
 elif dataset == 'mp':
-    n_max = 20
+    n_max = 21
     wyck_types = 28
 
     train_path = '/home/wanglei/cdvae/data/mp_20/train.csv'
     valid_path = '/home/wanglei/cdvae/data/mp_20/val.csv'
     test_path = '/home/wanglei/cdvae/data/mp_20/test.csv'
 
-elif dataset == "mp_symm":
-    n_max = 20
-    wyck_types = 28
-
-    train_path = '/home/wanglei/crystal_gpt/data/symm_data/train.csv'
-    valid_path = '/home/wanglei/crystal_gpt/data/symm_data/val.csv'
-    test_path = '/home/wanglei/crystal_gpt/data/symm_data/test.csv'
-
 elif dataset == 'carbon':
-    n_max = 24
+    n_max = 25
     wyck_types = 28
 
     train_path = '/home/wanglei/cdvae/data/carbon_24/train.csv'
@@ -70,7 +62,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     #prepare the job file 
     job='''#!/bin/bash -l
-#SBATCH --partition=a100
+#SBATCH --partition=a800
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --gres=gpu:1
