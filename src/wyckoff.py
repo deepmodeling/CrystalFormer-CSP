@@ -65,6 +65,25 @@ mult_table = jnp.array(mult_table)
 wmax_table = jnp.array(wmax_table)
 dof0_table = jnp.array(dof0_table)
 
+def symmetrize_atoms(g, w, x):
+    '''
+    Args:
+       g: int 
+       w: int
+       x: (3,)
+    Returns:
+       xs: (M, 3)  symmetrize atom positions
+    '''
+    m = mult_table[g-1, w] 
+    ops = symops[g-1, w, :m]
+    affine_point = jnp.array([*x, 1]) # (4, )
+    xs = []
+    for op in ops:
+        xs.append( jnp.dot(op, affine_point)[None, :])
+    xs = jnp.concatenate(xs, axis=0) # (M, 3)
+    xs -= jnp.floor(xs) # wrap back to 0-1 
+    return xs
+
 if __name__=='__main__':
     print (symops.shape)
     print (symops.size*symops.dtype.itemsize//(1024*1024))
@@ -72,28 +91,35 @@ if __name__=='__main__':
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
-    print (symops[225-1, 8, :4])
-    op = symops[225-1, 8, 2]
+    print (symops[166-1,3, :6])
+    op = symops[166-1, 3, 0]
     print (op)
     print ((jnp.abs(op[:3, :3]).sum(axis=1)!=0)) # fc_mask
-    sys.exit(1)
 
+    print (mult_table[166-1])
 
+    sys.exit(0)
+    
+    print ('mult_table')
     print (mult_table[25-1]) # space group id -> multiplicity table
     print (mult_table[42-1])
     print (mult_table[47-1])
     print (mult_table[99-1])
     print (mult_table[123-1])
     print (mult_table[221-1])
+    print (mult_table[166-1])
 
     print ('dof0_table')
     print (dof0_table[25-1])
     print (dof0_table[42-1])
     print (dof0_table[47-1])
     print (dof0_table[225-1])
-
+    print (dof0_table[166-1])
+    
+    print ('wmax_table')
     print (wmax_table[47-1])
     print (wmax_table[123-1])
+    print (wmax_table[166-1])
 
     print ('wmax_table', wmax_table)
     

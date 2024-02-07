@@ -279,5 +279,19 @@ def test_wyckoff():
     import wyckoff
     assert jnp.allclose(mult_table, wyckoff.mult_table)
     assert jnp.allclose(wmax_table, wyckoff.wmax_table)
-        
+
+def test_symmetrize_atoms():
+    from wyckoff import symmetrize_atoms
+    g = 166 
+    W = jnp.array(3)
+    X = jnp.array([0., 0., 0.5619])
+
+    Xs = symmetrize_atoms(g, W, X)
+
+    print (Xs)
+
+
+test_symmetrize_atoms()
 test_wyckoff()
+
+
