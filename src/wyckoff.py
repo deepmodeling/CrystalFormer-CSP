@@ -72,15 +72,12 @@ def symmetrize_atoms(g, w, x):
        w: int
        x: (3,)
     Returns:
-       xs: (M, 3)  symmetrize atom positions
+       xs: (m, 3)  symmetrize atom positions
     '''
     m = mult_table[g-1, w] 
-    ops = symops[g-1, w, :m]
+    ops = symops[g-1, w, :m]   # (m, 3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
-    xs = []
-    for op in ops:
-        xs.append( jnp.dot(op, affine_point)[None, :])
-    xs = jnp.concatenate(xs, axis=0) # (M, 3)
+    xs = ops@affine_point # (m, 3)
     xs -= jnp.floor(xs) # wrap back to 0-1 
     return xs
 
