@@ -34,12 +34,23 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         aw_max = wmax_table[G-1]*(atom_types-1) #  (wmax-1) * (atom_types-1)+ (atom_types-1-1) +1  
 
         initializer = hk.initializers.TruncatedNormal(0.01)
+        
+        G_one_hot = jax.nn.one_hot(G-1, 230) # extend this if there are property conditions
+        if h0_size >0:
+            # compute aw_logits depending on G_one_hot
+            aw_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+                                      jax.nn.gelu,
+                                      hk.Linear(aw_types, w_init=initializer)]
+                                     )(G_one_hot)
+        else:
+            # aw_logit of the first atom is simply a table
+            aw_params = hk.get_parameter('aw_params', [230, aw_types], init=initializer)
+            aw_logit = aw_params[G-1]
 
-        # aw_logit of the first atom is simply a table
-        aw_params = hk.get_parameter('aw_params', [230, aw_types], init=initializer)
-        aw_logit = aw_params[G-1]
-        # mask out unavaiable position for the given spacegroup
-        aw_logit = jnp.where(jnp.arange(aw_types)<=aw_max, aw_logit, aw_logit-1e10)
+        # (1) the first atom should not be the pad atom
+        # (2) mask out unavaiable position for the given spacegroup
+        aw_mask = jnp.logical_and(jnp.arange(aw_types)>0, jnp.arange(aw_types)<=aw_max)
+        aw_logit = jnp.where(aw_mask, aw_logit, aw_logit-1e10)
         # normalization
         aw_logit -= jax.scipy.special.logsumexp(aw_logit) # (aw_types, )
                
@@ -47,7 +58,6 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         if n == 0: return h0
 
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
-        G_one_hot = jax.nn.one_hot(G-1, 230)
 
         hAM = jnp.concatenate([G_one_hot.reshape(1, 230).repeat(n, axis=0),  # (n, 230)
                                jax.nn.one_hot(A, atom_types), # (n, atom_types)
