@@ -65,6 +65,27 @@ mult_table = jnp.array(mult_table)
 wmax_table = jnp.array(wmax_table)
 dof0_table = jnp.array(dof0_table)
 
+#https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L547
+def in_array_list(array_list: list[np.ndarray] | np.ndarray, arr: np.ndarray, tol: float = 1e-5) -> bool:
+    """Extremely efficient nd-array comparison using numpy's broadcasting. This
+    function checks if a particular array a, is present in a list of arrays.
+    It works for arrays of any size, e.g., even matrix searches.
+
+    Args:
+        array_list ([array]): A list of arrays to compare to.
+        arr (array): The test array for comparison.
+        tol (float): The tolerance. Defaults to 1e-5. If 0, an exact match is done.
+
+    Returns:
+        (bool)
+    """
+    if len(array_list) == 0:
+        return False
+    axes = tuple(range(1, arr.ndim + 1))
+    if not tol:
+        return any(np.all(array_list == arr[None, :], axes))
+    return any(np.sum(np.abs(array_list - arr[None, :]), axes) < tol)
+
 def symmetrize_atoms(g, w, x):
     '''
     Args:
@@ -72,14 +93,25 @@ def symmetrize_atoms(g, w, x):
        w: int
        x: (3,)
     Returns:
-       xs: (m, 3)  symmetrize atom positions
+       xs: (m, 3)  symmetrized atom positions
     '''
-    m = mult_table[g-1, w] 
-    ops = symops[g-1, w, :m]   # (m, 3, 4)
+    # (1) apply all space group symmetry ops to x 
+    wmax = wmax_table[g-1]
+    m = mult_table[g-1, wmax]
+    ops = symops[g-1, wmax, :m] # (m, 3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
     xs = ops@affine_point # (m, 3)
-    xs -= jnp.floor(xs) # wrap back to 0-1 
-    return xs
+    
+    # (2) deduplication to select the orbit 
+    #https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L148  
+    orbit: list[np.ndarray] = []
+    for pp in xs:
+        pp = np.mod(np.round(pp, decimals=10), 1)
+        if not in_array_list(orbit, pp):
+            orbit.append(pp)
+    orbit -= np.floor(orbit)   # wrap back to 0-1 
+    assert (orbit.shape[0] == mult_table[g-1, w])
+    return orbit
 
 if __name__=='__main__':
     print (symops.shape)
@@ -92,9 +124,10 @@ if __name__=='__main__':
     op = symops[166-1, 3, 0]
     print (op)
     print ((jnp.abs(op[:3, :3]).sum(axis=1)!=0)) # fc_mask
-
-    print (mult_table[166-1])
-
+    
+    w_max = wmax_table[225-1]
+    m_max = mult_table[225-1, w_max]
+    print ('w_max, m_max', w_max, m_max)
     sys.exit(0)
     
     print ('mult_table')

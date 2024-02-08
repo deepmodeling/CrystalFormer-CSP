@@ -281,15 +281,35 @@ def test_wyckoff():
     assert jnp.allclose(wmax_table, wyckoff.wmax_table)
 
 def test_symmetrize_atoms():
-    from wyckoff import symmetrize_atoms
+    from wyckoff import symmetrize_atoms, mult_table
+    from pymatgen.symmetry.groups import SpaceGroup
+    def symmetrize_atoms_pmg(g, w, x):
+        sg = SpaceGroup.from_int_number(g)
+        xs = sg.get_orbit(x)
+        m = mult_table[g-1, w]  
+        assert (len(xs) == m) # double check that the orbit has the right length
+        return np.array(xs)
+
+    def allclose_up_to_permutation(xs, xs_pmg):
+        # Sort each array lexicographically by rows
+        sorted_xs = xs[np.lexsort(np.rot90(xs))]
+        sorted_xs_pmg = xs_pmg[np.lexsort(np.rot90(xs_pmg))]
+        # Check if the sorted arrays are equal
+        return np.allclose(sorted_xs, sorted_xs_pmg)
+ 
     g = 166 
-    W = jnp.array(3)
-    X = jnp.array([0., 0., 0.5619])
+    w = jnp.array(3)
+    x = jnp.array([0., 0., 0.5619])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
 
-    Xs = symmetrize_atoms(g, W, X)
-
-    print (Xs)
-
+    g = 225
+    w = jnp.array(5)
+    x = jnp.array([0., 0., 0.7334])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
 
 test_symmetrize_atoms()
 test_wyckoff()

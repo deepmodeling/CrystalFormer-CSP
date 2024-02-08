@@ -47,5 +47,6 @@ def map_augmentation(key, G, X, W):
     fc_mask = jnp.sum(jnp.abs(op[:3, :3]),axis=1)!=0 # fc_mask depends on the rotational matrix. True means active
 
     affine_point = jnp.array([*X, 1]) # (4, )
-    return jnp.dot(op, affine_point), fc_mask # (3, ), (3, )
-    
+    X = jnp.dot(op, affine_point)
+    X -= jnp.floor(X)
+    return X, fc_mask # (3, ), (3, )

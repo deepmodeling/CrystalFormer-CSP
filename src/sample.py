@@ -7,20 +7,44 @@ from utils import to_A_W
 from lattice import symmetrize_lattice
 from wyckoff import mult_table, symops
 
-@partial(jax.vmap, in_axes=(None, 0, 0, 0), out_axes=0)      # batch
-def map_x(g, w, x, idx):
+@partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0), out_axes=0)      # batch
+def project_x(g, w_max, m_max, w, x, idx):
+    '''
+    project x to the selected Wyckoff point
+    '''
+    # we carry out the projection in 3 steps 
+
+    # (1) apply all space group symmetry op to the x 
+    ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
+    affine_point = jnp.array([*x, 1]) # (4, )
+    coords = ops@affine_point # (m_max, 3) 
+    coords -= jnp.floor(coords)
+    
+    # (2) search for the generator which satisfies op0(x) = x , i.e. the first Wyckoff position 
+    # here we solve it in a jit friendly way by looking for the minimal distance solution for the lhs and rhs  
+    #https://github.com/qzhu2017/PyXtal/blob/82e7d0eac1965c2713179eeda26a60cace06afc8/pyxtal/wyckoff_site.py#L115
+    def dist_to_op0x(coord):
+        diff = jnp.dot(symops[g-1, w, 0], jnp.array([*coord, 1])) - coord
+        diff -= jnp.floor(diff)
+        return jnp.sum(diff**2) 
+    idx = jnp.argmin(jax.vmap(dist_to_op0x)(coords))
+    x = coords[idx].reshape(3,)
+
+    # (3) lastly, apply the given symmetry op to x
     op = symops[g-1, w, idx].reshape(3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
-    return jnp.dot(op, affine_point)  # (3, )
+    x = jnp.dot(op, affine_point)  # (3, )
+    x -= jnp.floor(x)
+    return x 
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
-def inference(model, params, atom_types, G, X, AW):
+def inference(model, params, atom_types, g, X, AW):
     A, W = to_A_W(AW, atom_types) 
-    M = mult_table[G-1, W]  
-    return model(params, None, G, X, A, W, M, False)
+    M = mult_table[g-1, W]  
+    return model(params, None, g, X, A, W, M, False)
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, G, aw_mask, temperature):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, w_max, m_max, aw_mask, temperature):
     
     aw_types = (atom_types -1)*(wyck_types -1) + 1
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
@@ -29,11 +53,10 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     AW = jnp.zeros((batchsize, 0), dtype=int)
     L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice paraws and sawple lattice after
 
-    #TODO replace this with a lax.scan
     for i in range(2*n_max):
 
         if i%2 ==0: # AW_n ~ p(AW_n | AW_1, X_1, ..., AW_(n-1), X_(n-1))
-            aw_logit = inference(transformer, params, atom_types, G, X, AW)[:, -1] # (batchsize, aw_types)
+            aw_logit = inference(transformer, params, atom_types, g, X, AW)[:, -1] # (batchsize, aw_types)
             key, key_aw = jax.random.split(key)
 
             aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sawpling, not computing logp)
@@ -44,7 +67,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             # pad another zero to match the dimensionality of AW
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
-            hXL = inference(transformer, params, atom_types, G, Xpad, AW)[:, -2] # (batchsize, aw_types)
+            hXL = inference(transformer, params, atom_types, g, Xpad, AW)[:, -2] # (batchsize, aw_types)
 
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
                                                                      [Kx, 
@@ -64,17 +87,17 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
 
-            # randomly project to a wyckoff position according to G and w
+            # randomly project to a wyckoff position according to g and w
             w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
             idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
-            x = map_x(G, w, x, idx)
+            x = project_x(g, w_max, m_max, w, x, idx)
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
     A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
-    M = mult_table[G-1, W]
+    M = mult_table[g-1, W]
     num_sites = jnp.sum(A!=0, axis=1)
     num_atoms = jnp.sum(M, axis=1)
     
@@ -96,6 +119,6 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     L = jnp.concatenate([length, angle], axis=-1)
 
     #impose space group constraint to lattice paraws
-    L = jax.vmap(symmetrize_lattice, (None, 0))(G, L)  
+    L = jax.vmap(symmetrize_lattice, (None, 0))(g, L)  
 
     return X, A, W, M, L, AW

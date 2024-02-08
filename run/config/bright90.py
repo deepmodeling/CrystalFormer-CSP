@@ -9,11 +9,11 @@ nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mu
 atom_types = 119
 
 Kx, Kl = 48, 16
-h0_size = 256
+h0_size = 0
 transformer_layers = 4
 num_heads = 8
-key_size = 32
-model_size = 512
+key_size = 16
+model_size = 32
 dropout_rate = 0.1
 Nf = 5
 
