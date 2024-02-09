@@ -66,9 +66,10 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         natoms += site.wp.multiplicity
         assert (a < atom_types)
         assert (w < wyck_types)
+        assert (np.allclose(x, site.wp[0].operate(x)))
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
         ws.append( symbol )
-        fc.append( site.wp[0].operate(x))  # this should be the generator of the orbit
+        fc.append( x )  # the generator of the orbit
         print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
     #sort atoms according to wyckoff symbol a-z,A
     char_list = [''.join(filter(str.isalpha, s)) for s in ws]
