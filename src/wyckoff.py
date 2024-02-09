@@ -103,10 +103,10 @@ def symmetrize_atoms(g, w, x):
     xs = ops@affine_point # (m, 3)
     
     # (2) deduplication to select the orbit 
-    #https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L148  
+    #https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L328
     orbit: list[np.ndarray] = []
     for pp in xs:
-        pp = np.mod(np.round(pp, decimals=10), 1)
+        pp = np.mod(np.round(pp, decimals=10), 1) # round and mod to avoid duplication
         if not in_array_list(orbit, pp):
             orbit.append(pp)
     orbit -= np.floor(orbit)   # wrap back to 0-1 
