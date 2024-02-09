@@ -19,7 +19,7 @@ def project_x(g, w_max, m_max, w, x, idx):
     affine_point = jnp.array([*x, 1]) # (4, )
     coords = ops@affine_point # (m_max, 3) 
     coords -= jnp.floor(coords)
-    
+
     # (2) search for the generator which satisfies op0(x) = x , i.e. the first Wyckoff position 
     # here we solve it in a jit friendly way by looking for the minimal distance solution for the lhs and rhs  
     #https://github.com/qzhu2017/PyXtal/blob/82e7d0eac1965c2713179eeda26a60cace06afc8/pyxtal/wyckoff_site.py#L115
@@ -27,8 +27,8 @@ def project_x(g, w_max, m_max, w, x, idx):
         diff = jnp.dot(symops[g-1, w, 0], jnp.array([*coord, 1])) - coord
         diff -= jnp.floor(diff)
         return jnp.sum(diff**2) 
-    idx = jnp.argmin(jax.vmap(dist_to_op0x)(coords))
-    x = coords[idx].reshape(3,)
+    loc = jnp.argmin(jax.vmap(dist_to_op0x)(coords))
+    x = coords[loc].reshape(3,)
 
     # (3) lastly, apply the given symmetry op to x
     op = symops[g-1, w, idx].reshape(3, 4)
