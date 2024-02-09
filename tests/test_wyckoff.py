@@ -282,6 +282,7 @@ def test_wyckoff():
 
 def test_symmetrize_atoms():
     from wyckoff import symmetrize_atoms, mult_table
+    from wyckoff import symmetrize_atoms_deduplication
     from pymatgen.symmetry.groups import SpaceGroup
     def symmetrize_atoms_pmg(g, w, x):
         sg = SpaceGroup.from_int_number(g)
@@ -303,6 +304,7 @@ def test_symmetrize_atoms():
     xs = symmetrize_atoms(g, w, x)
     print ('xs:\n', xs)
     assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
 
     g = 225
     w = jnp.array(5)
@@ -310,6 +312,15 @@ def test_symmetrize_atoms():
     xs = symmetrize_atoms(g, w, x)
     print ('xs:\n', xs)
     assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
+
+    g = 225
+    w = jnp.array(8)
+    x = jnp.array([0.0, 0.23, 0.23])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
 
 test_symmetrize_atoms()
 test_wyckoff()
