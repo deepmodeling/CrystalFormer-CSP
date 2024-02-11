@@ -10,11 +10,12 @@ from wyckoff import mult_table, symops
 @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0), out_axes=0)      # batch
 def project_x(g, w_max, m_max, w, x, idx):
     '''
-    project x to the selected Wyckoff point
+    One wants to project randomly sampled fc to the nearest Wyckoff point
+    Alternately, we randomly select a Wyckoff point, and then project fc to that point
+    To achieve that, we do the following 3 steps 
     '''
-    # we carry out the projection in 3 steps 
 
-    # (1) apply all space group symmetry op to the x 
+    # (1) apply all space group symmetry op to the fc to get x
     ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
     coords = ops@affine_point # (m_max, 3) 
@@ -30,7 +31,7 @@ def project_x(g, w_max, m_max, w, x, idx):
     loc = jnp.argmin(jax.vmap(dist_to_op0x)(coords))
     x = coords[loc].reshape(3,)
 
-    # (3) lastly, apply the given symmetry op to x
+    # (3) lastly, apply the given randomly sampled Wyckoff symmetry op to x
     op = symops[g-1, w, idx].reshape(3, 4)
     affine_point = jnp.array([*x, 1]) # (4, )
     x = jnp.dot(op, affine_point)  # (3, )

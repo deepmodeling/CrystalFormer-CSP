@@ -29,7 +29,7 @@ def perm_augmentation(key, atom_types, X, A, W, M):
 
     return X, A, W, M, AW
 
-@partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=(0, 0)) # n 
+@partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=0) # n 
 def map_augmentation(key, G, X, W):
     '''
     randomly map atoms under spacegroup symmetry operation 
@@ -39,14 +39,12 @@ def map_augmentation(key, G, X, W):
         W: scalar int 
     Return:
         X: (dim, ) transformed coordinate 
-        fc_mask: (dim, ) a bool array indicates which dimensions are active
     '''
     
     idx = jax.random.randint(key, (1,), 0, symops.shape[2]) # randomly sample an operation
     op = symops[G-1, W, idx].reshape(3, 4)
-    fc_mask = jnp.sum(jnp.abs(op[:3, :3]),axis=1)!=0 # fc_mask depends on the rotational matrix. True means active
 
     affine_point = jnp.array([*X, 1]) # (4, )
     X = jnp.dot(op, affine_point)
     X -= jnp.floor(X)
-    return X, fc_mask # (3, ), (3, )
+    return X # (3, )

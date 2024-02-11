@@ -31,7 +31,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
     
         key, key_perm, key_map = jax.random.split(key, 3)
         X, A, W, M, AM = perm_augmentation(key_perm, atom_types, X, A, W, M)
-        X_aug, fc_mask = map_augmentation(key_map, G, X, W) # (n, dim) , (n, dim)
+        X_aug = map_augmentation(key_map, G, X, W) # (n, dim) 
 
         h = transformer(params, key, G, X_aug, A, W, M, is_train) # (2*n_max+1, ...)
         hAW = h[::2, :] # (n_max+1, aw_types) 
@@ -48,9 +48,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X_aug*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
-
-        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask)
-        logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
+        logp_x = jnp.sum(jnp.where((AW>0)[:, None], logp_x, jnp.zeros_like(logp_x)))
 
         logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
 
