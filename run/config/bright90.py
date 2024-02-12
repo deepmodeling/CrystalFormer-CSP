@@ -12,8 +12,8 @@ Kx, Kl = 48, 16
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
-key_size = 16
-model_size = 32
+key_size = 32
+model_size = 64
 dropout_rate = 0.1
 Nf = 5
 
@@ -25,8 +25,10 @@ clip_grad = 1.0
 batchsize = 100
 epochs = 50000
 
-perm_aug = True 
+lamb_aw, lamb_l = 5.0, 1.0
+
 map_aug = True
+perm_aug = False
 
 num_io_process = 40
 

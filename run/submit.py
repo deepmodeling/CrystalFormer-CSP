@@ -67,7 +67,9 @@ if __name__=='__main__':
                         'num_io_process' : num_io_process, 
                         'Nf': Nf, 
                         'perm_aug': perm_aug, 
-                        'map_aug': map_aug
+                        'map_aug': map_aug, 
+                        'lamb_aw': lamb_aw,  
+                        'lamb_l': lamb_l,  
                         }
 
                 logname = jobdir 

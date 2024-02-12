@@ -9,7 +9,7 @@ from utils import to_A_W, to_AW
 from wyckoff import mult_table, fc_mask_table
 from augmentation import perm_augmentation, map_augmentation
 
-def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True):
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True, lamb_aw=1.0, lamb_l=1.0):
 
     lattice_mask = make_lattice_mask()
 
@@ -77,7 +77,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         loss_aw = -jnp.mean(logp_aw)
         loss_l = -jnp.mean(logp_l)
 
-        return loss_x + loss_aw + loss_l, (loss_x, loss_aw, loss_l)
+        return loss_x + lamb_aw* loss_aw + lamb_l*loss_l, (loss_x, loss_aw, loss_l)
         
     return loss_fn
 

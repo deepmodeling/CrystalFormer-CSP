@@ -46,8 +46,12 @@ group.add_argument('--num_heads', type=int, default=8, help='The number of heads
 group.add_argument('--key_size', type=int, default=32, help='The key size')
 group.add_argument('--model_size', type=int, default=8, help='The model size')
 group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
+
+group = parser.add_argument_group('loss parameters')
 group.add_argument("--perm_aug", action='store_true', help="carry out permutation augumentation")
 group.add_argument("--map_aug", action='store_true', help="carry out map fc augumentation")
+group.add_argument("--lamb_aw", type=float, default=1.0, help="weight for the aw part relative to fc")
+group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part relative to fc")
 
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
@@ -105,13 +109,14 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug, args.lamb_aw, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
+                   + ('_aw_%g_l_%g'%(args.lamb_aw, args.lamb_l)) \
                    + ("_perm" if args.perm_aug else "") \
                    + ("_map" if args.map_aug else "") \
                    +  "_" + transformer_name 
