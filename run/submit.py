@@ -74,7 +74,7 @@ if __name__=='__main__':
                 for arg, value in args.items():
                     if isinstance(value, bool):
                         logname += ("%s_" % arg if value else "")
-                    elif arg not in ["folder", "restore_path"]:
+                    elif not ('_path' in arg or 'folder' in arg):
                         if '_' in arg:
                             arg = "".join([s[0] for s in arg.split('_')])
                         logname += "%s%s_" % (arg, value)

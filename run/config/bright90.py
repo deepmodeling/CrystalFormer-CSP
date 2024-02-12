@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-dropout-permloss-mult-aw_max-aw_params-pyxtal-sigmamin-aug'
+nickname = 'mp-'+dataset
 
 ###############################
 atom_types = 119
