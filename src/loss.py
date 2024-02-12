@@ -30,7 +30,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         #num_atoms = jnp.sum(M)
     
         key, key_perm, key_map = jax.random.split(key, 3)
-        X, A, W, M, AM = perm_augmentation(key_perm, atom_types, X, A, W, M)
+        X, A, W, M, AW = perm_augmentation(key_perm, atom_types, X, A, W, M)
         X_aug = map_augmentation(key_map, G, W, X) # (n, dim) 
 
         h = transformer(params, key, G, X_aug, A, W, M, is_train) # (2*n_max+1, ...)
