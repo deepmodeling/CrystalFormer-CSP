@@ -56,7 +56,8 @@ def test_perm():
 
     key = jax.random.PRNGKey(42)
 
-    W = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0])
+    #W = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0])
+    W = jnp.array([1,2, 2, 2, 5, 0,0, 0])
     n = len(W)
     key = jax.random.PRNGKey(42)
 
@@ -66,9 +67,8 @@ def test_perm():
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
-    print (W)
     print (idx)
-    print (W[idx])
+    print (W)
     assert jnp.allclose(W, W[idx])
 
 def test_forward():
@@ -98,4 +98,3 @@ def test_forward():
     print (sigma.reshape(batchsize, args.Kl, 6))
 
 test_perm()
-test_autoregressive()

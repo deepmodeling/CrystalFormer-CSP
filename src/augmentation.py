@@ -20,9 +20,10 @@ def perm_augmentation(key, atom_types, X, A, W, M):
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
+    assert (W == W[idx])
+
     X = X[idx]
     A = A[idx]
-    W = W[idx]
     M = M[idx]
 
     AW = to_AW(A, W, atom_types)
