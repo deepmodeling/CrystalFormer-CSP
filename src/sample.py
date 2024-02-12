@@ -6,37 +6,7 @@ from von_mises import sample_von_mises
 from utils import to_A_W
 from lattice import symmetrize_lattice
 from wyckoff import mult_table, symops
-
-@partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0), out_axes=0)      # batch
-def project_x(g, w_max, m_max, w, x, idx):
-    '''
-    One wants to project randomly sampled fc to the nearest Wyckoff point
-    Alternately, we randomly select a Wyckoff point, and then project fc to that point
-    To achieve that, we do the following 3 steps 
-    '''
-
-    # (1) apply all space group symmetry op to the fc to get x
-    ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
-    affine_point = jnp.array([*x, 1]) # (4, )
-    coords = ops@affine_point # (m_max, 3) 
-    coords -= jnp.floor(coords)
-
-    # (2) search for the generator which satisfies op0(x) = x , i.e. the first Wyckoff position 
-    # here we solve it in a jit friendly way by looking for the minimal distance solution for the lhs and rhs  
-    #https://github.com/qzhu2017/PyXtal/blob/82e7d0eac1965c2713179eeda26a60cace06afc8/pyxtal/wyckoff_site.py#L115
-    def dist_to_op0x(coord):
-        diff = jnp.dot(symops[g-1, w, 0], jnp.array([*coord, 1])) - coord
-        diff -= jnp.floor(diff)
-        return jnp.sum(diff**2) 
-    loc = jnp.argmin(jax.vmap(dist_to_op0x)(coords))
-    x = coords[loc].reshape(3,)
-
-    # (3) lastly, apply the given randomly sampled Wyckoff symmetry op to x
-    op = symops[g-1, w, idx].reshape(3, 4)
-    affine_point = jnp.array([*x, 1]) # (4, )
-    x = jnp.dot(op, affine_point)  # (3, )
-    x -= jnp.floor(x)
-    return x 
+from augmentation import project_x
 
 @partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
 def inference(model, params, atom_types, g, X, AW):
@@ -44,8 +14,8 @@ def inference(model, params, atom_types, g, X, AW):
     M = mult_table[g-1, W]  
     return model(params, None, g, X, A, W, M, False)
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, w_max, m_max, aw_mask, temperature):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, aw_mask, temperature):
     
     aw_types = (atom_types -1)*(wyck_types -1) + 1
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
@@ -91,7 +61,7 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             # randomly project to a wyckoff position according to g and w
             w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
             idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
-            x = project_x(g, w_max, m_max, w, x, idx)
+            x = jax.vmap(project_x, in_axes=(None, 0, 0, 0), out_axes=0)(g, w, x, idx) 
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 

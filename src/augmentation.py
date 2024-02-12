@@ -30,21 +30,27 @@ def perm_augmentation(key, atom_types, X, A, W, M):
     return X, A, W, M, AW
 
 @partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=0) # n 
-def map_augmentation(key, G, X, W):
+def map_augmentation(key, G, W, X):
     '''
     randomly map atoms under spacegroup symmetry operation 
     Args:
         G: scalar int
-        X: (dim, )
         W: scalar int 
+        X: (dim, )
     Return:
         X: (dim, ) transformed coordinate 
     '''
     
-    idx = jax.random.randint(key, (1,), 0, symops.shape[2]) # randomly sample an operation
-    op = symops[G-1, W, idx].reshape(3, 4)
+    idx = jax.random.randint(key, (), 0, symops.shape[2]) # randomly sample an operation
+    return project_x(G, W, X, idx)
 
-    affine_point = jnp.array([*X, 1]) # (4, )
-    X = jnp.dot(op, affine_point)
-    X -= jnp.floor(X)
-    return X # (3, )
+def project_x(g, w, x, idx):
+    '''
+    apply the randomly sampled Wyckoff symmetry op to sampled fc, which 
+    should be (or close to) the first WP
+    '''
+    op = symops[g-1, w, idx].reshape(3, 4)
+    affine_point = jnp.array([*x, 1]) # (4, )
+    x = jnp.dot(op, affine_point)  # (3, )
+    x -= jnp.floor(x)
+    return x 

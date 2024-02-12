@@ -189,12 +189,6 @@ else:
     '''
     FYI, the error was [Compiling module extracted] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
     '''
-    
-    # we need to get m_max outside of jit to avoid dynamic sized array
-    from wyckoff import wmax_table, mult_table
-    w_max = wmax_table[args.spacegroup-1].item()
-    m_max = mult_table[args.spacegroup-1, w_max].item()
-    print ('g, w_max, m_max:', args.spacegroup, w_max, m_max)
 
     num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
@@ -205,7 +199,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_max, m_max, aw_mask, args.temperature)
+        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
         print ("X:\n", X)
         print ("A:\n", A)  # atom type
         print ("W:\n", W)  # Wyckoff positions
