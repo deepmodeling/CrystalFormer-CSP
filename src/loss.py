@@ -9,7 +9,7 @@ from utils import to_A_W, to_AW
 from wyckoff import mult_table, fc_mask_table
 from augmentation import perm_augmentation, map_augmentation
 
-def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True):
 
     lattice_mask = make_lattice_mask()
 
@@ -29,9 +29,15 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
     
-        key, key_perm, key_map = jax.random.split(key, 3)
-        X, A, W, M, AW = perm_augmentation(key_perm, atom_types, X, A, W, M)
-        X_aug = map_augmentation(key_map, G, W, X) # (n, dim) 
+        if perm_aug:
+            key, subkey = jax.random.split(key)
+            X, A, W, M, AW = perm_augmentation(subkey, atom_types, X, A, W, M)
+        
+        if map_aug:
+            key, subkey = jax.random.split(key)
+            X_aug = map_augmentation(subkey, G, W, X) # (n, dim) 
+        else:
+            X_aug = X
 
         h = transformer(params, key, G, X_aug, A, W, M, is_train) # (2*n_max+1, ...)
         hAW = h[::2, :] # (n_max+1, aw_types) 
