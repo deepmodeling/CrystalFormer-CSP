@@ -70,7 +70,8 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
-        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
+        if (g ==1 or g==2):
+            print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
     idx = np.argsort(aw)
     aw = np.array(aw)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, dim)
@@ -84,10 +85,12 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
                          np.full((n_max - num_sites, dim), 1e10)],
                         axis=0)
     
-    deg = 180.0 / np.pi 
     abc = np.array([c.lattice.a, c.lattice.b, c.lattice.c])/natoms**(1./3.)
-    angles = np.array([c.lattice.alpha, c.lattice.beta, c.lattice.gamma])*deg
+    angles = np.array([c.lattice.alpha, c.lattice.beta, c.lattice.gamma])
     l = np.concatenate([abc, angles])
+
+    if (g <3 ):
+        print (l)
     
     print ('===================================')
 

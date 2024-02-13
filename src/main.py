@@ -163,12 +163,18 @@ if args.optimizer != "none":
 
 else:
 
-    print("\n========== Print out some test data ==========")
+    print("\n========== Print out some test data for the given space group ==========")
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
     G, L, X, AW = test_data
     print (G.shape, L.shape, X.shape, AW.shape)
+
+    idx = jnp.where(G==args.spacegroup,size=5)
+    G = G[idx]
+    L = L[idx]
+    X = X[idx]
+    AW = AW[idx]
     
     from utils import to_A_W
     A, W = jax.vmap(to_A_W, (0, None))(AW, args.atom_types)
@@ -181,17 +187,30 @@ else:
     num_atoms = M.sum(axis=-1)
     print ("num_atoms:", num_atoms)
 
-    batchsize = args.batchsize
-    print ("G:", G[:batchsize])
-    print ("A\n", A[:batchsize])
-    for a in A[:batchsize]: 
+    print ("G:", G)
+    print ("A:\n", A)
+    for a in A: 
        print([element_list[i] for i in a])
-    print ("W\n",W[:batchsize])
-    print ("X\n",X[:batchsize])
+    print ("W:\n",W)
+    print ("X:\n",X)
 
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print ("aw_types, xl_types:", aw_types, xl_types)
+
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, X, A, W, M, False)
+    print ("outputs.shape", outputs.shape)
+
+    hXL = outputs[:, 1::2, :] # (:, n_max, aw_types)
+    print ("hXL.shape", hXL.shape)
+    offset = args.Kx+2*args.Kx*args.dim 
+    l_logit, mu, sigma = jnp.split(hXL[jnp.arange(hXL.shape[0]), num_sites, 
+                                       offset:offset+args.Kl+2*6*args.Kl], 
+                                       [args.Kl, args.Kl+6*args.Kl], axis=-1)
+    print ("L:\n",L)
+    print ("exp(l_logit):\n", jnp.exp(l_logit))
+    print ("mu:\n", mu.reshape(-1, args.Kl, 6))
+    print ("sigma:\n", sigma.reshape(-1, args.Kl, 6))
 
     print("\n========== Start sampling ==========")
     jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 

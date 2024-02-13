@@ -77,20 +77,21 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
     key, key_k, key_l = jax.random.split(key, 3)
     # k is (batchsize, ) integer array whose value in [0, Kl) 
-    k = jax.random.categorical(key_k, l_logit/temperature, axis=1)  # x_logit.shape : (batchsize, Kl)
+    k = jax.random.categorical(key_k, l_logit/temperature, axis=1)  # l_logit.shape : (batchsize, Kl)
 
     mu = mu.reshape(batchsize, Kl, 6)
-    mu = mu[jnp.arange(batchsize), k]
+    mu = mu[jnp.arange(batchsize), k]       # (batchsize, 6)
     sigma = sigma.reshape(batchsize, Kl, 6)
-    sigma = sigma[jnp.arange(batchsize), k]
+    sigma = sigma[jnp.arange(batchsize), k] # (batchsize, 6)
     L = jax.random.normal(key_l, (batchsize, 6)) * sigma/jnp.sqrt(temperature) + mu # (batchsize, 6)
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)
     length = length*num_atoms[:, None]**(1/3)
+    angle = angle * (180.0 / jnp.pi) # to deg
     L = jnp.concatenate([length, angle], axis=-1)
 
-    #impose space group constraint to lattice paraws
+    #impose space group constraint to lattice params
     L = jax.vmap(symmetrize_lattice, (None, 0))(g, L)  
 
     return X, A, W, M, L, AW
