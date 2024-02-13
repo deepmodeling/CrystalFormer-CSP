@@ -114,8 +114,10 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = h.reshape(n, 2, -1)
         hXL, aw_logit = h[:, 0, :], h[:, 1, :]
         
-        # (1) impose W_0 < W_1 <= W_2 ... less for wyckoff points with zero dof, less euqal otherwise
-        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:, None]-1)*(atom_types-1)+1 
+        # (1) impose the constrain that AW_0 <= AW_1 <= AW_2 
+        # while for Wyckoff points with zero dof it is even stronger W_0 < W_1 
+        AW = (W-1)*(atom_types-1) + (A-1) +1
+        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < AW[:, None]
         aw_mask_less = jnp.arange(1, aw_types).reshape(1, aw_types-1) < W[:, None]*(atom_types-1) + 1
         aw_mask = jnp.where((dof0_table[G-1, W])[:, None], aw_mask_less, aw_mask_less_equal) # (n, aw_types-1)
 

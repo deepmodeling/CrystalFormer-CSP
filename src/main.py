@@ -209,15 +209,15 @@ else:
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
         X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature, args.map_aug)
-        print ("X:\n", X)
-        print ("A:\n", A)  # atom type
+        print ("X:\n", X)  # fractional coordinate 
+        print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
-        print ("M:\n", M)
-        print ("N:\n", M.sum(axis=-1))
-        print ("L:\n", L)  # sampled lattice
+        print ("M:\n", M)  # multiplicity 
+        print ("N:\n", M.sum(axis=-1)) # total number of atoms
+        print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-        #print ("AW:\n", AW)
+        print ("AW:\n", AW)
 
         GLXA_to_csv(args.spacegroup, L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

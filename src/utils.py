@@ -55,8 +55,8 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     print (g, c.group.symbol, num_sites)
     natoms = 0
     aw = []
-    ws = []
     fc = []
+    ws = []
     for site in c.atom_sites:
         a = element_list.index(site.specie) 
         x = site.position
@@ -68,16 +68,13 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         assert (w < wyck_types)
         assert (np.allclose(x, site.wp[0].operate(x)))
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
-        ws.append( symbol )
         fc.append( x )  # the generator of the orbit
+        ws.append( symbol )
         print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
-    #sort atoms according to wyckoff symbol a-z,A
-    char_list = [''.join(filter(str.isalpha, s)) for s in ws]
-    idx, _ = zip(*sorted(enumerate(char_list), key=lambda x: (x[1].isupper(), x[1].lower())))
-    idx = np.array(idx)
-    ws = np.array(ws)[idx]
+    idx = np.argsort(aw)
     aw = np.array(aw)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, dim)
+    ws = np.array(ws)[idx]
     print (ws, aw, natoms) 
 
     aw = np.concatenate([aw,
