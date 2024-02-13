@@ -36,6 +36,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         initializer = hk.initializers.TruncatedNormal(0.01)
         
         G_one_hot = jax.nn.one_hot(G-1, 230) # extend this if there are property conditions
+        #G_one_hot = g_code[G-1].astype(jnp.float32) #  (989, )
+
         if h0_size >0:
             # compute aw_logits depending on G_one_hot
             aw_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
@@ -59,14 +61,14 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
 
-        hAM = jnp.concatenate([G_one_hot.reshape(1, 230).repeat(n, axis=0),  # (n, 230)
+        hAM = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
                                jax.nn.one_hot(A, atom_types), # (n, atom_types)
                                jax.nn.one_hot(W, wyck_types), # (n, wyck_types)
                                M.reshape(n, 1), # (n, 1)
                               ], axis=1) # (n, ...)
         hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
 
-        hX = [G_one_hot.reshape(1, 230).repeat(n, axis=0)]      
+        hX = [G_one_hot[None, :].repeat(n, axis=0)]      
         for f in range(1, Nf+1):
             hX += [jnp.cos(2*jnp.pi*X*f),
                    jnp.sin(2*jnp.pi*X*f)]

@@ -43,6 +43,27 @@ wmax_table = np.zeros((230,), dtype=int)    # wmax_table[g-1] = number of possib
 dof0_table = np.ones((230, 28), dtype=bool)  # dof0_table[g-1, w] = True for those wyckoff points with dof = 0 (no continuous dof)
 fc_mask_table = np.zeros((230, 28, 3), dtype=bool) # fc_mask_table[g-1, w] = True for continuous fc 
 
+def build_g_code():
+    #use general wyckoff position as the code for space groups
+    xyz_table = []
+    g_table = []
+    for g in range(230):
+        wp0 = wyckoff_positions[g][0]
+        g_table.append([])
+        for xyz in wp0:
+            if xyz not in xyz_table: 
+                xyz_table.append(xyz)
+            g_table[-1].append(xyz_table.index(xyz))
+        assert len(g_table[-1]) == len(set(g_table[-1]))
+
+    g_code = []
+    for g in range(230):
+        g_code.append( [1 if i in g_table[g] else 0 for i in range(len(xyz_table))] )
+    del xyz_table
+    del g_table
+    g_code = jnp.array(g_code)
+    return g_code
+
 for g in range(230):
     wyckoffs = []
     for x in wyckoff_positions[g]:

@@ -14,8 +14,8 @@ def inference(model, params, atom_types, g, X, AW):
     M = mult_table[g-1, W]  
     return model(params, None, g, X, A, W, M, False)
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, aw_mask, temperature):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10, 13))
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, aw_mask, temperature, map_aug):
     
     aw_types = (atom_types -1)*(wyck_types -1) + 1
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
@@ -57,11 +57,12 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
-
-            # randomly project to a wyckoff position according to g and w
-            w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
-            idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
-            x = jax.vmap(project_x, in_axes=(None, 0, 0, 0), out_axes=0)(g, w, x, idx) 
+            
+            if map_aug: 
+                # randomly project to a wyckoff position according to g and w
+                w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
+                idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
+                x = jax.vmap(project_x, in_axes=(None, 0, 0, 0), out_axes=0)(g, w, x, idx) 
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
