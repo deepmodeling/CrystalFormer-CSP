@@ -2,33 +2,23 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from utils import to_AW
 from wyckoff import symops
 
-def perm_augmentation(key, atom_types, X, A, W, M):
+def perm_augmentation(key, AW, X):
     '''
-    randomly permute atoms with the same wyckoff symbol e.g. 2a, 2a, 2a, ...  
+    randomly permute fractional coordinate of atoms with the same element types and wyckoff letters
+    AW: (n, )
     X: (n, dim)
-    A: (n, )
-    W: (n, )
-    M: (n, )
     '''
-    n = A.shape[0]
-    temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+    n = AW.shape[0]
+    temp = jnp.where(AW>0, AW, 9999) # change 0 to 9999 so they remain in the end after sort
     idx_perm = jax.random.permutation(key, jnp.arange(n))
     temp = temp[idx_perm]
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
-    # one should have jnp.allclose(W, W[idx])
-
-    X = X[idx]
-    A = A[idx]
-    M = M[idx]
-
-    AW = to_AW(A, W, atom_types)
-
-    return X, A, W, M, AW
+    # one should still jnp.allclose(AW, AW[idx])
+    return X
 
 @partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=0) # n 
 def map_augmentation(key, G, W, X):

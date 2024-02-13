@@ -57,7 +57,6 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     aw = []
     ws = []
     fc = []
-    el = []
     for site in c.atom_sites:
         a = element_list.index(site.specie) 
         x = site.position
@@ -71,7 +70,6 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
         ws.append( symbol )
         fc.append( x )  # the generator of the orbit
-        el.append(a)
         print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
     #sort atoms according to wyckoff symbol a-z,A
     char_list = [''.join(filter(str.isalpha, s)) for s in ws]
@@ -80,7 +78,7 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     ws = np.array(ws)[idx]
     aw = np.array(aw)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, dim)
-    print (ws, el, natoms) 
+    print (ws, aw, natoms) 
 
     aw = np.concatenate([aw,
                          np.full((n_max - num_sites, ), 0)],
@@ -154,8 +152,8 @@ if __name__=='__main__':
     
     #csv_file = './mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
-    csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
+    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
     G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     

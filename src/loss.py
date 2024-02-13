@@ -23,15 +23,15 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         '''
         
         dim = X.shape[-1]
+    
+        if is_train and perm_aug:
+            key, subkey = jax.random.split(key)
+            X = perm_augmentation(subkey, AW, X)
 
         A, W = to_A_W(AW, atom_types) # (n_max,) (n_max,)
         num_sites = jnp.sum(A!=0)
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
-    
-        if is_train and perm_aug:
-            key, subkey = jax.random.split(key)
-            X, A, W, M, AW = perm_augmentation(subkey, atom_types, X, A, W, M)
         
         if is_train and map_aug:
             key, subkey = jax.random.split(key)
