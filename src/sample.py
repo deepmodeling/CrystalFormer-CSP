@@ -58,11 +58,15 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
             
+            w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
             if map_aug: 
                 # randomly project to a wyckoff position according to g and w
-                w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
                 idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
                 x = jax.vmap(project_x, in_axes=(None, 0, 0, 0), out_axes=0)(g, w, x, idx) 
+            else:
+                # always project to the first WP
+                x = jax.vmap(project_x, in_axes=(None, 0, 0, None), out_axes=0)(g, w, x, 0) 
+
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
 
