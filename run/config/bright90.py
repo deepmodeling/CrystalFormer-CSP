@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset+'-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal-aug-sigmamin'
+nickname = 'mp-'+dataset
 
 ###############################
 atom_types = 119
@@ -13,7 +13,7 @@ h0_size = 256
 transformer_layers = 4
 num_heads = 8
 key_size = 32
-model_size = 512
+model_size = 64
 dropout_rate = 0.1
 Nf = 5
 
@@ -24,6 +24,11 @@ lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
 epochs = 50000
+
+lamb_aw, lamb_l = 5.0, 1.0
+
+map_aug = True
+perm_aug = False
 
 num_io_process = 40
 
@@ -88,7 +93,10 @@ echo Job started at `date`\n'''
 
     job +='python '+ str(bin) + ' '
     for key, val in args.items():
-        job += '--'+str(key) + ' '+ str(val) + ' '
+        if isinstance(val, bool):
+            job += (" --%s" % key if val else "")
+        else:
+            job += " --%s %s" % (key, val)
     job += '''
 echo Job finished at `date`\n'''
 

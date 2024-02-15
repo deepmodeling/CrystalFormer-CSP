@@ -36,6 +36,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         initializer = hk.initializers.TruncatedNormal(0.01)
         
         G_one_hot = jax.nn.one_hot(G-1, 230) # extend this if there are property conditions
+        #G_one_hot = g_code[G-1].astype(jnp.float32) #  (989, )
+
         if h0_size >0:
             # compute aw_logits depending on G_one_hot
             aw_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
@@ -59,14 +61,14 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
 
-        hAM = jnp.concatenate([G_one_hot.reshape(1, 230).repeat(n, axis=0),  # (n, 230)
+        hAM = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
                                jax.nn.one_hot(A, atom_types), # (n, atom_types)
                                jax.nn.one_hot(W, wyck_types), # (n, wyck_types)
                                M.reshape(n, 1), # (n, 1)
                               ], axis=1) # (n, ...)
         hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
 
-        hX = [G_one_hot.reshape(1, 230).repeat(n, axis=0)]      
+        hX = [G_one_hot[None, :].repeat(n, axis=0)]      
         for f in range(1, Nf+1):
             hX += [jnp.cos(2*jnp.pi*X*f),
                    jnp.sin(2*jnp.pi*X*f)]
@@ -112,8 +114,10 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = h.reshape(n, 2, -1)
         hXL, aw_logit = h[:, 0, :], h[:, 1, :]
         
-        # (1) impose W_0 < W_1 <= W_2 ... less for wyckoff points with zero dof, less euqal otherwise
-        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < (W[:, None]-1)*(atom_types-1)+1 
+        # (1) impose the constrain that AW_0 <= AW_1 <= AW_2 
+        # while for Wyckoff points with zero dof it is even stronger W_0 < W_1 
+        AW = (W-1)*(atom_types-1) + (A-1) +1
+        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < AW[:, None]
         aw_mask_less = jnp.arange(1, aw_types).reshape(1, aw_types-1) < W[:, None]*(atom_types-1) + 1
         aw_mask = jnp.where((dof0_table[G-1, W])[:, None], aw_mask_less, aw_mask_less_equal) # (n, aw_types-1)
 

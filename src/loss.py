@@ -6,10 +6,10 @@ from functools import partial
 from von_mises import von_mises_logpdf
 from lattice import make_lattice_mask
 from utils import to_A_W, to_AW
-from wyckoff import mult_table
+from wyckoff import mult_table, fc_mask_table
 from augmentation import perm_augmentation, map_augmentation
 
-def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True, lamb_aw=1.0, lamb_l=1.0):
 
     lattice_mask = make_lattice_mask()
 
@@ -23,17 +23,23 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         '''
         
         dim = X.shape[-1]
+    
+        if is_train and perm_aug:
+            key, subkey = jax.random.split(key)
+            X = perm_augmentation(subkey, AW, X)
 
         A, W = to_A_W(AW, atom_types) # (n_max,) (n_max,)
         num_sites = jnp.sum(A!=0)
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
-    
-        key, key_perm, key_map = jax.random.split(key, 3)
-        X, A, W, M, AM = perm_augmentation(key_perm, atom_types, X, A, W, M)
-        X, fc_mask = map_augmentation(key_map, G, X, W) # (n, dim) , (n, dim)
+        
+        if is_train and map_aug:
+            key, subkey = jax.random.split(key)
+            X_aug = map_augmentation(subkey, G, W, X) # (n, dim) 
+        else:
+            X_aug = X
 
-        h = transformer(params, key, G, X, A, W, M, is_train) # (2*n_max+1, ...)
+        h = transformer(params, key, G, X_aug, A, W, M, is_train) # (2*n_max+1, ...)
         hAW = h[::2, :] # (n_max+1, aw_types) 
         hXL = h[1::2, :] # (n_max, aw_types)
 
@@ -45,11 +51,12 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
 
         loc = loc.reshape(n_max, Kx, dim)
         kappa = kappa.reshape(n_max, Kx, dim)
-
+        
+        # note that we still predict the first WP
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
 
-        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask)
+        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask_table[G-1, W][None, :]) # (n_max, dim)
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
         logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
@@ -70,7 +77,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer):
         loss_aw = -jnp.mean(logp_aw)
         loss_l = -jnp.mean(logp_l)
 
-        return loss_x + loss_aw + loss_l, (loss_x, loss_aw, loss_l)
+        return loss_x + lamb_aw* loss_aw + lamb_l*loss_l, (loss_x, loss_aw, loss_l)
         
     return loss_fn
 

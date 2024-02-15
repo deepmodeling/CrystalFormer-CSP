@@ -281,15 +281,96 @@ def test_wyckoff():
     assert jnp.allclose(wmax_table, wyckoff.wmax_table)
 
 def test_symmetrize_atoms():
-    from wyckoff import symmetrize_atoms
+    from wyckoff import symmetrize_atoms, mult_table, wmax_table, symops
+    from pymatgen.symmetry.groups import SpaceGroup
+
+    #https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L547
+    def in_array_list(array_list: list[np.ndarray], arr: np.ndarray, tol: float = 1e-5) -> bool:
+        """Extremely efficient nd-array comparison using numpy's broadcasting. This
+        function checks if a particular array a, is present in a list of arrays.
+        It works for arrays of any size, e.g., even matrix searches.
+
+        Args:
+            array_list ([array]): A list of arrays to compare to.
+            arr (array): The test array for comparison.
+            tol (float): The tolerance. Defaults to 1e-5. If 0, an exact match is done.
+
+        Returns:
+            (bool)
+        """
+        if len(array_list) == 0:
+            return False
+        axes = tuple(range(1, arr.ndim + 1))
+        if not tol:
+            return any(np.all(array_list == arr[None, :], axes))
+        return any(np.sum(np.abs(array_list - arr[None, :]), axes) < tol)
+
+    def symmetrize_atoms_deduplication(g, w, x):
+        '''
+        symmetrize atoms via deduplication
+        this implements the same method as pmg get_orbit function, see
+        #https://github.com/materialsproject/pymatgen/blob/1e347c42c01a4e926e15b910cca8964c1a0cc826/pymatgen/symmetry/groups.py#L328
+        Args:
+           g: int 
+           w: int
+           x: (3,)
+        Returns:
+           xs: (m, 3)  symmetrized atom positions
+        '''
+        # (1) apply all space group symmetry ops to x 
+        w_max = wmax_table[g-1].item()
+        m_max = mult_table[g-1, w_max].item()
+        ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
+        affine_point = jnp.array([*x, 1]) # (4, )
+        coords = ops@affine_point # (m_max, 3) 
+        
+        # (2) deduplication to select the orbit 
+        orbit: list[np.ndarray] = []
+        for pp in coords:
+            pp = np.mod(np.round(pp, decimals=10), 1) # round and mod to avoid duplication
+            if not in_array_list(orbit, pp):
+                orbit.append(pp)
+        orbit -= np.floor(orbit)   # wrap back to 0-1 
+        assert (orbit.shape[0] == mult_table[g-1, w]) # double check that the orbit has the right length
+        return orbit
+
+    def symmetrize_atoms_pmg(g, w, x):
+        sg = SpaceGroup.from_int_number(g)
+        xs = sg.get_orbit(x)
+        m = mult_table[g-1, w]  
+        assert (len(xs) == m) # double check that the orbit has the right length
+        return np.array(xs)
+
+    def allclose_up_to_permutation(xs, xs_pmg):
+        # Sort each array lexicographically by rows
+        sorted_xs = xs[np.lexsort(np.rot90(xs))]
+        sorted_xs_pmg = xs_pmg[np.lexsort(np.rot90(xs_pmg))]
+        # Check if the sorted arrays are equal
+        return np.allclose(sorted_xs, sorted_xs_pmg)
+ 
     g = 166 
-    W = jnp.array(3)
-    X = jnp.array([0., 0., 0.5619])
+    w = jnp.array(3)
+    x = jnp.array([0., 0., 0.5619])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
 
-    Xs = symmetrize_atoms(g, W, X)
+    g = 225
+    w = jnp.array(5)
+    x = jnp.array([0., 0., 0.7334])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
 
-    print (Xs)
-
+    g = 225
+    w = jnp.array(8)
+    x = jnp.array([0.0, 0.23, 0.23])
+    xs = symmetrize_atoms(g, w, x)
+    print ('xs:\n', xs)
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_pmg(g, w, x))
+    assert allclose_up_to_permutation(xs, symmetrize_atoms_deduplication(g, w, x))
 
 test_symmetrize_atoms()
 test_wyckoff()

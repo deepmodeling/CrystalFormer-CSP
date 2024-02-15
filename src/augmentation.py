@@ -2,50 +2,46 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from utils import to_AW
 from wyckoff import symops
 
-def perm_augmentation(key, atom_types, X, A, W, M):
+def perm_augmentation(key, AW, X):
     '''
-    randomly permute atoms with the same wyckoff symbol e.g. 2a, 2a, 2a, ...  
+    randomly permute fractional coordinate of atoms with the same element types and wyckoff letters
+    AW: (n, )
     X: (n, dim)
-    A: (n, )
-    W: (n, )
-    M: (n, )
     '''
-    n = A.shape[0]
-    temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+    n = AW.shape[0]
+    temp = jnp.where(AW>0, AW, 9999) # change 0 to 9999 so they remain in the end after sort
     idx_perm = jax.random.permutation(key, jnp.arange(n))
     temp = temp[idx_perm]
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
-    X = X[idx]
-    A = A[idx]
-    W = W[idx]
-    M = M[idx]
+    # one should still jnp.allclose(AW, AW[idx])
+    return X
 
-    AW = to_AW(A, W, atom_types)
-
-    return X, A, W, M, AW
-
-@partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=(0, 0)) # n 
-def map_augmentation(key, G, X, W):
+@partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=0) # n 
+def map_augmentation(key, G, W, X):
     '''
     randomly map atoms under spacegroup symmetry operation 
     Args:
         G: scalar int
-        X: (dim, )
         W: scalar int 
+        X: (dim, )
     Return:
         X: (dim, ) transformed coordinate 
-        fc_mask: (dim, ) a bool array indicates which dimensions are active
     '''
     
-    idx = jax.random.randint(key, (1,), 0, symops.shape[2]) # randomly sample an operation
-    op = symops[G-1, W, idx].reshape(3, 4)
-    fc_mask = jnp.sum(jnp.abs(op[:3, :3]),axis=1)!=0 # fc_mask depends on the rotational matrix. True means active
+    idx = jax.random.randint(key, (), 0, symops.shape[2]) # randomly sample an operation
+    return project_x(G, W, X, idx)
 
-    affine_point = jnp.array([*X, 1]) # (4, )
-    return jnp.dot(op, affine_point), fc_mask # (3, ), (3, )
-    
+def project_x(g, w, x, idx):
+    '''
+    apply the randomly sampled Wyckoff symmetry op to sampled fc, which 
+    should be (or close to) the first WP
+    '''
+    op = symops[g-1, w, idx].reshape(3, 4)
+    affine_point = jnp.array([*x, 1]) # (4, )
+    x = jnp.dot(op, affine_point)  # (3, )
+    x -= jnp.floor(x)
+    return x 

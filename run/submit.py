@@ -65,16 +65,21 @@ if __name__=='__main__':
                         'test_path' : test_path,  
                         'dropout_rate' : dropout_rate,  
                         'num_io_process' : num_io_process, 
-                        'Nf': Nf
+                        'Nf': Nf, 
+                        'perm_aug': perm_aug, 
+                        'map_aug': map_aug, 
+                        'lamb_aw': lamb_aw,  
+                        'lamb_l': lamb_l,  
                         }
 
                 logname = jobdir 
-                for key, val in args.items():
-                    if not ('_path' in key or 'folder' in key):
-                        k = str(key)
-                        if '_' in k:
-                            k = ''.join([s[0] for s in k.split('_')])
-                        logname +=  k + str(val) + '_'
+                for arg, value in args.items():
+                    if isinstance(value, bool):
+                        logname += ("%s_" % arg if value else "")
+                    elif not ('_path' in arg or 'folder' in arg):
+                        if '_' in arg:
+                            arg = "".join([s[0] for s in arg.split('_')])
+                        logname += "%s%s_" % (arg, value)
                 logname = logname[:-1] + '.log'
 
                 jobname = os.path.basename(os.path.dirname(logname))
