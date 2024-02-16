@@ -53,10 +53,10 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         kappa = kappa.reshape(n_max, Kx, dim)
         
         # note that we still predict the first WP
-        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)(X*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
+        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)((X-0.5)*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
 
-        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask_table[G-1, W][None, :]) # (n_max, dim)
+        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask_table[G-1, W]) # (n_max, dim)
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
         logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
