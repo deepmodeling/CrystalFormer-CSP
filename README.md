@@ -12,7 +12,7 @@ see colab [notebook](https://colab.research.google.com/drive/17iAaHocQ8KSnheKz3J
 - [X] move code from notebook to script 
 - [ ] implement flow model for `L` based on the gaussian p(L|G)
 - [X] train the model and get some samples 
-- [ ] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
+- [X] evaluate the model, may follow https://github.com/txie-93/cdvae or https://github.com/jiaor17/DiffCSP 
 - [X] write samples back to CIF file
 
 enhancement
@@ -23,7 +23,7 @@ enhancement
 - [ ] experiment with training with condition y, and conditional generation. 
 ~~[X] make a multiplicity table such as [1, 2, 3, 4, 8, 48, ...] to store possible multiplicities~~
 - [X] fix the primitive versus conventional cell issue when loading the mp_20 dataset
-- [ ] train for MP20 and evaluate the model again
+- [X] train for MP20 and evaluate the model again
 - [ ] consider condition everying on the number of atoms 
 - [X] specify possible elements at sampling time
 - [X] implement more wyckoff symbols in `wyckoff.py`
@@ -32,10 +32,15 @@ enhancement
 - [ ] `pmap` the code for multi-gpu training
 - [X] use pyxtal to load csv file (avoid build our own dataset)
 - [X] use dropout for the attention weights [flax example](https://github.com/google/flax/blob/main/flax/linen/attention.py), [haiku code we use](https://github.com/google-deepmind/dm-haiku/blob/main/haiku/_src/attention.py)
+- [X] impose the order constraint W_0 <= W_1 <= W_2  ... <= W_n
+- [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions. break autoregressive !
+- [X] for those zero-dimensional wyckoff point impose the single occupy condition, e.g. a,b,c,d can only occur once in space group 225. one can detect dof via `np.linalg.matrix_rank(self.ops[0].rotation_matrix)` or fc_mask
+- [X] make the code runnable for float32, suspect scipy.special.i0e (actually sigmamin)
 
 always welcome
 - [ ] write more tests 
 - [ ] polishing the code
+- [ ] more data!
 
 side project
 - [ ] symmetry constrainted flow-matching [this](https://github.com/wangleiphy/jax-flow-matching/) and spacegroup utils maybe useful
@@ -69,14 +74,14 @@ there is an associated data `M` stands for multiplicity, which can be read out b
 
 Sec. A2 of [MatterGen paper](https://arxiv.org/abs/2312.03687) contains a discussion of the relevant symmetries between them. 
 
-For X we consider to use a distributuion with periodic variables (e.g., wrapped Gaussuan, wrapped Cauchy, von Mises, ...). Here are some useful codes. In particular, we use mixture of von Mises distribution as the atom position is multi-modal. 
+For X we consider to use a distributuion with periodic variables (e.g., wrapped Gaussuan, wrapped Cauchy, von Mises, ...). Here are some useful codes. In particular, we use mixture of von Mises distribution as the atom position is multi-modal. von Mises might be the reason that we need to use float64 in the training. 
 
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/sampler.py
 https://code.itp.ac.cn/wanglei/hydrogen/-/blob/van/src/von_mises.py
 
-For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate for each Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
+For space group other than P1, we sample the Wyckoff positions. Note that there is a natural alphabetical order, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. In this way, we actually sample the occupied atom type and fractional coordinate, and Wyckoff position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). To ensure that certain special coordiates are sampled with accurate precision, we will model the Wyckoff symbol (1a, 2b, ...)  along with the coordiate. Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
-In practice, the space group label `G` plays three effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the lattice_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `symmetrize_lattice`  function.  3) G and W together constraints on the factional coordinate that is currenly used in training (via fc_mask) and  sampling (via apply_wyckoff_condition)
+In practice, the space group label `G` plays three effects to the code: 1) it acts as the one-hot condition in the transformer, so everything sampled (`X`, `AW`, `L`) depends on it; 2) it determines the lattice_mask such as [111000] that will be placed on the lattice regression loss, so we only score those free params that was not fixed by the space group. In sampling, we do similar thing to impose lattice according to the spacegroup with `symmetrize_lattice`  function.  3) G and W together constraints on the factional coordinate that is currenly used in training (via fc_mask and sym_ops data augmentation) and sampling (via symops projection)
 
 Since the number of atoms may vary, we will pad the atoms to the same length up to `n_max`. The paded atoms have type 0. 
 Note that we have designed an encoding scheme for atom type and wyckoff symbol into an integer. In the transformer, that encoding is handelled as a one-hot vector. In this way, we avoid predicting factorized atom type and multiplicity P(A, W| ...) = P(A| ... ) * P(W | ...)
@@ -97,12 +102,12 @@ MLE
 
 train
 ```bash 
-python ../src/main.py --n_max 20 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer adamw --train_path /home/wanglei/crystal_gpt/data/symm_data/train.csv --valid_path /home/wanglei/crystal_gpt/data/symm_data/val.csv --test_path /home/wanglei/crystal_gpt/data/symm_data/test.csv --dropout_rate 0.0 
+python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 1000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --Nf 5 --perm_aug --map_aug 
 ```
 
 sample
 ```bash 
-python ../src/main.py --n_max 20 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 16 --model_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer none --train_path /home/wanglei/crystal_gpt/data/symm_data/train.csv --valid_path /home/wanglei/crystal_gpt/data/symm_data/val.csv --test_path /home/wanglei/crystal_gpt/data/symm_data/test.csv --dropout_rate 0.0 --restore_path /data/wanglei/crystalgpt/mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max/mp-a622b/adamw_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_20_wd_0_Nf_5_K_16_16_h0_256_l_4_H_8_k_16_m_16_drop_0/ --spacegroup 123 
+python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --Nf 5 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_aw_1_l_1_perm_map_Nf_5_K_16_16_h0_256_l_4_H_8_k_32_m_64_drop_0.1/  --spacegroup 167 --num_samples 1000 --map_aug
 ```
 
 evaluate

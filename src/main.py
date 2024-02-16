@@ -1,5 +1,5 @@
 import jax 
-jax.config.update("jax_enable_x64", True)
+#jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp 
 from jax.flatten_util import ravel_pytree
 import optax
@@ -7,7 +7,7 @@ import os
 import multiprocessing
 import math
 
-from utils import GLXAW_from_file, LXA_to_csv
+from utils import GLXAW_from_file, GLXA_to_csv
 from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
@@ -26,7 +26,7 @@ group.add_argument('--lr', type=float, default=1e-4, help='learning rate')
 group.add_argument('--lr_decay', type=float, default=1e-5, help='lr decay')
 group.add_argument('--weight_decay', type=float, default=1e-3, help='weight decay')
 group.add_argument('--clip_grad', type=float, default=1.0, help='clip gradient')
-parser.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
+group.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
 
 group.add_argument("--folder", default="../data/", help="the folder to save data")
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
@@ -40,12 +40,18 @@ group = parser.add_argument_group('transformer parameters')
 group.add_argument('--Nf', type=int, default=5, help='number of frequencies')
 group.add_argument('--Kx', type=int, default=8, help='number of modes in von-mises')
 group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
-group.add_argument('--h0_size', type=int, default=512, help='hidden layer dimension for the first atom')
+group.add_argument('--h0_size', type=int, default=0, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=32, help='The key size')
 group.add_argument('--model_size', type=int, default=8, help='The model size')
 group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
+
+group = parser.add_argument_group('loss parameters')
+group.add_argument("--perm_aug", action='store_true', help="carry out permutation augumentation")
+group.add_argument("--map_aug", action='store_true', help="carry out map fc augumentation")
+group.add_argument("--lamb_aw", type=float, default=1.0, help="weight for the aw part relative to fc")
+group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part relative to fc")
 
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
@@ -103,13 +109,16 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug, args.lamb_aw, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
-if args.optimizer != "none":
+if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
+                   + ('_aw_%g_l_%g'%(args.lamb_aw, args.lamb_l)) \
+                   + ("_perm" if args.perm_aug else "") \
+                   + ("_map" if args.map_aug else "") \
                    +  "_" + transformer_name 
 
     os.makedirs(output_path, exist_ok=True)
@@ -153,9 +162,19 @@ if args.optimizer != "none":
     params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
 
 else:
-    print("\n========== Inference on test data ==========")
+
+    print("\n========== Print out some test data for the given space group ==========")
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
+
     G, L, X, AW = test_data
     print (G.shape, L.shape, X.shape, AW.shape)
+
+    idx = jnp.where(G==args.spacegroup,size=5)
+    G = G[idx]
+    L = L[idx]
+    X = X[idx]
+    AW = AW[idx]
     
     from utils import to_A_W
     A, W = jax.vmap(to_A_W, (0, None))(AW, args.atom_types)
@@ -168,62 +187,56 @@ else:
     num_atoms = M.sum(axis=-1)
     print ("num_atoms:", num_atoms)
 
-    batchsize = args.batchsize
-    print ("G:", G[:batchsize])
-    print ("A\n", A[:batchsize])
-    for a in A[:batchsize]: 
+    print ("G:", G)
+    print ("A:\n", A)
+    for a in A: 
        print([element_list[i] for i in a])
-    print ("W\n",W[:batchsize])
-    print ("X\n",X[:batchsize])
+    print ("W:\n",W)
+    print ("X:\n",X)
 
     aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
     print ("aw_types, xl_types:", aw_types, xl_types)
 
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, X, A, W, M, False)
     print ("outputs.shape", outputs.shape)
 
-    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
-    aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
-    print ("aw_logit.shape", aw_logit.shape)
-
-    # sample given ground truth
-    key, key_aw = jax.random.split(key)
-    AW_sample = jax.random.categorical(key_aw, aw_logit, axis=-1) # (batchsize, n_max+1, )
-    A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
-    print ("A_sample\n", A_sample)
-    print ("W_sample\n", W_sample)
-
-    outputs = outputs.reshape(batchsize, args.n_max+1, 2, aw_types)[:, :, 1, :]
+    hXL = outputs[:, 1::2, :] # (:, n_max, aw_types)
+    print ("hXL.shape", hXL.shape)
     offset = args.Kx+2*args.Kx*args.dim 
-    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
-                                                      offset:offset+args.Kl+2*6*args.Kl], 
-                                                      [args.Kl, args.Kl+6*args.Kl], axis=-1)
-    print (L[:batchsize])
-    print (jnp.exp(l_logit))
-    print (mu.reshape(batchsize, args.Kl, 6))
-    print (sigma.reshape(batchsize, args.Kl, 6))
- 
+    l_logit, mu, sigma = jnp.split(hXL[jnp.arange(hXL.shape[0]), num_sites, 
+                                       offset:offset+args.Kl+2*6*args.Kl], 
+                                       [args.Kl, args.Kl+6*args.Kl], axis=-1)
+    print ("L:\n",L)
+    print ("exp(l_logit):\n", jnp.exp(l_logit))
+    print ("mu:\n", mu.reshape(-1, args.Kl, 6))
+    print ("sigma:\n", sigma.reshape(-1, args.Kl, 6))
+
     print("\n========== Start sampling ==========")
-    num_batches = math.ceil(args.num_samples / batchsize)
+    jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 
+    '''
+    FYI, the error was [Compiling module extracted] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+    '''
+
+    num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
     filename = os.path.join(output_path, 
                             f"{name}_{args.spacegroup}.{extension}")
     for batch_idx in range(num_batches):
-        start_idx = batch_idx * batchsize
-        end_idx = min(start_idx + batchsize, args.num_samples)
+        start_idx = batch_idx * args.batchsize
+        end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature)
-        print ("X:\n", X)
-        print ("A:\n", A)  # atom type
+        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature, args.map_aug)
+        print ("X:\n", X)  # fractional coordinate 
+        print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
-        print ("M:\n", M)
-        print ("N:\n", M.sum(axis=-1))
-        print ("L:\n", L)  # sampled lattice
+        print ("M:\n", M)  # multiplicity 
+        print ("N:\n", M.sum(axis=-1)) # total number of atoms
+        print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-        #print ("AW:\n", AW)
+        print ("AW:\n", AW)
 
-        LXA_to_csv(L, X, A, num_worker=args.num_io_process, filename=filename)
+        GLXA_to_csv(args.spacegroup, L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

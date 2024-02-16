@@ -1,0 +1,4 @@
+pyxtal 
+jax 
+dm-haiku 
+optax

@@ -1,55 +1,63 @@
 from config import * 
 
-from utils import GLXAM_from_file
+from utils import GLXAW_from_file, to_A_W
+from wyckoff import mult_table
 from transformer import make_transformer
 
 def test_autoregressive():
     atom_types = 119
-    mult_types = 4
-    Nf = 5
-    n_max = 5
-    K = 8 
+    wyck_types = 28
+    Nf = 8
+    n_max = 21
+    Kx = 16 
+    Kl = 8
     dim = 3
+    dropout_rate = 0.0
 
     csv_file = '../data/mini.csv'
-    G, L, X, AM = GLXAM_from_file(csv_file, atom_types, mult_types, n_max, dim)
-
-    am_types = AM.shape[-1]
+    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
+        
+    A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
+    @jax.vmap
+    def lookup(G, W):
+        return mult_table[G-1, W] # (n_max, )
+    M = lookup(G, W) # (batchsize, n_max)
+    num_sites = jnp.sum(A!=0, axis=1)
 
     key = jax.random.PRNGKey(42)
-    params, transformer = make_transformer(key, Nf, K, n_max, dim, 128, 4, 4, 8, 16, atom_types, mult_types) 
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, dim, 128, 4, 4, 8, 16,atom_types, wyck_types, dropout_rate) 
 
-    def test_fn(G, AM, X):
-        output = transformer(params, G, X, AM) # (2*n+2, am_types)
-        output = output.reshape(n_max+1, 2, am_types)
-        return (output[:, 0, :]).sum(axis=-1), (output[:, 1, :]).sum(axis=-1)
-    
-    print (X.shape, AM.shape)
+    def test_fn(X, M):
+        output = transformer(params, None, G[0], X, A[0], W[0], M, False)
+        print (output.shape)
+        return output.sum(axis=-1)
 
-    jac_am_am = jax.jacfwd(lambda G, AM, X: test_fn(G, AM, X)[0], argnums = 1)(G[0], AM[0], X[0])
-    jac_am_x = jax.jacfwd(lambda G, AM, X: test_fn(G, AM, X)[0], argnums = 2)(G[0], AM[0], X[0])
-    jac_x_am = jax.jacfwd(lambda G, AM, X: test_fn(G, AM, X)[1], argnums = 1)(G[0], AM[0], X[0])
-    jac_x_x = jax.jacfwd(lambda G, AM, X: test_fn(G, AM, X)[1], argnums = 2)(G[0], AM[0], X[0])
+    jac_x = jax.jacfwd(test_fn, argnums=0)(X[0], M[0])
+    jac_m = jax.jacfwd(test_fn, argnums=1)(X[0], M[0].astype(jnp.float32))[:, :, None]
+
+    print(jac_x.shape, jac_m.shape)
 
     def print_dependencey(jac):
         dependencey = jnp.linalg.norm(jac, axis=-1)
         for row in (dependencey != 0.).astype(int):
             print(" ".join(str(val) for val in row))
 
-    print ('jac_am_am')
-    print_dependencey(jac_am_am)
-    print ('jac_am_x')
-    print_dependencey(jac_am_x)
-    print ('jac_x_am')
-    print_dependencey(jac_x_am)
-    print ('jac_x_x')
-    print_dependencey(jac_x_x)
+    print ("jac_a_x") 
+    print_dependencey(jac_x[::2])
+    print ("jac_x_x") 
+    print_dependencey(jac_x[1::2])
+    print ("jac_a_a") 
+    print_dependencey(jac_m[::2])
+    print ("jac_x_a") 
+    print_dependencey(jac_m[1::2])
+
 
 def test_perm():
 
     key = jax.random.PRNGKey(42)
 
-    W = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0])
+    #W = jnp.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0])
+    W = jnp.array([1,2, 2, 2, 5, 0,0, 0])
     n = len(W)
     key = jax.random.PRNGKey(42)
 
@@ -59,10 +67,34 @@ def test_perm():
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
-    print (W)
     print (idx)
-    print (W[idx])
+    print (W)
     assert jnp.allclose(W, W[idx])
 
+def test_forward():
+
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
+    print ("outputs.shape", outputs.shape)
+
+    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
+    aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
+    print ("aw_logit.shape", aw_logit.shape)
+
+    # sample given ground truth
+    key, key_aw = jax.random.split(key)
+    AW_sample = jax.random.categorical(key_aw, aw_logit, axis=-1) # (batchsize, n_max+1, )
+    A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
+    print ("A_sample\n", A_sample)
+    print ("W_sample\n", W_sample)
+
+    outputs = outputs.reshape(batchsize, args.n_max+1, 2, aw_types)[:, :, 1, :]
+    offset = args.Kx+2*args.Kx*args.dim 
+    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
+                                                      offset:offset+args.Kl+2*6*args.Kl], 
+                                                      [args.Kl, args.Kl+6*args.Kl], axis=-1)
+    print (L[:batchsize])
+    print (jnp.exp(l_logit))
+    print (mu.reshape(batchsize, args.Kl, 6))
+    print (sigma.reshape(batchsize, args.Kl, 6))
+
 test_perm()
-test_autoregressive()
