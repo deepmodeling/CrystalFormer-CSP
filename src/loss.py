@@ -43,8 +43,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         h = transformer(params, key, G, X_aug, A, W, M, is_train) # (3*n_max+1, ...)
         w_logit = h[0::3, :wyck_types] # (n_max+1, wyck_types) 
         w_logit = w_logit[:-1] # (n_max, wyck_types)
-        a_logit = h[1::3, :atom_types]  # (n_max, atom_types)
-        hXL = h[2::3, :xl_types] # (n_max, xl_types)
+        hXL = h[1::3, :xl_types] # (n_max, xl_types)
+        a_logit = h[2::3, :atom_types]  # (n_max, atom_types)
 
         x_logit, loc, kappa, _ = jnp.split(hXL, [Kx, 
                                                  Kx+Kx*dim, 
@@ -54,7 +54,6 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         kappa = kappa.reshape(n_max, Kx, dim)
 
         logp_w = jnp.sum(w_logit[jnp.arange(n_max), W.astype(int)])  
-        logp_a = jnp.sum(a_logit[jnp.arange(n_max), A.astype(int)])  
         
         # note that we always predict the first WP
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)((X-0.5)*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
@@ -62,6 +61,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
 
         fc_mask = jnp.logical_and((W>0)[:, None], fc_mask_table[G-1, W]) # (n_max, dim)
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
+
+        logp_a = jnp.sum(a_logit[jnp.arange(n_max), A.astype(int)])  
 
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
                                            Kx+2*Kx*dim:Kx+2*Kx*dim+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1)
@@ -71,16 +72,16 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
         
-        return logp_w, logp_a, logp_x, logp_l
+        return logp_w, logp_x, logp_a, logp_l
 
     def loss_fn(params, key, G, L, X, A, W, is_train):
-        logp_w, logp_a, logp_x, logp_l = logp_fn(params, key, G, L, X, A, W, is_train)
+        logp_w, logp_x, logp_a, logp_l = logp_fn(params, key, G, L, X, A, W, is_train)
         loss_w = -jnp.mean(logp_w)
-        loss_a = -jnp.mean(logp_a)
         loss_x = -jnp.mean(logp_x)
+        loss_a = -jnp.mean(logp_a)
         loss_l = -jnp.mean(logp_l)
 
-        return loss_x + lamb_a* loss_a + lamb_w*loss_w + lamb_l*loss_l, (loss_w, loss_a, loss_x, loss_l)
+        return loss_x + lamb_a* loss_a + lamb_w*loss_w + lamb_l*loss_l, (loss_w, loss_x, loss_a, loss_l)
         
     return loss_fn
 

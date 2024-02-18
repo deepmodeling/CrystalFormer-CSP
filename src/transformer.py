@@ -25,7 +25,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
             M: (n, )  multiplicities
             is_train: bool 
         Returns: 
-            h: (3n+1, output_types) it contains params [w_1, a_1, xl_1, w_2, a_2, ..., xl_n, w_{n+1}]
+            h: (3n+1, output_types) it contains params [w_1, xl_1, a_1, w_2, xl_2, ..., a_n, w_{n+1}]
         '''
         
         assert (X.ndim == 2 )
@@ -68,11 +68,6 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                               ], axis=1) # (n, ...)
         hW = hk.Linear(model_size, w_init=initializer)(hW)  # (n, model_size)
 
-        hA = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
-                              jax.nn.one_hot(A, atom_types), # (n, atom_types)
-                             ], axis=1) # (n, ...)
-        hA = hk.Linear(model_size, w_init=initializer)(hA)  # (n, model_size)
-
         hX = [G_one_hot[None, :].repeat(n, axis=0)]      
         for f in range(1, Nf+1):
             hX += [jnp.cos(2*jnp.pi*X*f),
@@ -80,10 +75,16 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         hX = jnp.concatenate(hX, axis=1) # (n, ...) 
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
+        hA = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
+                              jax.nn.one_hot(A, atom_types), # (n, atom_types)
+                             ], axis=1) # (n, ...)
+        hA = hk.Linear(model_size, w_init=initializer)(hA)  # (n, model_size)
+
         # interleave the three matrices
         h = jnp.concatenate([hW[:, None, :], 
-                             hA[:, None, :], 
-                             hX[:, None, :]], axis=1) # (n, 3, model_size)
+                             hX[:, None, :],
+                             hA[:, None, :]
+                             ], axis=1) # (n, 3, model_size)
         h = h.reshape(3*n, -1)                                         # (3*n, model_size)
 
         positional_embeddings = hk.get_parameter(
@@ -91,8 +92,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = h + positional_embeddings[:3*n, :]
 
         del hW
-        del hA
         del hX
+        del hA
 
         for _ in range(num_layers):
             attn_block = MultiHeadAttention(num_heads=num_heads,
@@ -122,7 +123,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = hk.Linear(output_size, w_init=initializer)(h) # (3*n, output_size)
         
         h = h.reshape(n, 3, -1)
-        a_logit, hXL, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :]
+        hXL, a_logit, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :]
 
         a_logit = a_logit[:, :atom_types]
         w_logit = w_logit[:, :wyck_types]
@@ -139,20 +140,22 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         # (2) # enhance the probability of pad atoms if there is already a type 0 atom 
         w_mask = jnp.concatenate(
-                [ jnp.where(jnp.logical_or(A==0, W==0), jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(W==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, wyck_types-1))
                 ], axis = 1 )  # (n, wyck_types) mask = 1 for those locations to place pad atoms of type 0
         w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0)
         w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
-        # same logic for a but note the shift
+        # (3) mask out unavaiable position after w_max for the given spacegroup
+        w_logit = jnp.where(jnp.arange(wyck_types)<=w_max, w_logit, w_logit-1e10)
+        w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
+
+        # (4) if w !=0 the mask out the pad atom, if w=0 select pad atoms starting from next one
         a_mask = jnp.concatenate(
-                [ jnp.where(jnp.concatenate([jnp.array([0]), jnp.logical_or(A==0, W==0)[:-1]]), 
-                            jnp.ones((n)), jnp.zeros((n))
-                            ).reshape(n, 1), 
-                  jnp.zeros((n, atom_types-1))
-                ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
-        a_logit = a_logit + jnp.where(a_mask, 1e10, 0.0)
+                 [(W>0).reshape(n, 1), 
+                 jnp.concatenate([jnp.array([0]), (W==0)[:-1]]).reshape(n, 1).repeat(atom_types-1, axis=1) 
+                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to be masked out
+        a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
         a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
             
         # the first a should not be pad atom
@@ -163,10 +166,6 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
         # normalization
         a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
-
-        # (3) mask out unavaiable position after w_max for the given spacegroup
-        w_logit = jnp.where(jnp.arange(wyck_types)<=w_max, w_logit, w_logit-1e10)
-        w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
         a_logit = jnp.concatenate([a_logit, 
                                    jnp.zeros((n, output_size - atom_types))
@@ -195,8 +194,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                jnp.zeros((n, output_size - xl_types))
                                ], axis=-1) # (n, output_size)
         
-        h = jnp.concatenate([a_logit[:, None, :], 
-                             hXL[:, None, :], 
+        h = jnp.concatenate([hXL[:, None, :], 
+                             a_logit[:, None, :], 
                              w_logit[:, None, :]
                              ], axis=1) # (n, 3, output_size)
         h = h.reshape(3*n, output_size) # (3*n, output_size)
