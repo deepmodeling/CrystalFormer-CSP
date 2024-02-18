@@ -3,42 +3,53 @@ import jax.numpy as jnp
 from functools import partial
 
 from von_mises import sample_von_mises
-from utils import to_A_W
 from lattice import symmetrize_lattice
 from wyckoff import mult_table, symops
 from augmentation import project_x
 
-@partial(jax.vmap, in_axes=(None, None, None, None, 0, 0), out_axes=0) # batch 
-def inference(model, params, atom_types, g, X, AW):
-    A, W = to_A_W(AW, atom_types) 
+@partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0), out_axes=0) # batch 
+def inference(model, params, g, X, A, W):
     M = mult_table[g-1, W]  
     return model(params, None, g, X, A, W, M, False)
 
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 10, 13))
-def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, aw_mask, temperature, map_aug):
+def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, wyck_types, Kx, Kl, g, atom_mask, temperature, map_aug):
     
-    aw_types = (atom_types -1)*(wyck_types -1) + 1
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
 
     X = jnp.zeros((batchsize, 0, dim))
-    AW = jnp.zeros((batchsize, 0), dtype=int)
-    L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice paraws and sawple lattice after
+    A = jnp.zeros((batchsize, 0), dtype=int)
+    W = jnp.zeros((batchsize, 0), dtype=int)
+    L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice params and sample lattice after
 
-    for i in range(2*n_max):
+    for i in range(3*n_max):
 
-        if i%2 ==0: # AW_n ~ p(AW_n | AW_1, X_1, ..., AW_(n-1), X_(n-1))
-            aw_logit = inference(transformer, params, atom_types, g, X, AW)[:, -1] # (batchsize, aw_types)
-            key, key_aw = jax.random.split(key)
+        if i%3 ==0: # W_n ~ p(W_n | W_1, A_1, X_1, ..., W_(n-1), A_(n-1), X_(n-1))
+            w_logit = inference(transformer, params, g, X, A, W)[:, -1] # (batchsize, output_size)
+            w_logit = w_logit[:, :wyck_types]
 
-            aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sawpling, not computing logp)
-            aw = jax.random.categorical(key_aw, aw_logit/temperature, axis=1)  # aw_logit.shape : (batchsize, )
-            AW = jnp.concatenate([AW, aw[:, None]], axis=1)
- 
-        else: # X_n ~ p(X_n | AW_1, X_1, ... AW_(n-1), X_(n-1), AW_n)
+            key, subkey = jax.random.split(key)
+            w = jax.random.categorical(subkey, w_logit/temperature, axis=1) 
 
-            # pad another zero to match the dimensionality of AW
+            W = jnp.concatenate([W, w[:, None]], axis=1)
+
+        elif i%3==1: # A_n
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
-            hXL = inference(transformer, params, atom_types, g, Xpad, AW)[:, -2] # (batchsize, aw_types)
+            Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+
+            a_logit = inference(transformer, params, g, Xpad, Apad, W)[:, -3] # (batchsize, output_size)
+            a_logit = a_logit[:, :atom_types]
+
+            key, subkey = jax.random.split(key)
+            a_logit = a_logit + jnp.where(atom_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
+            a = jax.random.categorical(subkey, a_logit/temperature, axis=1)  
+            A = jnp.concatenate([A, a[:, None]], axis=1)
+ 
+        else: # X_n ~ p(X_n | A_1, W_1, X_1, ... A_(n-1), W_(n-1), X_(n-1), A_n, W_n)
+
+            # pad another zero to match the dimensionality 
+            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
+            hXL = inference(transformer, params, g, Xpad, A, W)[:, -2] # (batchsize, output_size)
 
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
                                                                      [Kx, 
@@ -58,7 +69,6 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
             x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize, dim)) # [-pi, pi]
             x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
             
-            w = jnp.where(aw==0, jnp.zeros_like(aw), (aw-1)//(atom_types-1)+1) # (batchsize, )
             if map_aug: 
                 # randomly project to a wyckoff position according to g and w
                 idx = jax.random.randint(key_op, (batchsize,), 0, symops.shape[2]) # (batchsize, ) 
@@ -67,12 +77,9 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
                 # always project to the first WP
                 x = jax.vmap(project_x, in_axes=(None, 0, 0, None), out_axes=0)(g, w, x, 0) 
 
-
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
-
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
     
-    A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
     M = mult_table[g-1, W]
     num_sites = jnp.sum(A!=0, axis=1)
     num_atoms = jnp.sum(M, axis=1)
@@ -98,4 +105,4 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     #impose space group constraint to lattice params
     L = jax.vmap(symmetrize_lattice, (None, 0))(g, L)  
 
-    return X, A, W, M, L, AW
+    return X, A, W, M, L

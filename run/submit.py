@@ -68,7 +68,8 @@ if __name__=='__main__':
                         'Nf': Nf, 
                         'perm_aug': perm_aug, 
                         'map_aug': map_aug, 
-                        'lamb_aw': lamb_aw,  
+                        'lamb_a': lamb_a,  
+                        'lamb_w': lamb_w,  
                         'lamb_l': lamb_l,  
                         }
 

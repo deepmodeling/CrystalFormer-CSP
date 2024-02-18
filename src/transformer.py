@@ -4,6 +4,7 @@ https://github.com/google-deepmind/dm-haiku/blob/main/examples/transformer/model
 import jax
 import jax.numpy as jnp
 import haiku as hk
+import numpy as np
 
 from attention import MultiHeadAttention
 from wyckoff import wmax_table, dof0_table
@@ -11,7 +12,7 @@ from wyckoff import wmax_table, dof0_table
 def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
 
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
-    output_size = jnp.max(jnp.array([xl_types, atom_types, wyck_types]))
+    output_size = np.max(np.array([xl_types, atom_types, wyck_types]))
 
     @hk.transform
     def network(G, X, A, W, M, is_train):
@@ -138,7 +139,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         # (2) # enhance the probability of pad atoms if there is already a type 0 atom 
         w_mask = jnp.concatenate(
-                [ jnp.where(W==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(jnp.logical_or(A==0, W==0), jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, wyck_types-1))
                 ], axis = 1 )  # (n, wyck_types) mask = 1 for those locations to place pad atoms of type 0
         w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0)
@@ -146,10 +147,19 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         # same logic for a 
         a_mask = jnp.concatenate(
-                [ jnp.where(A==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(jnp.logical_or(A==0, W==0), jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
                   jnp.zeros((n, atom_types-1))
                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
         a_logit = a_logit + jnp.where(a_mask, 1e10, 0.0)
+        a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
+            
+        # the first a should not be pad atom
+        a_mask = jnp.concatenate(
+                [jnp.where(jnp.arange(atom_types)==0, jnp.ones((atom_types)), jnp.zeros((atom_types))).reshape(1, atom_types), 
+                 jnp.zeros((n-1, atom_types))
+                ], axis = 0 )  
+        a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
+        # normalization
         a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
 
         # (3) mask out unavaiable position after w_max for the given spacegroup

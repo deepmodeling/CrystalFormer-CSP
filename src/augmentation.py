@@ -12,16 +12,16 @@ def perm_augmentation(key, A, W, X):
     X: (n, dim)
     '''
     n = W.shape[0]
-    temp = jnp.where(W>0, AW, 9999) # change 0 to 9999 so they remain in the end after sort
+    temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
     idx_perm = jax.random.permutation(key, jnp.arange(n))
     temp = temp[idx_perm]
     idx_sort = jnp.argsort(temp)
     idx = idx_perm[idx_sort]
 
+    # one should still jnp.allclose(W, W[idx])
     A = A[idx]
     X = X[idx]
 
-    # one should still jnp.allclose(W, W[idx])
     return A, X
 
 @partial(jax.vmap, in_axes=(None, None, 0, 0), out_axes=0) # n 

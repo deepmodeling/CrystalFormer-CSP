@@ -50,7 +50,8 @@ group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout 
 group = parser.add_argument_group('loss parameters')
 group.add_argument("--perm_aug", action='store_true', help="carry out permutation augumentation")
 group.add_argument("--map_aug", action='store_true', help="carry out map fc augumentation")
-group.add_argument("--lamb_aw", type=float, default=1.0, help="weight for the aw part relative to fc")
+group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part relative to fc")
+group.add_argument("--lamb_w", type=float, default=1.0, help="weight for the w part relative to fc")
 group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part relative to fc")
 
 group = parser.add_argument_group('physics parameters')
@@ -86,15 +87,14 @@ else:
     assert (args.spacegroup is not None) # for inference we need to specify space group
     test_data = GLXAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.dim, args.num_io_process)
     
-    aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     if args.elements is not None:
         idx = [element_dict[e] for e in args.elements]
-        aw_mask = [1] + [1 if ((aw-1)%(args.atom_types-1)+1 in idx) else 0 for aw in range(1, aw_types)]
-        aw_mask = jnp.array(aw_mask)
+        atom_mask = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
+        atom_mask = jnp.array(atom_mask)
         print ('sampling structure formed by these elements:', args.elements)
-        print (aw_mask)
+        print (atom_mask)
     else:
-        aw_mask = jnp.zeros((aw_types), dtype=int) # we will do nothing to aw_logit in sampling
+        atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
 
 ################### Model #############################
 params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, args.dim, 
@@ -109,14 +109,14 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug, args.lamb_aw, args.lamb_l)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug, args.lamb_a, args.lamb_w, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
-                   + ('_aw_%g_l_%g'%(args.lamb_aw, args.lamb_l)) \
+                   + ('_a_%g_w_%g_l_%g'%(args.lamb_a, args.lamb_w, args.lamb_l)) \
                    + ("_perm" if args.perm_aug else "") \
                    + ("_map" if args.map_aug else "") \
                    +  "_" + transformer_name 
@@ -162,22 +162,22 @@ if args.optimizer != "none":
     params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
 
 else:
+    pass
 
     print("\n========== Print out some test data for the given space group ==========")
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
-    G, L, X, AW = test_data
-    print (G.shape, L.shape, X.shape, AW.shape)
+    G, L, X, A, W = test_data
+    print (G.shape, L.shape, X.shape, A.shape, W.shape)
 
     idx = jnp.where(G==args.spacegroup,size=5)
     G = G[idx]
     L = L[idx]
     X = X[idx]
-    AW = AW[idx]
+    A = A[idx]
+    W = W[idx]
     
-    from utils import to_A_W
-    A, W = jax.vmap(to_A_W, (0, None))(AW, args.atom_types)
     num_sites = jnp.sum(A!=0, axis=1)
     print ("num_sites:", num_sites)
     @jax.vmap
@@ -194,14 +194,13 @@ else:
     print ("W:\n",W)
     print ("X:\n",X)
 
-    aw_types = (args.atom_types -1)*(args.wyck_types -1) + 1
     xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
-    print ("aw_types, xl_types:", aw_types, xl_types)
+    print ("xl_types:", xl_types)
 
     outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, X, A, W, M, False)
     print ("outputs.shape", outputs.shape)
 
-    hXL = outputs[:, 1::2, :] # (:, n_max, aw_types)
+    hXL = outputs[:, 2::3, :xl_types] # (:, n_max, xl_types)
     print ("hXL.shape", hXL.shape)
     offset = args.Kx+2*args.Kx*args.dim 
     l_logit, mu, sigma = jnp.split(hXL[jnp.arange(hXL.shape[0]), num_sites, 
@@ -214,9 +213,7 @@ else:
 
     print("\n========== Start sampling ==========")
     jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 
-    '''
-    FYI, the error was [Compiling module extracted] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
-    '''
+    #FYI, the error was [Compiling module extracted] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
 
     num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
@@ -227,7 +224,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        X, A, W, M, L, AW = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, aw_mask, args.temperature, args.map_aug)
+        X, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, atom_mask, args.temperature, args.map_aug)
         print ("X:\n", X)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
@@ -236,7 +233,6 @@ else:
         print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-        print ("AW:\n", AW)
 
         GLXA_to_csv(args.spacegroup, L, X, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

@@ -44,8 +44,8 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
 
     print (g, c.group.symbol, num_sites)
     natoms = 0
-    w = []
-    a = []
+    ww = []
+    aa = []
     fc = []
     ws = []
     for site in c.atom_sites:
@@ -58,25 +58,24 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         assert (a < atom_types)
         assert (w < wyck_types)
         assert (np.allclose(x, site.wp[0].operate(x)))
-        a.append( a )
-        w.append( w )
+        aa.append( a )
+        ww.append( w )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
         if (g ==1 or g==2):
             print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
-    idx = np.argsort(w)
-    w = np.array(w)[idx]
-    a = np.array(a)[idx]
+    idx = np.argsort(ww)
+    ww = np.array(ww)[idx]
+    aa = np.array(aa)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, dim)
     ws = np.array(ws)[idx]
-    print (ws, a, w, natoms) 
+    print (ws, aa, ww, natoms) 
 
-
-    a = np.concatenate([a,
+    aa = np.concatenate([aa,
                         np.full((n_max - num_sites, ), 0)],
                         axis=0)
 
-    w = np.concatenate([w,
+    ww = np.concatenate([ww,
                         np.full((n_max - num_sites, ), 0)],
                         axis=0)
     fc = np.concatenate([fc, 
@@ -89,7 +88,7 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     
     print ('===================================')
 
-    return g, l, fc, a, w
+    return g, l, fc, aa, ww 
 
 def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
     data = pd.read_csv(csv_file)
@@ -152,24 +151,20 @@ if __name__=='__main__':
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
+    G, L, X, A, W = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
     
     print (G.shape)
     print (L.shape)
     print (X.shape)
-    print (AW.shape)
+    print (A.shape)
+    print (W.shape)
     
     print ('L:\n',L)
     print ('X:\n',X)
 
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
-    
-    A, W = to_A_W(AW, atom_types)
-    print ('A:\n', A)
-    print ('W:\n', W)
-    print(A.shape)
-    
+
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )
