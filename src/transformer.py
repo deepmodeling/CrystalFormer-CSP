@@ -150,23 +150,14 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         w_logit = jnp.where(jnp.arange(wyck_types)<=w_max, w_logit, w_logit-1e10)
         w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
-        # (4) if w !=0 the mask out the pad atom, if w=0 select pad atoms starting from next one
+        # (4) if w !=0 the mask out the pad atom, otherwise mask out true atoms
         a_mask = jnp.concatenate(
                  [(W>0).reshape(n, 1), 
-                 jnp.concatenate([jnp.array([0]), (W==0)[:-1]]).reshape(n, 1).repeat(atom_types-1, axis=1) 
+                 (W==0).reshape(n, 1).repeat(atom_types-1, axis=1) 
                  ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to be masked out
         a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
         a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
             
-        # the first a should not be pad atom
-        a_mask = jnp.concatenate(
-                [jnp.where(jnp.arange(atom_types)==0, jnp.ones((atom_types)), jnp.zeros((atom_types))).reshape(1, atom_types), 
-                 jnp.zeros((n-1, atom_types))
-                ], axis = 0 )  
-        a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
-        # normalization
-        a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
-
         a_logit = jnp.concatenate([a_logit, 
                                    jnp.zeros((n, output_size - atom_types))
                                    ], axis = -1) 

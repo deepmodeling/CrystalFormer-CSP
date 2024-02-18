@@ -200,7 +200,7 @@ else:
     outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, X, A, W, M, False)
     print ("outputs.shape", outputs.shape)
 
-    hXL = outputs[:, 2::3, :xl_types] # (:, n_max, xl_types)
+    hXL = outputs[:, 1::3, :xl_types] # (:, n_max, xl_types)
     print ("hXL.shape", hXL.shape)
     offset = args.Kx+2*args.Kx*args.dim 
     l_logit, mu, sigma = jnp.split(hXL[jnp.arange(hXL.shape[0]), num_sites, 

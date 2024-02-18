@@ -84,7 +84,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                         ) 
 
             train_loss_w, train_loss_x, train_loss_a, train_loss_l = train_aux
-            valid_loss_w, valid_loss_x, valid_loss_a, valid_loss_l = valid_auxa
+            valid_loss_w, valid_loss_x, valid_loss_a, valid_loss_l = valid_aux
 
             f.write( ("%6d" + 10*"  %.6f" + "\n") % (epoch, 
                                                     train_loss,   valid_loss,
