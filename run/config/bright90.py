@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset
+nickname = 'mp-'+dataset+'wax'
 
 ###############################
 atom_types = 119
@@ -14,7 +14,7 @@ transformer_layers = 4
 num_heads = 8
 key_size = 32
 model_size = 64
-dropout_rate = 0.3
+dropout_rate = 0.1
 Nf = 5
 
 optimizer = 'adam'
@@ -23,7 +23,7 @@ lr = 1e-4
 lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
-epochs = 5000
+epochs = 50000
 
 lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
 

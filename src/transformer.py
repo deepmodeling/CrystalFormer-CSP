@@ -82,8 +82,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
 
         # interleave the three matrices
         h = jnp.concatenate([hW[:, None, :], 
-                             hX[:, None, :],
-                             hA[:, None, :]
+                             hA[:, None, :],
+                             hX[:, None, :]
                              ], axis=1) # (n, 3, model_size)
         h = h.reshape(3*n, -1)                                         # (3*n, model_size)
 
@@ -123,7 +123,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         h = hk.Linear(output_size, w_init=initializer)(h) # (3*n, output_size)
         
         h = h.reshape(n, 3, -1)
-        hXL, a_logit, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :]
+        a_logit, hXL, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :]
 
         a_logit = a_logit[:, :atom_types]
         w_logit = w_logit[:, :wyck_types]
@@ -185,8 +185,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
                                jnp.zeros((n, output_size - xl_types))
                                ], axis=-1) # (n, output_size)
         
-        h = jnp.concatenate([hXL[:, None, :], 
-                             a_logit[:, None, :], 
+        h = jnp.concatenate([a_logit[:, None, :], 
+                             hXL[:, None, :], 
                              w_logit[:, None, :]
                              ], axis=1) # (n, 3, output_size)
         h = h.reshape(3*n, output_size) # (3*n, output_size)

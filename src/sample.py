@@ -17,14 +17,14 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
     
     xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
 
-    W = jnp.zeros((batchsize, 0), dtype=int)
     X = jnp.zeros((batchsize, 0, dim))
     A = jnp.zeros((batchsize, 0), dtype=int)
+    W = jnp.zeros((batchsize, 0), dtype=int)
     L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice params and sample lattice after
 
     for i in range(3*n_max):
 
-        if i%3 ==0: # W_n ~ p(W_n | ...)
+        if i%3 ==0: # W_n ~ p(W_n | W_1, A_1, X_1, ..., W_(n-1), A_(n-1), X_(n-1))
             w_logit = inference(transformer, params, g, X, A, W)[:, -1] # (batchsize, output_size)
             w_logit = w_logit[:, :wyck_types]
 
@@ -33,13 +33,23 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             W = jnp.concatenate([W, w[:, None]], axis=1)
 
-        elif i%3==1: # X_n ~ p(X_n | ...)
-
-            # pad another zero to match the dimensionality 
+        elif i%3==1: # A_n
             Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
             Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
 
-            hXL = inference(transformer, params, g, Xpad, Apad, W)[:, -3] # (batchsize, output_size)
+            a_logit = inference(transformer, params, g, Xpad, Apad, W)[:, -3] # (batchsize, output_size)
+            a_logit = a_logit[:, :atom_types]
+
+            key, subkey = jax.random.split(key)
+            a_logit = a_logit + jnp.where(atom_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
+            a = jax.random.categorical(subkey, a_logit/temperature, axis=1)  
+            A = jnp.concatenate([A, a[:, None]], axis=1)
+ 
+        else: # X_n ~ p(X_n | W_1, A_1, X_1, ...  W_(n-1), A_(n-1), X_(n-1), W_n, A_n)
+
+            # pad another zero to match the dimensionality 
+            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1, dim))], axis=1)
+            hXL = inference(transformer, params, g, Xpad, A, W)[:, -2] # (batchsize, output_size)
 
             x_logit, loc, kappa, lattice_params = jnp.split(hXL[:, :xl_types], 
                                                                      [Kx, 
@@ -69,16 +79,6 @@ def sample_crystal(key, transformer, params, n_max, dim, batchsize, atom_types, 
 
             X = jnp.concatenate([X, x[:, None, :]], axis=1)
             L = jnp.concatenate([L, lattice_params[:, None, :]], axis=1)
- 
-        else: # A_n ~ p(A_n | ...)
-            Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            a_logit = inference(transformer, params, g, X, Apad, W)[:, -2] # (batchsize, output_size)
-            a_logit = a_logit[:, :atom_types]
-
-            key, subkey = jax.random.split(key)
-            a_logit = a_logit + jnp.where(atom_mask, 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
-            a = jax.random.categorical(subkey, a_logit/temperature, axis=1)  
-            A = jnp.concatenate([A, a[:, None]], axis=1)
     
     M = mult_table[g-1, W]
     num_sites = jnp.sum(A!=0, axis=1)

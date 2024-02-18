@@ -43,8 +43,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         h = transformer(params, key, G, X_aug, A, W, M, is_train) # (3*n_max+1, ...)
         w_logit = h[0::3, :wyck_types] # (n_max+1, wyck_types) 
         w_logit = w_logit[:-1] # (n_max, wyck_types)
-        hXL = h[1::3, :xl_types] # (n_max, xl_types)
-        a_logit = h[2::3, :atom_types]  # (n_max, atom_types)
+        a_logit = h[1::3, :atom_types]  # (n_max, atom_types)
+        hXL = h[2::3, :xl_types] # (n_max, xl_types)
 
         x_logit, loc, kappa, _ = jnp.split(hXL, [Kx, 
                                                  Kx+Kx*dim, 
