@@ -36,6 +36,7 @@ enhancement
 - [ ] consider put in pair-wise distance feature X_i - X_j, may require restore all atom positions. break autoregressive !
 - [X] for those zero-dimensional wyckoff point impose the single occupy condition, e.g. a,b,c,d can only occur once in space group 225. one can detect dof via `np.linalg.matrix_rank(self.ops[0].rotation_matrix)` or fc_mask
 - [X] make the code runnable for float32, suspect scipy.special.i0e (actually sigmamin)
+- [X] split AW, arrange the transformer in terms of W-X-A
 
 always welcome
 - [ ] write more tests 
@@ -102,12 +103,12 @@ MLE
 
 train
 ```bash 
-python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 1000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --Nf 5 --perm_aug --map_aug 
+python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mp/wax-2a1a0/ --Kx 48 --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 50000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --Nf 5 --perm_aug --map_aug --lamb_a 1.0 --lamb_w 1.0 --lamb_l 1.0
 ```
 
 sample
 ```bash 
-python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --Nf 5 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_aw_1_l_1_perm_map_Nf_5_K_16_16_h0_256_l_4_H_8_k_32_m_64_drop_0.1/  --spacegroup 167 --num_samples 1000 --map_aug
+python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --Nf 5 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 48 --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 10000 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mp/wax-2a1a0/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_perm_map_Nf_5_K_48_4_h0_256_l_4_H_8_k_32_m_64_drop_0.1/  --spacegroup 225  --num_samples 100
 ```
 
 evaluate
