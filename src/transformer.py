@@ -145,9 +145,11 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
         w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0)
         w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
-        # same logic for a 
+        # same logic for a but note the shift
         a_mask = jnp.concatenate(
-                [ jnp.where(jnp.logical_or(A==0, W==0), jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                [ jnp.where(jnp.concatenate([jnp.array([0]), jnp.logical_or(A==0, W==0)[:-1]]), 
+                            jnp.ones((n)), jnp.zeros((n))
+                            ).reshape(n, 1), 
                   jnp.zeros((n, atom_types-1))
                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to place pad atoms of type 0
         a_logit = a_logit + jnp.where(a_mask, 1e10, 0.0)
