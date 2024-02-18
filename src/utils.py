@@ -19,23 +19,13 @@ def letter_to_number(letter):
     '''
     return ord(letter) - ord('a') + 1 if 'a' <= letter <= 'z' else 27 if letter == 'A' else None
 
-@partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
-def to_A_W(AW, atom_types):
-    A = jnp.where(AW==0, jnp.zeros_like(AW), (AW-1)%(atom_types-1)+1)
-    W = jnp.where(AW==0, jnp.zeros_like(AW), (AW-1)//(atom_types-1)+1)
-    return A, W
-
-@partial(jax.vmap, in_axes=(0, 0, None), out_axes=0) # n 
-def to_AW(A, W, atom_types):
-    return jnp.where(A==0, jnp.zeros_like(A), (W-1)*(atom_types-1) + (A-1) +1)
-
 def shuffle(key, data):
     '''
     shuffle data along batch dimension
     '''
-    G, L, X, AW = data
+    G, L, X, A, W = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
-    return G[idx], L[idx], X[idx], AW[idx]
+    return G[idx], L[idx], X[idx], A[idx], W[idx]
     
 def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
@@ -54,7 +44,8 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
 
     print (g, c.group.symbol, num_sites)
     natoms = 0
-    aw = []
+    w = []
+    a = []
     fc = []
     ws = []
     for site in c.atom_sites:
@@ -67,19 +58,26 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         assert (a < atom_types)
         assert (w < wyck_types)
         assert (np.allclose(x, site.wp[0].operate(x)))
-        aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
+        a.append( a )
+        w.append( w )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
         if (g ==1 or g==2):
             print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
-    idx = np.argsort(aw)
-    aw = np.array(aw)[idx]
+    idx = np.argsort(w)
+    w = np.array(w)[idx]
+    a = np.array(a)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, dim)
     ws = np.array(ws)[idx]
-    print (ws, aw, natoms) 
+    print (ws, a, w, natoms) 
 
-    aw = np.concatenate([aw,
-                         np.full((n_max - num_sites, ), 0)],
+
+    a = np.concatenate([a,
+                        np.full((n_max - num_sites, ), 0)],
+                        axis=0)
+
+    w = np.concatenate([w,
+                        np.full((n_max - num_sites, ), 0)],
                         axis=0)
     fc = np.concatenate([fc, 
                          np.full((n_max - num_sites, dim), 1e10)],
@@ -88,13 +86,10 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
     abc = np.array([c.lattice.a, c.lattice.b, c.lattice.c])/natoms**(1./3.)
     angles = np.array([c.lattice.alpha, c.lattice.beta, c.lattice.gamma])
     l = np.concatenate([abc, angles])
-
-    if (g <3 ):
-        print (l)
     
     print ('===================================')
 
-    return g, l, fc, aw
+    return g, l, fc, a, w
 
 def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
     data = pd.read_csv(csv_file)
@@ -106,12 +101,14 @@ def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1)
     p.close()
     p.join()
 
-    G, L, X, AW = zip(*results)
+    G, L, X, A, W = zip(*results)
     G = jnp.array(G) 
     L = jnp.array(L).reshape(-1, 6)
     X = jnp.array(X).reshape(-1, n_max, dim)
-    AW = jnp.array(AW).reshape(-1, n_max)
-    return G, L, X, AW
+    A = jnp.array(A).reshape(-1, n_max)
+    W = jnp.array(W).reshape(-1, n_max)
+
+    return G, L, X, A, W
 
 def GLXA_to_structure_single(G, L, X, A):
 

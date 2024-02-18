@@ -5,30 +5,30 @@ from functools import partial
 
 from von_mises import von_mises_logpdf
 from lattice import make_lattice_mask
-from utils import to_A_W, to_AW
 from wyckoff import mult_table, fc_mask_table
 from augmentation import perm_augmentation, map_augmentation
 
-def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True, lamb_aw=1.0, lamb_l=1.0):
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=True, map_aug=True, lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
 
+    xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
     lattice_mask = make_lattice_mask()
 
     @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, None), out_axes=0) # batch 
-    def logp_fn(params, key, G, L, X, AW, is_train):
+    def logp_fn(params, key, G, L, X, A, W, is_train):
         '''
         G: scalar 
         L: (6,) [a, b, c, alpha, beta, gamma] 
         X: (n_max, dim)
-        AW: (n_max,)
+        A: (n_max,)
+        W: (n_max,)
         '''
         
         dim = X.shape[-1]
     
         if is_train and perm_aug:
             key, subkey = jax.random.split(key)
-            X = perm_augmentation(subkey, AW, X)
+            X = perm_augmentation(subkey, A, W, X)
 
-        A, W = to_A_W(AW, atom_types) # (n_max,) (n_max,)
         num_sites = jnp.sum(A!=0)
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
@@ -39,11 +39,12 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         else:
             X_aug = X
 
-        h = transformer(params, key, G, X_aug, A, W, M, is_train) # (2*n_max+1, ...)
-        hAW = h[::2, :] # (n_max+1, aw_types) 
-        hXL = h[1::2, :] # (n_max, aw_types)
+        h = transformer(params, key, G, X_aug, A, W, M, is_train) # (3*n_max+1, ...)
+        w_logit = h[0::3, :wyck_types] # (n_max+1, wyck_types) 
+        w_logit = w_logit[:-1] # (n_max, wyck_types)
+        a_logit = h[1::3, :atom_types]  # (n_max, atom_types)
+        hXL = h[2::3, :xl_types] # (n_max, xl_types)
 
-        aw_logit = hAW[:-1] # (n_max, aw_types)
         x_logit, loc, kappa, _ = jnp.split(hXL, [Kx, 
                                                  Kx+Kx*dim, 
                                                  Kx+2*Kx*dim, 
@@ -56,10 +57,11 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)((X-0.5)*2*jnp.pi, loc, kappa) # (n_max, Kx, dim)
         logp_x = jax.scipy.special.logsumexp(x_logit[..., None] + logp_x, axis=1) # (n_max, dim)
 
-        fc_mask = jnp.logical_and((AW>0)[:, None], fc_mask_table[G-1, W]) # (n_max, dim)
+        fc_mask = jnp.logical_and((W>0)[:, None], fc_mask_table[G-1, W]) # (n_max, dim)
         logp_x = jnp.sum(jnp.where(fc_mask, logp_x, jnp.zeros_like(logp_x)))
 
-        logp_aw = jnp.sum(aw_logit[jnp.arange(n_max), AW.astype(int)])  
+        logp_w = jnp.sum(w_logit[jnp.arange(n_max), W.astype(int)])  
+        logp_a = jnp.sum(a_logit[jnp.arange(n_max), A.astype(int)])  
 
         l_logit, mu, sigma = jnp.split(hXL[num_sites, 
                                            Kx+2*Kx*dim:Kx+2*Kx*dim+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1)
@@ -69,15 +71,16 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, perm_aug=Tr
         logp_l = jax.scipy.special.logsumexp(l_logit[:, None] + logp_l, axis=0) # (6,)
         logp_l = jnp.sum(jnp.where((lattice_mask[G-1]>0), logp_l, jnp.zeros_like(logp_l)))
         
-        return logp_x, logp_aw, logp_l
+        return logp_x, logp_a, logp_w, logp_l
 
-    def loss_fn(params, key, G, L, X, AW, is_train):
-        logp_x, logp_aw, logp_l = logp_fn(params, key, G, L, X, AW, is_train)
+    def loss_fn(params, key, G, L, X, A, W, is_train):
+        logp_x, logp_a, logp_w, logp_l = logp_fn(params, key, G, L, X, A, W, is_train)
         loss_x = -jnp.mean(logp_x)
-        loss_aw = -jnp.mean(logp_aw)
+        loss_a = -jnp.mean(logp_a)
+        loss_w = -jnp.mean(logp_w)
         loss_l = -jnp.mean(logp_l)
 
-        return loss_x + lamb_aw* loss_aw + lamb_l*loss_l, (loss_x, loss_aw, loss_l)
+        return loss_x + lamb_a* loss_a + lamb_w*loss_w + lamb_l*loss_l, (loss_x, loss_a, loss_w, loss_l)
         
     return loss_fn
 
@@ -93,7 +96,7 @@ if __name__=='__main__':
     dropout_rate = 0.1 
 
     csv_file = '../data/mini.csv'
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
+    G, L, X, A, W = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
 
     key = jax.random.PRNGKey(42)
 
@@ -101,8 +104,8 @@ if __name__=='__main__':
 
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
-    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1], AW[:1], True)
+    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1], A[:1], W[:1], True)
     print (value)
 
-    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1]-1.0, AW[:1], True)
+    value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, key, G[:1], L[:1], X[:1]-1.0, A[:1], W[:1], True)
     print (value)
