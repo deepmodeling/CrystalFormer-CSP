@@ -21,7 +21,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch t_loss v_loss t_loss_w v_loss_w t_loss_x v_loss_x t_loss_a v_loss_a t_loss_l v_loss_l\n")
+        f.write("epoch t_loss v_loss t_loss_w v_loss_w t_loss_a v_loss_a t_loss_xyz v_loss_xyz t_loss_l v_loss_l\n")
  
     for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
@@ -83,14 +83,14 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                         (valid_loss, valid_aux)
                         ) 
 
-            train_loss_w, train_loss_x, train_loss_a, train_loss_l = train_aux
-            valid_loss_w, valid_loss_x, valid_loss_a, valid_loss_l = valid_aux
+            train_loss_w, train_loss_a, train_loss_xyz, train_loss_l = train_aux
+            valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
 
             f.write( ("%6d" + 10*"  %.6f" + "\n") % (epoch, 
                                                     train_loss,   valid_loss,
                                                     train_loss_w, valid_loss_w, 
-                                                    train_loss_x, valid_loss_x, 
                                                     train_loss_a, valid_loss_a, 
+                                                    train_loss_xyz, valid_loss_xyz, 
                                                     train_loss_l, valid_loss_l
                                                     ))
 

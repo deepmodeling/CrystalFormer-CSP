@@ -7,7 +7,7 @@ import os
 import multiprocessing
 import math
 
-from utils import GLXAW_from_file, GLXA_to_csv
+from utils import GLXYZAW_from_file, GLXA_to_csv
 from elements import element_dict, element_list
 from transformer import make_transformer  
 from train import train
@@ -37,8 +37,6 @@ group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val
 group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
 group = parser.add_argument_group('transformer parameters')
-group.add_argument('--Nf', type=int, default=5, help='number of frequencies')
-group.add_argument('--Kx', type=int, default=8, help='number of modes in von-mises')
 group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
 group.add_argument('--h0_size', type=int, default=0, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
@@ -56,9 +54,9 @@ group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lat
 
 group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
-group.add_argument('--atom_types', type=int, default=118, help='Atom types including the padded atoms')
-group.add_argument('--wyck_types', type=int, default=15, help='Number of possible multiplicites including 0')
-group.add_argument('--dim', type=int, default=3, help='The spatial dimension')
+group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
+group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
+group.add_argument('--coord_types', type=int, default=100, help='Coordinate discritization')
 
 group = parser.add_argument_group('sampling parameters')
 group.add_argument('--spacegroup', type=int, help='The space group id to be sampled (1-230)')
@@ -81,11 +79,11 @@ if args.num_io_process > num_cpu:
 
 ################### Data #############################
 if args.optimizer != "none":
-    train_data = GLXAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.n_max, args.dim, args.num_io_process)
-    valid_data = GLXAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.dim, args.num_io_process)
+    train_data = GLXYZAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
+    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
 else:
     assert (args.spacegroup is not None) # for inference we need to specify space group
-    test_data = GLXAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.dim, args.num_io_process)
+    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
     
     if args.elements is not None:
         idx = [element_dict[e] for e in args.elements]
@@ -97,24 +95,24 @@ else:
         atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, args.dim, 
+params, transformer = make_transformer(key, args.Kl, args.n_max, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types, args.wyck_types, 
+                                      args.atom_types, args.wyck_types, args.coord_types, 
                                       args.dropout_rate)
-transformer_name = 'Nf_%d_K_%d_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
+transformer_name = 'Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.perm_aug, args.map_aug, args.lamb_a, args.lamb_w, args.lamb_l)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.coord_types, args.Kl, transformer, args.perm_aug, args.lamb_a, args.lamb_w, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
-                   + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
+                   + '_A_%g_W_%g_C_%g_N_%g'%(args.atom_types, args.wyck_types, args.coord_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    + ('_a_%g_w_%g_l_%g'%(args.lamb_a, args.lamb_w, args.lamb_l)) \
                    + ("_perm" if args.perm_aug else "") \
@@ -168,13 +166,13 @@ else:
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
 
-    G, L, X, A, W = test_data
-    print (G.shape, L.shape, X.shape, A.shape, W.shape)
+    G, L, XYZ, A, W = test_data
+    print (G.shape, L.shape, XYZ.shape, A.shape, W.shape)
 
     idx = jnp.where(G==args.spacegroup,size=5)
     G = G[idx]
     L = L[idx]
-    X = X[idx]
+    XYZ = XYZ[idx]
     A = A[idx]
     W = W[idx]
     
@@ -192,19 +190,14 @@ else:
     for a in A: 
        print([element_list[i] for i in a])
     print ("W:\n",W)
-    print ("X:\n",X)
+    print ("XYZ:\n",XYZ/args.coord_types)
 
-    xl_types = args.Kx+2*args.Kx*args.dim+args.Kl+2*6*args.Kl
-    print ("xl_types:", xl_types)
-
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, X, A, W, M, False)
+    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, XYZ, A, W, M, False)
     print ("outputs.shape", outputs.shape)
 
-    hXL = outputs[:, 2::3, :xl_types] # (:, n_max, xl_types)
-    print ("hXL.shape", hXL.shape)
-    offset = args.Kx+2*args.Kx*args.dim 
-    l_logit, mu, sigma = jnp.split(hXL[jnp.arange(hXL.shape[0]), num_sites, 
-                                       offset:offset+args.Kl+2*6*args.Kl], 
+    h_al = outputs[:, 1::5, :] # (:, n_max, :)
+    l_logit, mu, sigma = jnp.split(h_al[jnp.arange(h_al.shape[0]), num_sites, 
+                                       args.atom_types:args.atom_types+args.Kl+2*6*args.Kl], 
                                        [args.Kl, args.Kl+6*args.Kl], axis=-1)
     print ("L:\n",L)
     print ("exp(l_logit):\n", jnp.exp(l_logit))
@@ -224,8 +217,8 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        X, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, args.dim, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, atom_mask, args.temperature, args.map_aug)
-        print ("X:\n", X)  # fractional coordinate 
+        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.coord_types, args.Kl, args.spacegroup, atom_mask, args.temperature)
+        print ("XYZ:\n", XYZ/args.coord_types)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
         print ("M:\n", M)  # multiplicity 
@@ -234,5 +227,5 @@ else:
         for a in A:
            print([element_list[i] for i in a])
 
-        GLXA_to_csv(args.spacegroup, L, X, A, num_worker=args.num_io_process, filename=filename)
+        GLXA_to_csv(args.spacegroup, L, XYZ/args.coord_types, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

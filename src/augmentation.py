@@ -55,9 +55,9 @@ def map_augmentation(key, G, W, X):
     '''
     
     idx = jax.random.randint(key, (), 0, symops.shape[2]) # randomly sample an operation
-    return project_x(G, W, X, idx)
+    return project_xyz(G, W, X, idx)
 
-def project_x(g, w, x, idx):
+def project_xyz(g, w, x, idx):
     '''
     apply the randomly sampled Wyckoff symmetry op to sampled fc, which 
     should be (or close to) the first WP
