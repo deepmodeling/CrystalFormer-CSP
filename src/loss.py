@@ -40,14 +40,12 @@ def make_loss_fn(n_max, atom_types, wyck_types, coord_types, Kl, transformer, pe
 
         X, Y, Z = XYZ[:, 0], XYZ[:, 1], XYZ[:,2]
  
-        logp_w = w_logit[jnp.arange(n_max), W.astype(int)]
-        logp_a = a_logit[jnp.arange(n_max), A.astype(int)]
+        logp_w = jnp.sum(w_logit[jnp.arange(n_max), W.astype(int)])
+        logp_a = jnp.sum(a_logit[jnp.arange(n_max), A.astype(int)])
+
         logp_x = x_logit[jnp.arange(n_max), X.astype(int)]  
         logp_y = y_logit[jnp.arange(n_max), Y.astype(int)]  
         logp_z = z_logit[jnp.arange(n_max), Z.astype(int)]  
-
-        logp_w = jnp.sum(jnp.where(W>0, logp_w, jnp.zeros_like(logp_w)))
-        logp_a = jnp.sum(jnp.where(W>0, logp_a, jnp.zeros_like(logp_a)))
 
         fc_mask = jnp.logical_and((W>0)[:, None], fc_mask_table[G-1, W]) # (n_max, 3)
         logp_x = jnp.sum(jnp.where(fc_mask[:, 0], logp_x, jnp.zeros_like(logp_x)))
