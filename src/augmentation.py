@@ -4,6 +4,24 @@ from functools import partial
 
 from wyckoff import symops
 
+def sort_atoms(W, A, X):
+    '''
+    sort atoms according to xyz with the same W
+    W: (n, )
+    A: (n, )
+    X: (n, dim)
+    '''
+    n = W.shape[0]
+    W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+    
+    X -= jnp.floor(X) # wrap back to 0-1 
+    idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], W_temp))
+
+    # one should have jnp.allclose(W, W[idx]) as W are always sorted
+    A = A[idx]
+    X = X[idx]
+    return A, X
+
 def perm_augmentation(key, A, W, X):
     '''
     randomly permute fractional coordinate of atoms with the same wyckoff letter
