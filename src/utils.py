@@ -33,9 +33,10 @@ def sort_atoms(W, A, X):
     X = X[idx]
     return A, X
 
-def map_to_mesh(array, coord_types):
-    array -= jnp.floor(array)
-    return jnp.minimum((array * coord_types).astype(int), coord_types - 1)
+def map_to_mesh(X, coord_types):
+    X -= jnp.floor(X)
+    X = jnp.round(X*coord_types).astype(int)
+    return X%coord_types
 
 def letter_to_number(letter):
     '''

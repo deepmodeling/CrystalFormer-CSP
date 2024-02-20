@@ -1,5 +1,6 @@
 from config import *
 from utils import sort_atoms
+from utils import map_to_mesh
 
 def test_sort_atoms():
     W = jnp.array([1, 1, 1,  1, 2, 2, 2, 0, 0])
@@ -20,4 +21,10 @@ def test_sort_atoms():
     print (A)
     print (X)
 
+def test_map_to_mesh():
+    x = jnp.array([0.111, 0.3333, 0.499, 0.501, 0.666, 0.99, 0.999])
+    x = map_to_mesh(x, 100)
+    print (x)
+
 test_sort_atoms()
+test_map_to_mesh()
