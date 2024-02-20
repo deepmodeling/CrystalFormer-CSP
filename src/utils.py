@@ -16,7 +16,7 @@ from elements import element_list
 @jax.vmap
 def sort_atoms(W, A, X):
     '''
-    lex sort atoms according W, A, X, Y, Z
+    lex sort atoms according W, X, Y, Z
 
     W: (n, )
     A: (n, )
@@ -24,10 +24,9 @@ def sort_atoms(W, A, X):
     '''
 
     W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
-    A_temp = jnp.where(A>0, A, 9999)
 
     X -= jnp.floor(X) # wrap back to 0-1 
-    idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], A_temp, W_temp))
+    idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], W_temp))
 
     #assert jnp.allclose(W, W[idx])
     A = A[idx]
@@ -94,10 +93,6 @@ def process_one(cif, atom_types, wyck_types, coord_types, n_max, tol=0.01):
     fc = np.array(fc)[idx].reshape(num_sites, 3)
     ws = np.array(ws)[idx]
     print (ws, aa, ww, natoms) 
-
-    _, count = np.unique(np.array(ww), return_counts=True)
-    if count.max() > 4:
-        print (g, ww, fc)
 
     aa = np.concatenate([aa,
                         np.full((n_max - num_sites, ), 0)],
