@@ -132,9 +132,9 @@ def GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max, num_
     XYZ = jnp.array(XYZ).reshape(-1, n_max, 3)
     L = jnp.array(L).reshape(-1, 6)
 
+    XYZ = map_to_mesh(XYZ, coord_types)
     A, XYZ = sort_atoms(W, A, XYZ)
     
-    XYZ = map_to_mesh(XYZ, coord_types)
     return G, L, XYZ, A, W
 
 def GLXA_to_structure_single(G, L, X, A):
