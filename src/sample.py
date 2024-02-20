@@ -93,7 +93,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             y = jax.random.categorical(subkey, y_logit/temperature, axis=1)
 
             # project to the first WP
-            xyz = jnp.concatenate([jnp.zeros((batchsize, 1)), 
+            xyz = jnp.concatenate([X[:, -1][:, None], 
                                    y[:, None], 
                                    jnp.zeros((batchsize, 1)), 
                                   ], axis=-1) 
@@ -115,8 +115,8 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             z = jax.random.categorical(subkey, z_logit/temperature, axis=1)
 
             # project to the first WP
-            xyz = jnp.concatenate([jnp.zeros((batchsize, 1)), 
-                                   jnp.zeros((batchsize, 1)), 
+            xyz = jnp.concatenate([X[:, -1][:, None], 
+                                   Y[:, -1][:, None], 
                                    z[:, None], 
                                   ], axis=-1) 
             xyz = xyz/coord_types
