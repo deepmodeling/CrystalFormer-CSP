@@ -7,8 +7,9 @@ nickname = 'mp-'+dataset + 'sort-xyz'
 
 ###############################
 atom_types = 119
-coord_types = 128
+coord_types = 100
 
+Nf = 5
 Kl = 4
 h0_size = 256
 transformer_layers = 4

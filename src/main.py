@@ -37,6 +37,7 @@ group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val
 group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
 
 group = parser.add_argument_group('transformer parameters')
+group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
 group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
 group.add_argument('--h0_size', type=int, default=0, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
@@ -95,13 +96,13 @@ else:
         atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.Kl, args.n_max, 
+params, transformer = make_transformer(key, args.Nf, args.Kl, args.n_max, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
                                       args.atom_types, args.wyck_types, args.coord_types, 
                                       args.dropout_rate)
-transformer_name = 'Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
+transformer_name = 'Nf_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 

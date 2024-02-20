@@ -9,7 +9,7 @@ import numpy as np
 from attention import MultiHeadAttention
 from wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, coord_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+def make_transformer(key, Nf, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, coord_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
 
     lattice_types = Kl+2*6*Kl
     output_size = np.max(np.array([atom_types+lattice_types, coord_types, wyck_types]))
@@ -77,17 +77,23 @@ def make_transformer(key, Kl, n_max, h0_size, num_layers, num_heads, key_size, m
 
         hX = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
                               jax.nn.one_hot(X, coord_types)
-                             ], axis=1) # (n, ...)
+                             ] + 
+                             [fn(2*jnp.pi*X[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
         hY = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
                               jax.nn.one_hot(Y, coord_types)
-                             ], axis=1) # (n, ...)
+                             ] +
+                             [fn(2*jnp.pi*Y[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
         hY = hk.Linear(model_size, w_init=initializer)(hY)  # (n, model_size)
 
         hZ = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
                               jax.nn.one_hot(Z, coord_types)
-                             ], axis=1) # (n, ...)
+                             ]+
+                             [fn(2*jnp.pi*Z[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
         hZ = hk.Linear(model_size, w_init=initializer)(hZ)  # (n, model_size)
 
         # interleave the three matrices

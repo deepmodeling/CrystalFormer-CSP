@@ -82,6 +82,7 @@ if __name__=='__main__':
     n_max = 20
     wyck_types = 20
     coord_types = 100
+    Nf = 5
     Kl  = 1
     dropout_rate = 0.1 
 
@@ -92,7 +93,7 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Kl, n_max, 128, 4, 4, 8, 16, atom_types, wyck_types, coord_types, dropout_rate) 
+    params, transformer = make_transformer(key, Nf, Kl, n_max, 128, 4, 4, 8, 16, atom_types, wyck_types, coord_types, dropout_rate) 
  
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, coord_types, Kl, transformer)
     

@@ -47,6 +47,7 @@ if __name__=='__main__':
                         'wyck_types': wyck_types, 
                         'coord_types': coord_types,
                         'folder':resfolder,
+                        'Nf':Nf, 
                         'Kl':Kl,
                         'h0_size': h0_size, 
                         'transformer_layers':transformer_layers, 
