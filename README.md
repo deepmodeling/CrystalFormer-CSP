@@ -108,7 +108,7 @@ python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --coord_types
 
 sample
 ```bash 
-python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --coord_types 100 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 10000 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mp/w-a-x-y-z-d226d/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_C_100_N_21_a_1_w_1_l_1_Kl_4_h0_256_l_4_H_8_k_32_m_64_drop_0.1/ --spacegroup 160 --num_samples 100
+python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --coord_types 100 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 10000 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mp/w-a-x-y-z-d226d/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_C_100_N_21_a_1_w_1_l_1_Kl_4_h0_256_l_4_H_8_k_32_m_64_drop_0.3/ --spacegroup 160 --num_samples 100
 ```
 
 evaluate

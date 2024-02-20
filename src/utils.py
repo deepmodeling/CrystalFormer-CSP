@@ -87,7 +87,7 @@ def process_one(cif, atom_types, wyck_types, coord_types, n_max, tol=0.01):
         ww.append( w )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
-        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x, map_to_mesh(np.array(x), coord_types))
+        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
     idx = np.argsort(ww)
     ww = np.array(ww)[idx]
     aa = np.array(aa)[idx]
