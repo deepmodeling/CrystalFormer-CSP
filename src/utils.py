@@ -13,7 +13,29 @@ import os
 from wyckoff import mult_table
 from elements import element_list
 
+@jax.vmap
+def sort_atoms(W, A, X):
+    '''
+    lex sort atoms according W, A, X, Y, Z
+
+    W: (n, )
+    A: (n, )
+    X: (n, dim)
+    '''
+
+    W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+    A_temp = jnp.where(A>0, A, 9999)
+
+    X -= jnp.floor(X) # wrap back to 0-1 
+    idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], A_temp, W_temp))
+
+    #assert jnp.allclose(W, W[idx])
+    A = A[idx]
+    X = X[idx]
+    return A, X
+
 def map_to_mesh(array, coord_types):
+    array -= jnp.floor(array)
     return jnp.minimum((array * coord_types).astype(int), coord_types - 1)
 
 def letter_to_number(letter):
@@ -30,7 +52,7 @@ def shuffle(key, data):
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return G[idx], L[idx], XYZ[idx], A[idx], W[idx]
     
-def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
+def process_one(cif, atom_types, wyck_types, coord_types, n_max, tol=0.01):
     # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
     crystal = Structure.from_str(cif, fmt='cif')
     spga = SpacegroupAnalyzer(crystal, symprec=tol)
@@ -65,19 +87,17 @@ def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
         ww.append( w )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
-        if (g <= 2):
-            print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
-    _, count = np.unique(np.array(ww), return_counts=True)
-    if count.max() > 4:
-        print (g, ww, fc)
-
+        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x, map_to_mesh(np.array(x), coord_types))
     idx = np.argsort(ww)
     ww = np.array(ww)[idx]
     aa = np.array(aa)[idx]
     fc = np.array(fc)[idx].reshape(num_sites, 3)
     ws = np.array(ws)[idx]
-
     print (ws, aa, ww, natoms) 
+
+    _, count = np.unique(np.array(ww), return_counts=True)
+    if count.max() > 4:
+        print (g, ww, fc)
 
     aa = np.concatenate([aa,
                         np.full((n_max - num_sites, ), 0)],
@@ -103,20 +123,22 @@ def GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max, num_
     cif_strings = data['cif']
 
     p = multiprocessing.Pool(num_workers)
-    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max)
+    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, coord_types=coord_types, n_max=n_max)
     results = p.map_async(partial_process_one, cif_strings).get()
     p.close()
     p.join()
 
     G, L, XYZ, A, W = zip(*results)
+
     G = jnp.array(G) 
-    L = jnp.array(L).reshape(-1, 6)
-    XYZ = jnp.array(XYZ).reshape(-1, n_max, 3)
-    XYZ -= jnp.floor(XYZ)
-    XYZ = map_to_mesh(XYZ, coord_types)
     A = jnp.array(A).reshape(-1, n_max)
     W = jnp.array(W).reshape(-1, n_max)
+    XYZ = jnp.array(XYZ).reshape(-1, n_max, 3)
+    L = jnp.array(L).reshape(-1, 6)
 
+    A, XYZ = sort_atoms(W, A, XYZ)
+    
+    XYZ = map_to_mesh(XYZ, coord_types)
     return G, L, XYZ, A, W
 
 def GLXA_to_structure_single(G, L, X, A):
@@ -153,13 +175,16 @@ def GLXA_to_csv(G, L, X, A, num_worker=1, filename='out_structure.csv'):
 if __name__=='__main__':
     atom_types = 119
     wyck_types = 28
-    coord_types = 100
+    coord_types = 128
     n_max = 24
+
+    import numpy as np 
+    np.set_printoptions(threshold=np.inf)
     
-    csv_file = '../data/mini.csv'
+    #csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    #csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
     G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max)
     
@@ -172,8 +197,6 @@ if __name__=='__main__':
     print ('L:\n',L)
     print ('XYZ:\n',XYZ)
 
-    import numpy as np 
-    np.set_printoptions(threshold=np.inf)
 
     @jax.vmap
     def lookup(G, W):

@@ -8,7 +8,7 @@ from augmentation import project_xyz
 from utils import map_to_mesh
 
 @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, 0), out_axes=0) # batch 
-def inference(model, params, g, A, W, X, Y, Z):
+def inference(model, params, g, W, A, X, Y, Z):
     XYZ = jnp.concatenate([X[:, None],
                            Y[:, None],
                            Z[:, None]
@@ -30,7 +30,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
     for i in range(5*n_max):
 
         if i%5 ==0: 
-            w_logit = inference(transformer, params, g, A, W, X, Y, Z)[:, -1] # (batchsize, output_size)
+            w_logit = inference(transformer, params, g, W, A, X, Y, Z)[:, -1] # (batchsize, output_size)
             w_logit = w_logit[:, :wyck_types]
 
             key, subkey = jax.random.split(key)
@@ -152,9 +152,9 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
     #impose space group constraint to lattice params
     L = jax.vmap(symmetrize_lattice, (None, 0))(g, L)  
 
-    XYZ = jnp.concatenate([X[:, None], 
-                           Y[:, None], 
-                           Z[:, None]
+    XYZ = jnp.concatenate([X[..., None], 
+                           Y[..., None], 
+                           Z[..., None]
                            ], 
                            axis=-1)
 

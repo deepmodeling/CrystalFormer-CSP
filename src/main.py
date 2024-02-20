@@ -196,6 +196,7 @@ else:
     print ("outputs.shape", outputs.shape)
 
     h_al = outputs[:, 1::5, :] # (:, n_max, :)
+    a_logit = h_al[:, :, :args.atom_types]
     l_logit, mu, sigma = jnp.split(h_al[jnp.arange(h_al.shape[0]), num_sites, 
                                        args.atom_types:args.atom_types+args.Kl+2*6*args.Kl], 
                                        [args.Kl, args.Kl+6*args.Kl], axis=-1)
