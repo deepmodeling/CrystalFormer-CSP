@@ -20,12 +20,10 @@ def sort_atoms(W, A, X):
 
     W: (n, )
     A: (n, )
-    X: (n, dim)
+    X: (n, dim) int
     '''
 
     W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
-
-    X -= jnp.floor(X) # wrap back to 0-1 
     idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], W_temp))
 
     #assert jnp.allclose(W, W[idx])
