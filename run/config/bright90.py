@@ -7,10 +7,9 @@ nickname = 'mp-'+dataset + 'sort-xyz'
 
 ###############################
 atom_types = 119
-coord_types = 100
 
 Nf = 5
-Kl = 4
+Kx, Kl = 16, 4
 h0_size = 256
 transformer_layers = 4
 num_heads = 8
@@ -27,9 +26,6 @@ batchsize = 100
 epochs = 10000
 
 lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
-
-map_aug = False
-perm_aug = False
 
 num_io_process = 40
 

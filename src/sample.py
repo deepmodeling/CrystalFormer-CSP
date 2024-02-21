@@ -2,10 +2,10 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
+from von_mises import sample_von_mises
 from lattice import symmetrize_lattice
 from wyckoff import mult_table
 from augmentation import project_xyz
-from utils import map_to_mesh
 
 @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, 0), out_axes=0) # batch 
 def inference(model, params, g, W, A, X, Y, Z):
@@ -17,14 +17,25 @@ def inference(model, params, g, W, A, X, Y, Z):
     M = mult_table[g-1, W]  
     return model(params, None, g, XYZ, A, W, M, False)
 
+def sample_x(key, h_x, Kx, temperature, batchsize):
+    coord_types = 3*Kx 
+    x_logit, loc, kappa = jnp.split(h_x[:, :coord_types], [Kx, 2*Kx], axis=-1)
+    key, key_k, key_x = jax.random.split(key, 3)
+    k = jax.random.categorical(key_k, x_logit/temperature, axis=1)
+    loc = loc.reshape(batchsize, Kx)[jnp.arange(batchsize), k]
+    kappa = kappa.reshape(batchsize, Kx)[jnp.arange(batchsize), k]
+    x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize,))
+    x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
+    return key, x 
+
 @partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9))
-def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_types, coord_types, Kl, g, atom_mask, temperature):
+def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_types, Kx, Kl, g, atom_mask, temperature):
     
     W = jnp.zeros((batchsize, 0), dtype=int)
     A = jnp.zeros((batchsize, 0), dtype=int)
-    X = jnp.zeros((batchsize, 0), dtype=int)
-    Y = jnp.zeros((batchsize, 0), dtype=int)
-    Z = jnp.zeros((batchsize, 0), dtype=int)
+    X = jnp.zeros((batchsize, 0))
+    Y = jnp.zeros((batchsize, 0))
+    Z = jnp.zeros((batchsize, 0))
     L = jnp.zeros((batchsize, 0, Kl+2*6*Kl)) # we accumulate lattice params and sample lattice after
 
     for i in range(5*n_max):
@@ -40,9 +51,9 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
 
         elif i%5==1: 
 
-            Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+            Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1))], axis=1)
+            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1))], axis=1)
+            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1))], axis=1)
             Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
 
             h_al = inference(transformer, params, g, W, Apad, Xpad, Ypad, Zpad)[:, -5] # (batchsize, output_size)
@@ -59,69 +70,53 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
 
         elif i%5==2: 
 
-            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+            Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1))], axis=1)
+            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1))], axis=1)
+            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1))], axis=1)
 
-            x_logit = inference(transformer, params, g, W, A, Xpad, Ypad, Zpad)[:, -4] # (batchsize, output_size)
-            x_logit = x_logit[:, :coord_types]
-        
-            key, subkey = jax.random.split(key)
-            x = jax.random.categorical(subkey, x_logit/temperature, axis=1)
+            h_x = inference(transformer, params, g, W, A, Xpad, Ypad, Zpad)[:, -4] # (batchsize, output_size)
+            key, x = sample_x(key, h_x, Kx, temperature, batchsize)
 
             # project to the first WP
             xyz = jnp.concatenate([x[:, None], 
                                    jnp.zeros((batchsize, 1)), 
                                    jnp.zeros((batchsize, 1)), 
                                   ], axis=-1) 
-            xyz = xyz/coord_types
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
-            xyz = map_to_mesh(xyz, coord_types)
             x = xyz[:, 0]
-
             X = jnp.concatenate([X, x[:, None]], axis=1)
 
         elif i%5==3: 
 
-            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
-            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+            Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1))], axis=1)
+            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1))], axis=1)
 
-            y_logit = inference(transformer, params, g, W, A, X, Ypad, Zpad)[:, -3] # (batchsize, output_size)
-            y_logit = y_logit[:, :coord_types]
+            h_y = inference(transformer, params, g, W, A, X, Ypad, Zpad)[:, -3] # (batchsize, output_size)
+            key, y = sample_x(key, h_y, Kx, temperature, batchsize)
         
-            key, subkey = jax.random.split(key)
-            y = jax.random.categorical(subkey, y_logit/temperature, axis=1)
-
             # project to the first WP
             xyz = jnp.concatenate([X[:, -1][:, None], 
                                    y[:, None], 
                                    jnp.zeros((batchsize, 1)), 
                                   ], axis=-1) 
-            xyz = xyz/coord_types
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
-            xyz = map_to_mesh(xyz, coord_types)
             y = xyz[:, 1]
 
             Y = jnp.concatenate([Y, y[:, None]], axis=1)
 
         elif i%5==4: 
 
-            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+            Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1))], axis=1)
 
-            z_logit = inference(transformer, params, g, W, A, X, Y, Zpad)[:, -2] # (batchsize, output_size)
-            z_logit = z_logit[:, :coord_types]
+            h_z = inference(transformer, params, g, W, A, X, Y, Zpad)[:, -2] # (batchsize, output_size)
+            key, z = sample_x(key, h_z, Kx, temperature, batchsize)
         
-            key, subkey = jax.random.split(key)
-            z = jax.random.categorical(subkey, z_logit/temperature, axis=1)
-
             # project to the first WP
             xyz = jnp.concatenate([X[:, -1][:, None], 
                                    Y[:, -1][:, None], 
                                    z[:, None], 
                                   ], axis=-1) 
-            xyz = xyz/coord_types
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
-            xyz = map_to_mesh(xyz, coord_types)
             z = xyz[:, 2]
 
             Z = jnp.concatenate([Z, z[:, None]], axis=1)

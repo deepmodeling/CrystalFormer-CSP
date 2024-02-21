@@ -9,17 +9,26 @@ import numpy as np
 from attention import MultiHeadAttention
 from wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Nf, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, coord_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
-
+def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+    
+    coord_types = 3*Kx
     lattice_types = Kl+2*6*Kl
     output_size = np.max(np.array([atom_types+lattice_types, coord_types, wyck_types]))
+
+    def renormalize(h_x):
+        n = h_x.shape[0]
+        x_logit, x_loc, x_kappa = jnp.split(h_x[:, :coord_types], [Kx, 2*Kx], axis=-1)
+        x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
+        x_kappa = jax.nn.softplus(x_kappa) 
+        h_x = jnp.concatenate([x_logit, x_loc, x_kappa, jnp.zeros((n, output_size - coord_types))], axis=-1)  
+        return h_x
 
     @hk.transform
     def network(G, XYZ, A, W, M, is_train):
         '''
         Args:
             G: scalar integer for space group id 1-230
-            XYZ: (n, 3)
+            XYZ: (n, 3) fractional coordinates
             A: (n, )  element type 
             W: (n, )  wyckoff position index
             M: (n, )  multiplicities
@@ -76,23 +85,20 @@ def make_transformer(key, Nf, Kl, n_max, h0_size, num_layers, num_heads, key_siz
         hA = hk.Linear(model_size, w_init=initializer)(hA)  # (n, model_size)
 
         hX = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
-                              jax.nn.one_hot(X, coord_types)
                              ] + 
-                             [fn(2*jnp.pi*X[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             [fn(2*jnp.pi*X[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
         hY = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
-                              jax.nn.one_hot(Y, coord_types)
                              ] +
-                             [fn(2*jnp.pi*Y[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             [fn(2*jnp.pi*Y[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
         hY = hk.Linear(model_size, w_init=initializer)(hY)  # (n, model_size)
 
         hZ = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
-                              jax.nn.one_hot(Z, coord_types)
                              ]+
-                             [fn(2*jnp.pi*Z[:, None]/coord_types*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             [fn(2*jnp.pi*Z[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
         hZ = hk.Linear(model_size, w_init=initializer)(hZ)  # (n, model_size)
 
@@ -143,28 +149,12 @@ def make_transformer(key, Nf, Kl, n_max, h0_size, num_layers, num_heads, key_siz
         h = hk.Linear(output_size, w_init=initializer)(h) # (5*n, output_size)
         
         h = h.reshape(n, 5, -1)
-        h_al, x_logit, y_logit, z_logit, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :], h[:, 3, :], h[:, 4, :]
-        
-        # normalization
-        x_logit = x_logit[:, :coord_types]
-        y_logit = y_logit[:, :coord_types]
-        z_logit = z_logit[:, :coord_types]
-
-        x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
-        y_logit -= jax.scipy.special.logsumexp(y_logit, axis=1)[:, None] 
-        z_logit -= jax.scipy.special.logsumexp(z_logit, axis=1)[:, None] 
-
-        x_logit = jnp.concatenate([x_logit, 
-                                   jnp.zeros((n, output_size - coord_types))
-                                   ], axis = -1) 
-
-        y_logit = jnp.concatenate([y_logit, 
-                                   jnp.zeros((n, output_size - coord_types))
-                                   ], axis = -1) 
-
-        z_logit = jnp.concatenate([z_logit, 
-                                   jnp.zeros((n, output_size - coord_types))
-                                   ], axis = -1) 
+        h_al, h_x, h_y, h_z, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :], h[:, 3, :], h[:, 4, :]
+    
+        # handle coordinate related params 
+        h_x = renormalize(h_x)
+        h_y = renormalize(h_y)
+        h_z = renormalize(h_z)
         
         # we now do all kinds of masks to a_logit and w_logit
         
@@ -222,9 +212,9 @@ def make_transformer(key, Nf, Kl, n_max, h0_size, num_layers, num_heads, key_siz
         
         # finally assemble everything together
         h = jnp.concatenate([h_al[:, None, :], 
-                             x_logit[:, None, :], 
-                             y_logit[:, None, :],
-                             z_logit[:, None, :],
+                             h_x[:, None, :], 
+                             h_y[:, None, :],
+                             h_z[:, None, :],
                              w_logit[:, None, :]
                              ], axis=1) # (n, 5, output_size)
         h = h.reshape(5*n, output_size) # (5*n, output_size)

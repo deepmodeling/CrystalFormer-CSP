@@ -6,25 +6,32 @@ from functools import partial
 from von_mises import von_mises_logpdf
 from lattice import make_lattice_mask
 from wyckoff import mult_table, fc_mask_table
-from augmentation import perm_augmentation
 
-def make_loss_fn(n_max, atom_types, wyck_types, coord_types, Kl, transformer, perm_aug=True, lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
+
+def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
     
+    coord_types = 3*Kx
     lattice_mask = make_lattice_mask()
+
+    def compute_logp_x(h_x, X, fc_mask_x):
+        x_logit, loc, kappa = jnp.split(h_x, [Kx, 2*Kx], axis=-1)
+        x_loc = loc.reshape(n_max, Kx)
+        kappa = kappa.reshape(n_max, Kx)
+        logp_x = jax.vmap(von_mises_logpdf, (None, 1, 1), 1)((X-0.5)*2*jnp.pi, loc, kappa) # (n_max, Kx)
+        logp_x = jax.scipy.special.logsumexp(x_logit + logp_x, axis=1) # (n_max, )
+        logp_x = jnp.sum(jnp.where(fc_mask_x, logp_x, jnp.zeros_like(logp_x)))
+
+        return logp_x
 
     @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, None), out_axes=0) # batch 
     def logp_fn(params, key, G, L, XYZ, A, W, is_train):
         '''
         G: scalar 
         L: (6,) [a, b, c, alpha, beta, gamma] 
-        X: (n_max, 3)
+        XYZ: (n_max, 3)
         A: (n_max,)
         W: (n_max,)
         '''
-        
-        if is_train and perm_aug:
-            key, subkey = jax.random.split(key)
-            A, XYZ = perm_augmentation(subkey, A, W, XYZ)
 
         num_sites = jnp.sum(A!=0)
         M = mult_table[G-1, W]  # (n_max,) multplicities
@@ -34,23 +41,19 @@ def make_loss_fn(n_max, atom_types, wyck_types, coord_types, Kl, transformer, pe
         w_logit = h[0::5, :wyck_types] # (n_max+1, wyck_types) 
         w_logit = w_logit[:-1] # (n_max, wyck_types)
         a_logit = h[1::5, :atom_types] 
-        x_logit = h[2::5, :coord_types]
-        y_logit = h[3::5, :coord_types]
-        z_logit = h[4::5, :coord_types]
+        h_x = h[2::5, :coord_types]
+        h_y = h[3::5, :coord_types]
+        h_z = h[4::5, :coord_types]
 
-        X, Y, Z = XYZ[:, 0], XYZ[:, 1], XYZ[:,2]
- 
         logp_w = jnp.sum(w_logit[jnp.arange(n_max), W.astype(int)])
         logp_a = jnp.sum(a_logit[jnp.arange(n_max), A.astype(int)])
 
-        logp_x = x_logit[jnp.arange(n_max), X.astype(int)]  
-        logp_y = y_logit[jnp.arange(n_max), Y.astype(int)]  
-        logp_z = z_logit[jnp.arange(n_max), Z.astype(int)]  
+        X, Y, Z = XYZ[:, 0], XYZ[:, 1], XYZ[:,2]
 
         fc_mask = jnp.logical_and((W>0)[:, None], fc_mask_table[G-1, W]) # (n_max, 3)
-        logp_x = jnp.sum(jnp.where(fc_mask[:, 0], logp_x, jnp.zeros_like(logp_x)))
-        logp_y = jnp.sum(jnp.where(fc_mask[:, 1], logp_y, jnp.zeros_like(logp_y)))
-        logp_z = jnp.sum(jnp.where(fc_mask[:, 2], logp_z, jnp.zeros_like(logp_z)))
+        logp_x = compute_logp_x(h_x, X, fc_mask[:, 0])
+        logp_y = compute_logp_x(h_y, Y, fc_mask[:, 1])
+        logp_z = compute_logp_x(h_z, Z, fc_mask[:, 2])
 
         logp_xyz = logp_x + logp_y + logp_z
 
@@ -81,21 +84,22 @@ if __name__=='__main__':
     atom_types = 119
     n_max = 20
     wyck_types = 20
-    coord_types = 100
     Nf = 5
-    Kl  = 1
+    Kx = 16
+    Kl  = 4
     dropout_rate = 0.1 
 
     csv_file = '../data/mini.csv'
-    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max)
-
-    print (XYZ.shape)
+    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Nf, Kl, n_max, 128, 4, 4, 8, 16, atom_types, wyck_types, coord_types, dropout_rate) 
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, atom_types, wyck_types, dropout_rate) 
  
-    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, coord_types, Kl, transformer)
+    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
     value = jax.jit(loss_fn, static_argnums=7)(params, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], True)
+    print (value)
+
+    value = jax.jit(loss_fn, static_argnums=7)(params, key, G[:1], L[:1], XYZ[:1]+1.0, A[:1], W[:1], True)
     print (value)

@@ -24,17 +24,14 @@ def sort_atoms(W, A, X):
     '''
 
     W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+
+    X -= jnp.floor(X)
     idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], W_temp))
 
     #assert jnp.allclose(W, W[idx])
     A = A[idx]
     X = X[idx]
     return A, X
-
-def map_to_mesh(X, coord_types):
-    X -= jnp.floor(X)
-    X = jnp.round(X*coord_types).astype(int)
-    return X%coord_types
 
 def letter_to_number(letter):
     '''
@@ -50,7 +47,7 @@ def shuffle(key, data):
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return G[idx], L[idx], XYZ[idx], A[idx], W[idx]
     
-def process_one(cif, atom_types, wyck_types, coord_types, n_max, tol=0.01):
+def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
     # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
     crystal = Structure.from_str(cif, fmt='cif')
     spga = SpacegroupAnalyzer(crystal, symprec=tol)
@@ -112,12 +109,12 @@ def process_one(cif, atom_types, wyck_types, coord_types, n_max, tol=0.01):
 
     return g, l, fc, aa, ww 
 
-def GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max, num_workers=1):
+def GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, num_workers=1):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
 
     p = multiprocessing.Pool(num_workers)
-    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, coord_types=coord_types, n_max=n_max)
+    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max)
     results = p.map_async(partial_process_one, cif_strings).get()
     p.close()
     p.join()
@@ -130,7 +127,6 @@ def GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max, num_
     XYZ = jnp.array(XYZ).reshape(-1, n_max, 3)
     L = jnp.array(L).reshape(-1, 6)
 
-    XYZ = map_to_mesh(XYZ, coord_types)
     A, XYZ = sort_atoms(W, A, XYZ)
     
     return G, L, XYZ, A, W
@@ -169,7 +165,6 @@ def GLXA_to_csv(G, L, X, A, num_worker=1, filename='out_structure.csv'):
 if __name__=='__main__':
     atom_types = 119
     wyck_types = 28
-    coord_types = 128
     n_max = 24
 
     import numpy as np 
@@ -180,7 +175,7 @@ if __name__=='__main__':
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
 
-    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, coord_types, n_max)
+    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
     
     print (G.shape)
     print (L.shape)

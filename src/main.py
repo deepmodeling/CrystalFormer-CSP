@@ -38,6 +38,7 @@ group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test
 
 group = parser.add_argument_group('transformer parameters')
 group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
+group.add_argument('--Kx', type=int, default=16, help='number of modes in x')
 group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
 group.add_argument('--h0_size', type=int, default=0, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
 group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
@@ -47,8 +48,6 @@ group.add_argument('--model_size', type=int, default=8, help='The model size')
 group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
 
 group = parser.add_argument_group('loss parameters')
-group.add_argument("--perm_aug", action='store_true', help="carry out permutation augumentation")
-group.add_argument("--map_aug", action='store_true', help="carry out map fc augumentation")
 group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part relative to fc")
 group.add_argument("--lamb_w", type=float, default=1.0, help="weight for the w part relative to fc")
 group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part relative to fc")
@@ -57,7 +56,6 @@ group = parser.add_argument_group('physics parameters')
 group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
 group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
-group.add_argument('--coord_types', type=int, default=100, help='Coordinate discritization')
 
 group = parser.add_argument_group('sampling parameters')
 group.add_argument('--spacegroup', type=int, help='The space group id to be sampled (1-230)')
@@ -80,11 +78,11 @@ if args.num_io_process > num_cpu:
 
 ################### Data #############################
 if args.optimizer != "none":
-    train_data = GLXYZAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
-    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
+    train_data = GLXYZAW_from_file(args.train_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
 else:
     assert (args.spacegroup is not None) # for inference we need to specify space group
-    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.coord_types, args.n_max, args.num_io_process)
+    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
     
     if args.elements is not None:
         idx = [element_dict[e] for e in args.elements]
@@ -96,28 +94,26 @@ else:
         atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
 
 ################### Model #############################
-params, transformer = make_transformer(key, args.Nf, args.Kl, args.n_max, 
+params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
                                       args.key_size, args.model_size, 
-                                      args.atom_types, args.wyck_types, args.coord_types, 
+                                      args.atom_types, args.wyck_types,
                                       args.dropout_rate)
-transformer_name = 'Nf_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
+transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.coord_types, args.Kl, transformer, args.perm_aug, args.lamb_a, args.lamb_w, args.lamb_l)
+loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.lamb_a, args.lamb_w, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
     output_path = args.folder + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
-                   + '_A_%g_W_%g_C_%g_N_%g'%(args.atom_types, args.wyck_types, args.coord_types, args.n_max) \
+                   + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                    + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                    + ('_a_%g_w_%g_l_%g'%(args.lamb_a, args.lamb_w, args.lamb_l)) \
-                   + ("_perm" if args.perm_aug else "") \
-                   + ("_map" if args.map_aug else "") \
                    +  "_" + transformer_name 
 
     os.makedirs(output_path, exist_ok=True)
@@ -191,7 +187,7 @@ else:
     for a in A: 
        print([element_list[i] for i in a])
     print ("W:\n",W)
-    print ("XYZ:\n",XYZ/args.coord_types)
+    print ("XYZ:\n",XYZ)
 
     outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, XYZ, A, W, M, False)
     print ("outputs.shape", outputs.shape)
@@ -219,8 +215,8 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.coord_types, args.Kl, args.spacegroup, atom_mask, args.temperature)
-        print ("XYZ:\n", XYZ/args.coord_types)  # fractional coordinate 
+        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, atom_mask, args.temperature)
+        print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
         print ("M:\n", M)  # multiplicity 
@@ -229,5 +225,5 @@ else:
         for a in A:
            print([element_list[i] for i in a])
 
-        GLXA_to_csv(args.spacegroup, L, XYZ/args.coord_types, A, num_worker=args.num_io_process, filename=filename)
+        GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)
