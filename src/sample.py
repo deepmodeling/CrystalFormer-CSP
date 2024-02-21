@@ -24,7 +24,7 @@ def sample_x(key, h_x, Kx, temperature, batchsize):
     k = jax.random.categorical(key_k, x_logit/temperature, axis=1)
     loc = loc.reshape(batchsize, Kx)[jnp.arange(batchsize), k]
     kappa = kappa.reshape(batchsize, Kx)[jnp.arange(batchsize), k]
-    x = sample_von_mises(key_x, loc, kappa*temperature, (batchsize,))
+    x = sample_von_mises(key_x, loc, kappa/temperature, (batchsize,))
     x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
     return key, x 
 
@@ -136,7 +136,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
     mu = mu[jnp.arange(batchsize), k]       # (batchsize, 6)
     sigma = sigma.reshape(batchsize, Kl, 6)
     sigma = sigma[jnp.arange(batchsize), k] # (batchsize, 6)
-    L = jax.random.normal(key_l, (batchsize, 6)) * sigma/jnp.sqrt(temperature) + mu # (batchsize, 6)
+    L = jax.random.normal(key_l, (batchsize, 6)) * sigma*jnp.sqrt(temperature) + mu # (batchsize, 6)
     
     #scale length according to atom number since we did reverse of that when loading data
     length, angle = jnp.split(L, 2, axis=-1)
