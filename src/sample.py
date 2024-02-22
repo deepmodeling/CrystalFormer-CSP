@@ -50,10 +50,10 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
         W = jnp.concatenate([W, w[:, None]], axis=1)
 
         # (2) A
-        Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1))], axis=1)
+        Apad = jnp.concatenate([A, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
         Xpad = jnp.concatenate([X, jnp.zeros((batchsize, 1))], axis=1)
         Ypad = jnp.concatenate([Y, jnp.zeros((batchsize, 1))], axis=1)
-        Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1), dtype=int)], axis=1)
+        Zpad = jnp.concatenate([Z, jnp.zeros((batchsize, 1))], axis=1)
 
         h_al = inference(transformer, params, g, W, Apad, Xpad, Ypad, Zpad)[:, -5] # (batchsize, output_size)
 
