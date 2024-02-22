@@ -47,9 +47,9 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
         w_max = wmax_table[G-1]
         initializer = hk.initializers.TruncatedNormal(0.01)
         
-        g_embeddings = hk.get_parameter('g_embeddings', [230, np.minimum(embed_size, 230)], init=initializer)[G-1]
-        w_embeddings = hk.get_parameter('w_embeddings', [wyck_types, np.minimum(embed_size, wyck_types)], init=initializer)[W]
-        a_embeddings = hk.get_parameter('a_embeddings', [atom_types, np.minimum(embed_size, atom_types)], init=initializer)[A]
+        g_embeddings = hk.get_parameter('g_embeddings', [230, embed_size], init=initializer)[G-1]
+        w_embeddings = hk.get_parameter('w_embeddings', [wyck_types, embed_size], init=initializer)[W]
+        a_embeddings = hk.get_parameter('a_embeddings', [atom_types, embed_size], init=initializer)[A]
 
         if h0_size >0:
             # compute w_logits depending on g 
