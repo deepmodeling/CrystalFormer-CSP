@@ -45,6 +45,7 @@ group.add_argument('--transformer_layers', type=int, default=4, help='The number
 group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
 group.add_argument('--key_size', type=int, default=32, help='The key size')
 group.add_argument('--model_size', type=int, default=8, help='The model size')
+group.add_argument('--embed_size', type=int, default=8, help='The enbedding size')
 group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
 
 group = parser.add_argument_group('loss parameters')
@@ -97,10 +98,10 @@ else:
 params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
                                       args.h0_size, 
                                       args.transformer_layers, args.num_heads, 
-                                      args.key_size, args.model_size, 
+                                      args.key_size, args.model_size, args.embed_size, 
                                       args.atom_types, args.wyck_types,
                                       args.dropout_rate)
-transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.dropout_rate)
+transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_e_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.embed_size, args.dropout_rate)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 

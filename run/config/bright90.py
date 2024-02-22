@@ -3,7 +3,7 @@ import numpy as np
 import time 
 
 dataset = 'mp'
-nickname = 'mp-'+dataset + 'sort-xyz'
+nickname = 'mp-'+dataset + 'sort-xyz-embed' 
 
 ###############################
 atom_types = 119
@@ -15,6 +15,7 @@ transformer_layers = 4
 num_heads = 8
 key_size = 32
 model_size = 64
+embed_size = 32
 dropout_rate = 0.3
 
 optimizer = 'adam'

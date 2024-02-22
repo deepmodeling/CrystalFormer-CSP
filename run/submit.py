@@ -54,6 +54,7 @@ if __name__=='__main__':
                         'num_heads':num_heads, 
                         'key_size':key_size,
                         'model_size':model_size, 
+                        'embed_size':embed_size, 
                         'lr':lr, 
                         'lr_decay': lr_decay, 
                         'weight_decay': weight_decay, 

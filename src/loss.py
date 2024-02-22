@@ -94,7 +94,7 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, atom_types, wyck_types, dropout_rate) 
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
  
     loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     

@@ -9,7 +9,7 @@ import numpy as np
 from attention import MultiHeadAttention
 from wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, embed_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
     
     coord_types = 3*Kx
     lattice_types = Kl+2*6*Kl
@@ -47,14 +47,16 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
         w_max = wmax_table[G-1]
         initializer = hk.initializers.TruncatedNormal(0.01)
         
-        G_one_hot = jax.nn.one_hot(G-1, 230) # extend this if there are property conditions
+        g_embeddings = hk.get_parameter('g_embeddings', [230, np.minimum(embed_size, 230)], init=initializer)[G-1]
+        w_embeddings = hk.get_parameter('w_embeddings', [wyck_types, np.minimum(embed_size, wyck_types)], init=initializer)[W]
+        a_embeddings = hk.get_parameter('a_embeddings', [atom_types, np.minimum(embed_size, atom_types)], init=initializer)[A]
 
         if h0_size >0:
-            # compute w_logits depending on G_one_hot
+            # compute w_logits depending on g 
             w_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                       jax.nn.gelu,
                                       hk.Linear(wyck_types, w_init=initializer)]
-                                     )(G_one_hot)
+                                     )(g_embeddings)
         else:
             # w_logit of the first atom is simply a table
             w_params = hk.get_parameter('w_params', [230, wyck_types], init=initializer)
@@ -73,30 +75,30 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
 
         mask = jnp.tril(jnp.ones((1, 5*n, 5*n))) # mask for the attention matrix
 
-        hW = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
-                               jax.nn.one_hot(W, wyck_types), # (n, wyck_types)
-                               M.reshape(n, 1), # (n, 1)
+        hW = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0),  # (n, embed_size)
+                              w_embeddings,                             # (n, embed_size)
+                              M.reshape(n, 1), # (n, 1)
                               ], axis=1) # (n, ...)
         hW = hk.Linear(model_size, w_init=initializer)(hW)  # (n, model_size)
 
-        hA = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
-                              jax.nn.one_hot(A, atom_types), # (n, atom_types)
+        hA = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0),  # (n, embed_size)
+                              a_embeddings,                             # (n, embed_size)
                              ], axis=1) # (n, ...)
         hA = hk.Linear(model_size, w_init=initializer)(hA)  # (n, model_size)
 
-        hX = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
+        hX = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
                              ] + 
                              [fn(2*jnp.pi*X[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
-        hY = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
+        hY = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
                              ] +
                              [fn(2*jnp.pi*Y[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
         hY = hk.Linear(model_size, w_init=initializer)(hY)  # (n, model_size)
 
-        hZ = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0), 
+        hZ = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
                              ]+
                              [fn(2*jnp.pi*Z[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
                              , axis=1) # (n, ...)
