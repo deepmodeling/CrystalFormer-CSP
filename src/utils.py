@@ -134,12 +134,10 @@ def GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, num_workers=1):
 def GLXA_to_structure_single(G, L, X, A):
 
     lattice = Lattice.from_parameters(*L)
-    # filter out zero
-    zero_idx = np.where(A == 0)[0]
-    if zero_idx is not None and len(zero_idx) > 0:
-        idx = zero_idx[0]
-        A = A[:idx]
-        X = X[:idx]
+    # filter out padding atoms
+    idx = np.where(A > 0)
+    A = A[idx]
+    X = X[idx]
     structure = Structure.from_spacegroup(sg=G, lattice=lattice, species=A, coords=X).as_dict()
 
     return structure
