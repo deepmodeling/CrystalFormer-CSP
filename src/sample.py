@@ -74,12 +74,13 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             key, y = sample_x(key, h_y, Kx, temperature, batchsize)
             
             # project to the first WP
-            xyz = jnp.concatenate([X[:, -1][:, None], 
+            xyz = jnp.concatenate([X[:, i][:, None], 
                                    y[:, None], 
                                    jnp.zeros((batchsize, 1)), 
                                   ], axis=-1) 
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
             y = xyz[:, 1]
+            jax.debug.print("x,y:{}{}", x, y)
             Y = Y.at[:, i].set(y)
         
             # (5) Z
@@ -87,8 +88,8 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             key, z = sample_x(key, h_z, Kx, temperature, batchsize)
             
             # project to the first WP
-            xyz = jnp.concatenate([X[:, -1][:, None], 
-                                   Y[:, -1][:, None], 
+            xyz = jnp.concatenate([X[:, i][:, None], 
+                                   Y[:, i][:, None], 
                                    z[:, None], 
                                   ], axis=-1) 
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
