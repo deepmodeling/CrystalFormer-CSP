@@ -80,7 +80,6 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
                                   ], axis=-1) 
             xyz = jax.vmap(project_xyz, in_axes=(None, 0, 0, None), out_axes=0)(g, w, xyz, 0) 
             y = xyz[:, 1]
-            jax.debug.print("x,y:{}{}", x, y)
             Y = Y.at[:, i].set(y)
         
             # (5) Z
