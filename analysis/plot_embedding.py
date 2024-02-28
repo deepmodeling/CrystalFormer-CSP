@@ -46,11 +46,11 @@ ticks = np.arange(a_max)
 element_ticks = [element_list[i+1] for i in ticks]
 ax.set_xticks(ticks, labels=element_ticks, fontsize=8, rotation=90)
 ax.set_yticks(ticks, labels=element_ticks, fontsize=8)
-cax = ax.imshow(a_a[:a_max, :a_max], cmap='viridis', interpolation='none')
+cax = ax.imshow(a_a[1:a_max+1, 1:a_max+1], cmap='coolwarm', interpolation='none')
 fig.colorbar(cax, ax=ax) 
 
 ax = axes[1]
-cax = ax.imshow(g_g[:100, :100], cmap='viridis', interpolation='none')
+cax = ax.imshow(g_g[:100, :100], cmap='coolwarm', interpolation='none')
 fig.colorbar(cax, ax=ax) 
 
 plt.show()
