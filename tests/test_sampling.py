@@ -69,4 +69,17 @@ def test_symops():
     y = project_x(g, w, x, idx)
     assert jnp.allclose(y, jnp.array([1-0.1, 1-0.2, 1-0.3]))
 
-test_symops()
+def test_sample_top_p():
+    from sample import sample_top_p
+    key = jax.random.PRNGKey(42)
+    logits = jnp.array([[1.0, 1.0, 2.0, 2.0, 3.0], 
+                        [2.0, 1.0, 4.0, 1.0, 0.0]
+                        ]
+                       )
+    p = 0.8
+    temperature = 1.0
+    k = jax.jit(sample_top_p, static_argnums=2)(key, logits, p, temperature)
+    print (k)
+
+test_sample_top_p()
+#test_symops()
