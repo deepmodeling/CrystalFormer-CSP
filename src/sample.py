@@ -17,24 +17,25 @@ def inference(model, params, g, W, A, X, Y, Z):
     M = mult_table[g-1, W]  
     return model(params, None, g, XYZ, A, W, M, False)
 
-@partial(jax.vmap, in_axes=(None, 0, None, None), out_axes=0) # batch
 def sample_top_p(key, logits, p, temperature):
     '''
     drop remaining logits once the cumulative_probs is larger than p
     for very small p, we may drop everything excet the leading logit
     for very large p, we will keep everything
     '''
-    assert (logits.ndim == 1)
+    assert (logits.ndim == 2)
     if p < 1.0:
-        indices = jnp.argsort(logits)[::-1]
-        cumulative_probs = jnp.cumsum(jax.nn.softmax(logits[indices]))
-        mask =  jnp.concatenate([jnp.array([0]),  # at least keep the leading one
-                                (cumulative_probs > p)[:-1]
-                                ])
-        mask = mask.at[indices].set(mask) # logits to be dropped
+        batchsize = logits.shape[0]
+        batch_idx = jnp.arange(batchsize)[:, None]
+        indices = jnp.argsort(logits, axis=1)[:, ::-1]
+        cumulative_probs = jnp.cumsum(jax.nn.softmax(logits[batch_idx, indices], axis=1), axis=1)
+        mask =  jnp.concatenate([jnp.zeros((batchsize, 1)),  # at least keep the leading one
+                                (cumulative_probs > p)[:, :-1]
+                                ], axis=1)
+        mask = mask.at[batch_idx, indices].set(mask) # logits to be dropped
         logits = logits + jnp.where(mask, -1e10, 0.0)
     
-    samples = jax.random.categorical(key, logits/temperature)
+    samples = jax.random.categorical(key, logits/temperature, axis=1)
     return samples
 
 def sample_x(key, h_x, Kx, top_p, temperature, batchsize):

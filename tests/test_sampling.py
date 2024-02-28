@@ -73,7 +73,7 @@ def test_sample_top_p():
     from sample import sample_top_p
     key = jax.random.PRNGKey(42)
     logits = jnp.array([[1.0, 1.0, 2.0, 2.0, 3.0], 
-                        [2.0, 1.0, 4.0, 1.0, 0.0]
+                        [-1.0, 1.0, 4.0, 1.0, 0.0]
                         ]
                        )
     p = 0.8
