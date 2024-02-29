@@ -61,9 +61,11 @@ group.add_argument('--wyck_types', type=int, default=28, help='Number of possibl
 group = parser.add_argument_group('sampling parameters')
 group.add_argument('--spacegroup', type=int, help='The space group id to be sampled (1-230)')
 group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
+group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
 group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 group.add_argument('--num_io_process', type=int, default=10, help='number of process used in multiprocessing io')
 group.add_argument('--num_samples', type=int, default=1, help='number of test samples')
+group.add_argument('--use_foriloop', action='store_true', help='use lax.fori_loop in sampling')
 group.add_argument('--output_filename', type=str, default='output.csv', help='outfile to save sampled structures')
 
 args = parser.parse_args()
@@ -216,7 +218,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, atom_mask, args.temperature)
+        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, atom_mask, args.top_p, args.temperature, args.use_foriloop)
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
@@ -225,6 +227,5 @@ else:
         print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-
         GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)
