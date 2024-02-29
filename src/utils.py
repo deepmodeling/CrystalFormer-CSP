@@ -13,31 +13,41 @@ import os
 from wyckoff import mult_table
 from elements import element_list
 
+@jax.vmap
+def sort_atoms(W, A, X):
+    '''
+    lex sort atoms according W, X, Y, Z
+
+    W: (n, )
+    A: (n, )
+    X: (n, dim) int
+    '''
+
+    W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
+
+    X -= jnp.floor(X)
+    idx = jnp.lexsort((X[:,2], X[:,1], X[:,0], W_temp))
+
+    #assert jnp.allclose(W, W[idx])
+    A = A[idx]
+    X = X[idx]
+    return A, X
+
 def letter_to_number(letter):
     '''
     'a' to 1 , 'b' to 2 , 'z' to 26, and 'A' to 27 
     '''
     return ord(letter) - ord('a') + 1 if 'a' <= letter <= 'z' else 27 if letter == 'A' else None
 
-@partial(jax.vmap, in_axes=(0, None), out_axes=0) # n 
-def to_A_W(AW, atom_types):
-    A = jnp.where(AW==0, jnp.zeros_like(AW), (AW-1)%(atom_types-1)+1)
-    W = jnp.where(AW==0, jnp.zeros_like(AW), (AW-1)//(atom_types-1)+1)
-    return A, W
-
-@partial(jax.vmap, in_axes=(0, 0, None), out_axes=0) # n 
-def to_AW(A, W, atom_types):
-    return jnp.where(A==0, jnp.zeros_like(A), (W-1)*(atom_types-1) + (A-1) +1)
-
 def shuffle(key, data):
     '''
     shuffle data along batch dimension
     '''
-    G, L, X, AW = data
+    G, L, XYZ, A, W = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
-    return G[idx], L[idx], X[idx], AW[idx]
+    return G[idx], L[idx], XYZ[idx], A[idx], W[idx]
     
-def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
+def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
     # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
     crystal = Structure.from_str(cif, fmt='cif')
     spga = SpacegroupAnalyzer(crystal, symprec=tol)
@@ -54,7 +64,8 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
 
     print (g, c.group.symbol, num_sites)
     natoms = 0
-    aw = []
+    ww = []
+    aa = []
     fc = []
     ws = []
     for site in c.atom_sites:
@@ -67,61 +78,66 @@ def process_one(cif, atom_types, wyck_types, n_max, dim, tol=0.01):
         assert (a < atom_types)
         assert (w < wyck_types)
         assert (np.allclose(x, site.wp[0].operate(x)))
-        aw.append( (w-1) * (atom_types-1)+ (a-1) +1 )
+        aa.append( a )
+        ww.append( w )
         fc.append( x )  # the generator of the orbit
         ws.append( symbol )
-        if (g ==1 or g==2):
-            print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
-    idx = np.argsort(aw)
-    aw = np.array(aw)[idx]
-    fc = np.array(fc)[idx].reshape(num_sites, dim)
+        print ('g, a, w, m, symbol, x:', g, a, w, m, symbol, x)
+    idx = np.argsort(ww)
+    ww = np.array(ww)[idx]
+    aa = np.array(aa)[idx]
+    fc = np.array(fc)[idx].reshape(num_sites, 3)
     ws = np.array(ws)[idx]
-    print (ws, aw, natoms) 
+    print (ws, aa, ww, natoms) 
 
-    aw = np.concatenate([aw,
-                         np.full((n_max - num_sites, ), 0)],
+    aa = np.concatenate([aa,
+                        np.full((n_max - num_sites, ), 0)],
+                        axis=0)
+
+    ww = np.concatenate([ww,
+                        np.full((n_max - num_sites, ), 0)],
                         axis=0)
     fc = np.concatenate([fc, 
-                         np.full((n_max - num_sites, dim), 1e10)],
+                         np.full((n_max - num_sites, 3), 1e10)],
                         axis=0)
     
     abc = np.array([c.lattice.a, c.lattice.b, c.lattice.c])/natoms**(1./3.)
     angles = np.array([c.lattice.alpha, c.lattice.beta, c.lattice.gamma])
     l = np.concatenate([abc, angles])
-
-    if (g <3 ):
-        print (l)
     
     print ('===================================')
 
-    return g, l, fc, aw
+    return g, l, fc, aa, ww 
 
-def GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim, num_workers=1):
+def GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, num_workers=1):
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
 
     p = multiprocessing.Pool(num_workers)
-    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max, dim=dim)
+    partial_process_one = partial(process_one, atom_types=atom_types, wyck_types=wyck_types, n_max=n_max)
     results = p.map_async(partial_process_one, cif_strings).get()
     p.close()
     p.join()
 
-    G, L, X, AW = zip(*results)
+    G, L, XYZ, A, W = zip(*results)
+
     G = jnp.array(G) 
+    A = jnp.array(A).reshape(-1, n_max)
+    W = jnp.array(W).reshape(-1, n_max)
+    XYZ = jnp.array(XYZ).reshape(-1, n_max, 3)
     L = jnp.array(L).reshape(-1, 6)
-    X = jnp.array(X).reshape(-1, n_max, dim)
-    AW = jnp.array(AW).reshape(-1, n_max)
-    return G, L, X, AW
+
+    A, XYZ = sort_atoms(W, A, XYZ)
+    
+    return G, L, XYZ, A, W
 
 def GLXA_to_structure_single(G, L, X, A):
 
     lattice = Lattice.from_parameters(*L)
-    # filter out zero
-    zero_idx = np.where(A == 0)[0]
-    if zero_idx is not None and len(zero_idx) > 0:
-        idx = zero_idx[0]
-        A = A[:idx]
-        X = X[:idx]
+    # filter out padding atoms
+    idx = np.where(A > 0)
+    A = A[idx]
+    X = X[idx]
     structure = Structure.from_spacegroup(sg=G, lattice=lattice, species=A, coords=X).as_dict()
 
     return structure
@@ -148,31 +164,27 @@ if __name__=='__main__':
     atom_types = 119
     wyck_types = 28
     n_max = 24
-    dim = 3
-    
-    #csv_file = './mini.csv'
-    #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
-    #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
-
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
-    
-    print (G.shape)
-    print (L.shape)
-    print (X.shape)
-    print (AW.shape)
-    
-    print ('L:\n',L)
-    print ('X:\n',X)
 
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
-    A, W = to_A_W(AW, atom_types)
-    print ('A:\n', A)
-    print ('W:\n', W)
-    print(A.shape)
+    #csv_file = '../data/mini.csv'
+    #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
+    #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
+    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+
+    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
     
+    print (G.shape)
+    print (L.shape)
+    print (XYZ.shape)
+    print (A.shape)
+    print (W.shape)
+    
+    print ('L:\n',L)
+    print ('XYZ:\n',XYZ)
+
+
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )

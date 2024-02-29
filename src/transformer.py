@@ -4,96 +4,135 @@ https://github.com/google-deepmind/dm-haiku/blob/main/examples/transformer/model
 import jax
 import jax.numpy as jnp
 import haiku as hk
+import numpy as np
 
+from attention import MultiHeadAttention
 from wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads, key_size, model_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, embed_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+    
+    coord_types = 3*Kx
+    lattice_types = Kl+2*6*Kl
+    output_size = np.max(np.array([atom_types+lattice_types, coord_types, wyck_types]))
+
+    def renormalize(h_x):
+        n = h_x.shape[0]
+        x_logit, x_loc, x_kappa = jnp.split(h_x[:, :coord_types], [Kx, 2*Kx], axis=-1)
+        x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
+        x_kappa = jax.nn.softplus(x_kappa) 
+        h_x = jnp.concatenate([x_logit, x_loc, x_kappa, jnp.zeros((n, output_size - coord_types))], axis=-1)  
+        return h_x
 
     @hk.transform
-    def network(G, X, A, W, M, is_train):
+    def network(G, XYZ, A, W, M, is_train):
         '''
         Args:
             G: scalar integer for space group id 1-230
-            X: (n, dim)
+            XYZ: (n, 3) fractional coordinates
             A: (n, )  element type 
             W: (n, )  wyckoff position index
             M: (n, )  multiplicities
             is_train: bool 
         Returns: 
-            h: (2n+1, aw_types) it contains params [aw_1, xl_1, aw_1, ..., xl_n, aw_{n+1}]
+            h: (5n+1, output_types)
         '''
         
-        assert (X.ndim == 2 )
-        assert (X.shape[0] == A.shape[0])
-        assert (X.shape[1] == dim)
-        n = X.shape[0]
-        
-        aw_types = (atom_types -1)*(wyck_types-1) + 1
-        xl_types = Kx+2*Kx*dim+Kl+2*6*Kl
-        assert (aw_types > xl_types)
-        aw_max = wmax_table[G-1]*(atom_types-1) #  (wmax-1) * (atom_types-1)+ (atom_types-1-1) +1  
+        assert (XYZ.ndim == 2 )
+        assert (XYZ.shape[0] == A.shape[0])
+        assert (XYZ.shape[1] == 3)
 
+        n = XYZ.shape[0]
+        X, Y, Z = XYZ[:, 0], XYZ[:, 1], XYZ[:,2]
+
+        w_max = wmax_table[G-1]
         initializer = hk.initializers.TruncatedNormal(0.01)
         
-        G_one_hot = jax.nn.one_hot(G-1, 230) # extend this if there are property conditions
-        #G_one_hot = g_code[G-1].astype(jnp.float32) #  (989, )
+        g_embeddings = hk.get_parameter('g_embeddings', [230, embed_size], init=initializer)[G-1]
+        w_embeddings = hk.get_parameter('w_embeddings', [wyck_types, embed_size], init=initializer)[W]
+        a_embeddings = hk.get_parameter('a_embeddings', [atom_types, embed_size], init=initializer)[A]
 
         if h0_size >0:
-            # compute aw_logits depending on G_one_hot
-            aw_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
+            # compute w_logits depending on g 
+            w_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                       jax.nn.gelu,
-                                      hk.Linear(aw_types, w_init=initializer)]
-                                     )(G_one_hot)
+                                      hk.Linear(wyck_types, w_init=initializer)]
+                                     )(g_embeddings)
         else:
-            # aw_logit of the first atom is simply a table
-            aw_params = hk.get_parameter('aw_params', [230, aw_types], init=initializer)
-            aw_logit = aw_params[G-1]
+            # w_logit of the first atom is simply a table
+            w_params = hk.get_parameter('w_params', [230, wyck_types], init=initializer)
+            w_logit = w_params[G-1]
 
         # (1) the first atom should not be the pad atom
         # (2) mask out unavaiable position for the given spacegroup
-        aw_mask = jnp.logical_and(jnp.arange(aw_types)>0, jnp.arange(aw_types)<=aw_max)
-        aw_logit = jnp.where(aw_mask, aw_logit, aw_logit-1e10)
+        w_mask = jnp.logical_and(jnp.arange(wyck_types)>0, jnp.arange(wyck_types)<=w_max)
+        w_logit = jnp.where(w_mask, w_logit, w_logit-1e10)
         # normalization
-        aw_logit -= jax.scipy.special.logsumexp(aw_logit) # (aw_types, )
-               
-        h0 = aw_logit[None, :]  # (1, aw_types)
+        w_logit -= jax.scipy.special.logsumexp(w_logit) # (wyck_types, )
+        
+        h0 = jnp.concatenate([w_logit[None, :], 
+                             jnp.zeros((1, output_size-wyck_types))], axis=-1)  # (1, output_size)
         if n == 0: return h0
 
-        mask = jnp.tril(jnp.ones((1, 2*n, 2*n))) # mask for the attention matrix
+        mask = jnp.tril(jnp.ones((1, 5*n, 5*n))) # mask for the attention matrix
 
-        hAM = jnp.concatenate([G_one_hot[None, :].repeat(n, axis=0),  # (n, 230)
-                               jax.nn.one_hot(A, atom_types), # (n, atom_types)
-                               jax.nn.one_hot(W, wyck_types), # (n, wyck_types)
-                               M.reshape(n, 1), # (n, 1)
+        hW = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0),  # (n, embed_size)
+                              w_embeddings,                             # (n, embed_size)
+                              M.reshape(n, 1), # (n, 1)
                               ], axis=1) # (n, ...)
-        hAM = hk.Linear(model_size, w_init=initializer)(hAM)  # (n, model_size)
+        hW = hk.Linear(model_size, w_init=initializer)(hW)  # (n, model_size)
 
-        hX = [G_one_hot[None, :].repeat(n, axis=0)]      
-        for f in range(1, Nf+1):
-            hX += [jnp.cos(2*jnp.pi*X*f),
-                   jnp.sin(2*jnp.pi*X*f)]
-        hX = jnp.concatenate(hX, axis=1) # (n, ...) 
+        hA = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0),  # (n, embed_size)
+                              a_embeddings,                             # (n, embed_size)
+                             ], axis=1) # (n, ...)
+        hA = hk.Linear(model_size, w_init=initializer)(hA)  # (n, model_size)
+
+        hX = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
+                             ] + 
+                             [fn(2*jnp.pi*X[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
         hX = hk.Linear(model_size, w_init=initializer)(hX)  # (n, model_size)
 
-        # interleave the two matrix
-        h = jnp.concatenate([hAM[:, None, :], hX[:, None, :]], axis=1) # (n, 2, model_size)
-        h = h.reshape(2*n, -1)                                         # (2*n, model_size)
+        hY = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
+                             ] +
+                             [fn(2*jnp.pi*Y[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
+        hY = hk.Linear(model_size, w_init=initializer)(hY)  # (n, model_size)
+
+        hZ = jnp.concatenate([g_embeddings[None, :].repeat(n, axis=0), 
+                             ]+
+                             [fn(2*jnp.pi*Z[:, None]*f) for f in range(1, Nf+1) for fn in (jnp.sin, jnp.cos)]
+                             , axis=1) # (n, ...)
+        hZ = hk.Linear(model_size, w_init=initializer)(hZ)  # (n, model_size)
+
+        # interleave the three matrices
+        h = jnp.concatenate([hW[:, None, :], 
+                             hA[:, None, :],
+                             hX[:, None, :],
+                             hY[:, None, :],
+                             hZ[:, None, :]
+                             ], axis=1) # (n, 5, model_size)
+        h = h.reshape(5*n, -1)                                         # (5*n, model_size)
 
         positional_embeddings = hk.get_parameter(
-                        'positional_embeddings', [2*n_max, model_size], init=initializer)
-        h = h + positional_embeddings[:2*n, :]
+                        'positional_embeddings', [5*n_max, model_size], init=initializer)
+        h = h + positional_embeddings[:5*n, :]
 
-        del hAM 
+        del hW
+        del hA
         del hX
+        del hY
+        del hZ
 
         for _ in range(num_layers):
-            attn_block = hk.MultiHeadAttention(num_heads=num_heads,
+            attn_block = MultiHeadAttention(num_heads=num_heads,
                                                key_size=key_size,
                                                model_size=model_size,
-                                               w_init =initializer
+                                               w_init =initializer, 
+                                               dropout_rate =dropout_rate
                                               )
             h_norm = _layer_norm(h)
-            h_attn = attn_block(h_norm, h_norm, h_norm, mask=mask)
+            h_attn = attn_block(h_norm, h_norm, h_norm, 
+                                mask=mask, is_train=is_train)
             if is_train: 
                 h_attn = hk.dropout(hk.next_rng_key(), dropout_rate, h_attn)
             h = h + h_attn
@@ -109,70 +148,91 @@ def make_transformer(key, Nf, Kx, Kl, n_max, dim, h0_size, num_layers, num_heads
             h = h + h_dense
 
         h = _layer_norm(h)
-        h = hk.Linear(aw_types, w_init=initializer)(h) # (2*n, aw_types)
+        h = hk.Linear(output_size, w_init=initializer)(h) # (5*n, output_size)
         
-        h = h.reshape(n, 2, -1)
-        hXL, aw_logit = h[:, 0, :], h[:, 1, :]
+        h = h.reshape(n, 5, -1)
+        h_al, h_x, h_y, h_z, w_logit = h[:, 0, :], h[:, 1, :], h[:, 2, :], h[:, 3, :], h[:, 4, :]
+    
+        # handle coordinate related params 
+        h_x = renormalize(h_x)
+        h_y = renormalize(h_y)
+        h_z = renormalize(h_z)
         
-        # (1) impose the constrain that AW_0 <= AW_1 <= AW_2 
+        # we now do all kinds of masks to a_logit and w_logit
+        
+        a_logit = h_al[:, :atom_types]
+        w_logit = w_logit[:, :wyck_types]
+        
+        # (1) impose the constrain that W_0 <= W_1 <= W_2 
         # while for Wyckoff points with zero dof it is even stronger W_0 < W_1 
-        AW = (W-1)*(atom_types-1) + (A-1) +1
-        aw_mask_less_equal = jnp.arange(1, aw_types).reshape(1, aw_types-1) < AW[:, None]
-        aw_mask_less = jnp.arange(1, aw_types).reshape(1, aw_types-1) < W[:, None]*(atom_types-1) + 1
-        aw_mask = jnp.where((dof0_table[G-1, W])[:, None], aw_mask_less, aw_mask_less_equal) # (n, aw_types-1)
+        w_mask_less_equal = jnp.arange(1, wyck_types).reshape(1, wyck_types-1) < W[:, None]
+        w_mask_less = jnp.arange(1, wyck_types).reshape(1, wyck_types-1) <= W[:, None]
+        w_mask = jnp.where((dof0_table[G-1, W])[:, None], w_mask_less, w_mask_less_equal) # (n, wyck_types-1)
 
-        aw_mask = jnp.concatenate([jnp.zeros((n, 1)), aw_mask], axis=1) # (n, aw_types)
-        aw_logit = aw_logit - jnp.where(aw_mask, 1e10, 0.0)
-        aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
+        w_mask = jnp.concatenate([jnp.zeros((n, 1)), w_mask], axis=1) # (n, wyck_types)
+        w_logit = w_logit - jnp.where(w_mask, 1e10, 0.0)
+        w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
         # (2) # enhance the probability of pad atoms if there is already a type 0 atom 
-        aw_mask = jnp.concatenate(
-                [ jnp.where(A==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
-                  jnp.zeros((n, aw_types-1))
-                ], axis = 1 )  # (n, aw_types) mask = 1 for those locations to place pad atoms of type 0
-        aw_logit = aw_logit + jnp.where(aw_mask, 1e10, 0.0)
-        aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
+        w_mask = jnp.concatenate(
+                [ jnp.where(W==0, jnp.ones((n)), jnp.zeros((n))).reshape(n, 1), 
+                  jnp.zeros((n, wyck_types-1))
+                ], axis = 1 )  # (n, wyck_types) mask = 1 for those locations to place pad atoms of type 0
+        w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0)
+        w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
-        # (3) mask out unavaiable position after aw_max for the given spacegroup
-        aw_logit = jnp.where(jnp.arange(aw_types)<=aw_max, aw_logit,aw_logit-1e10)
-        aw_logit -= jax.scipy.special.logsumexp(aw_logit, axis=1)[:, None] # normalization
+        # (3) mask out unavaiable position after w_max for the given spacegroup
+        w_logit = jnp.where(jnp.arange(wyck_types)<=w_max, w_logit, w_logit-1e10)
+        w_logit -= jax.scipy.special.logsumexp(w_logit, axis=1)[:, None] # normalization
 
-        x_logit, loc, kappa, l_logit, mu, sigma = jnp.split(hXL[:, :xl_types], [Kx, 
-                                                                  Kx+Kx*dim, 
-                                                                  Kx+2*Kx*dim, 
-                                                                  Kx+2*Kx*dim+Kl, 
-                                                                  Kx+2*Kx*dim+Kl+Kl*6, 
+        # (4) if w !=0 the mask out the pad atom, otherwise mask out true atoms
+        a_mask = jnp.concatenate(
+                 [(W>0).reshape(n, 1), 
+                 (W==0).reshape(n, 1).repeat(atom_types-1, axis=1) 
+                 ], axis = 1 )  # (n, atom_types) mask = 1 for those locations to be masked out
+        a_logit = a_logit + jnp.where(a_mask, -1e10, 0.0)
+        a_logit -= jax.scipy.special.logsumexp(a_logit, axis=1)[:, None] # normalization
+            
+        w_logit = jnp.concatenate([w_logit, 
+                                   jnp.zeros((n, output_size - wyck_types))
+                                   ], axis = -1) 
+        
+        # now move on to lattice part 
+        l_logit, mu, sigma = jnp.split(h_al[:, atom_types:atom_types+lattice_types], 
+                                                                 [Kl, 
+                                                                  Kl+Kl*6, 
                                                                   ], axis=-1)
-        # ensure positivity
-        kappa = jax.nn.softplus(kappa) 
-        sigma = jax.nn.softplus(sigma) + sigmamin
 
         # normalization
-        x_logit -= jax.scipy.special.logsumexp(x_logit, axis=1)[:, None] 
         l_logit -= jax.scipy.special.logsumexp(l_logit, axis=1)[:, None] 
+        # ensure positivity
+        sigma = jax.nn.softplus(sigma) + sigmamin
 
-        hXL = jnp.concatenate([x_logit, loc, kappa, 
-                               l_logit, mu, sigma,
-                               jnp.zeros((n, aw_types - xl_types))
-                               ], axis=-1) # (n, aw_types)
+        h_al = jnp.concatenate([a_logit, l_logit, mu, sigma, 
+                               jnp.zeros((n, output_size - atom_types - lattice_types))
+                               ], axis=-1) # (n, output_size)
         
-        h = jnp.concatenate([hXL[:, None, :], 
-                             aw_logit[:, None, :]
-                             ], axis=1) # (n, 2, aw_types)
-        h = h.reshape(2*n, aw_types) # (2*n, aw_types)
+        # finally assemble everything together
+        h = jnp.concatenate([h_al[:, None, :], 
+                             h_x[:, None, :], 
+                             h_y[:, None, :],
+                             h_z[:, None, :],
+                             w_logit[:, None, :]
+                             ], axis=1) # (n, 5, output_size)
+        h = h.reshape(5*n, output_size) # (5*n, output_size)
 
-        h = jnp.concatenate( [h0, h], axis = 0) # (2*n+1, aw_types)
+        h = jnp.concatenate( [h0, h], axis = 0) # (5*n+1, output_size)
 
         return h
  
 
     G = jnp.array(123)
-    X = jax.random.uniform(key, (n_max, dim))
+    XYZ = jnp.zeros((n_max, 3), dtype=int) 
     A = jnp.zeros((n_max, ), dtype=int) 
     W = jnp.zeros((n_max, ), dtype=int) 
     M = jnp.zeros((n_max, ), dtype=int) 
 
-    params = network.init(key, G, X, A, W, M, True)
+    params = network.init(key, G, XYZ, A, W, M, True)
     return params, network.apply
 
 def _layer_norm(x: jax.Array) -> jax.Array:

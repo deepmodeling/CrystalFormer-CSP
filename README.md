@@ -31,13 +31,13 @@ Note that there is a natural alphabetical ordering for the Wyckoff letters, star
 ### train
 
 ```bash 
-python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 1000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --Nf 5 --perm_aug --map_aug 
+python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mpsort-xyz-embed/w-a-x-y-z-periodic-fixed-size-embed-eb630/ --Nf 5 --Kx 16 --Kl 4 --h0_size 256 --transformer_layers 8 --num_heads 8 --key_size 32 --model_size 64 --embed_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --lamb_a 1.0 --lamb_w 1.0 --lamb_l 1.0
 ```
 
 ### sample
 
 ```bash 
-python ../src/main.py --n_max 21 --atom_types 119 --wyck_types 28 --Nf 5 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 16 --Kl 16 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.1 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mpsort_aw/fix-symops-pyxtal-5d111/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_aw_1_l_1_perm_map_Nf_5_K_16_16_h0_256_l_4_H_8_k_32_m_64_drop_0.1/  --spacegroup 167 --num_samples 1000 --map_aug
+python ../src/main.py --Nf 5 --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 16 --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --embed_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 10000 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mpsort-xyz/w-a-x-y-z-periodic-7ea88/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_4_H_8_k_32_m_64_drop_0.3/ --spacegroup 160 --num_samples 100
 ```
 
 ### evaluate
