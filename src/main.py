@@ -109,7 +109,7 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.lamb_a, args.lamb_w, args.lamb_l)
+loss_fn, logp_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.lamb_a, args.lamb_w, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
@@ -227,5 +227,35 @@ else:
         print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-        GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
+
+        # output L, X, A, W, M, AW to csv file
+        # output logp_w, logp_xyz, logp_a, logp_l to csv file
+        import pandas as pd
+        data = pd.DataFrame()
+        data['L'] = np.array(L).tolist()
+        data['X'] = np.array(XYZ).tolist()
+        data['A'] = np.array(A).tolist()
+        data['W'] = np.array(W).tolist()
+        data['M'] = np.array(M).tolist()
+
+        num_atoms = jnp.sum(M, axis=1)
+        length, angle = jnp.split(L, 2, axis=-1)
+        length = length/num_atoms[:, None]**(1/3)
+        angle = angle * (jnp.pi / 180) # to rad
+        L = jnp.concatenate([length, angle], axis=-1)
+
+        G = args.spacegroup * jnp.ones((n_sample), dtype=int)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
+
+        data['logp_w'] = np.array(logp_w).tolist()
+        data['logp_xyz'] = np.array(logp_xyz).tolist()
+        data['logp_a'] = np.array(logp_a).tolist()
+        data['logp_l'] = np.array(logp_l).tolist()
+        data['logp'] = np.array(logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l).tolist()
+
+        data = data.sort_values(by='logp', ascending=False) # sort by logp
+        header = False if os.path.exists(filename) else True
+        data.to_csv(filename, mode='a', index=False, header=header)
+
+        # GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)
