@@ -2,7 +2,7 @@
 <img align="middle" src="data/crystalformer.png" width="400" alt="logo"/>
 </div>
 
-# CrystalFormer: Crystal Generation with Transformer
+# CrystalFormer: Space Group-Controlled Crystal Generation with Transformer
 
 ## Contents
 
@@ -25,21 +25,21 @@ The model is an autoregressive transformer for the space group conditioned cryst
 
 `g`: space group number 1-230
 
-`W`: Wyckoff letter (0=empty, 1=a, 2=b, 3=c, ..., 27=A)  
+`W`: Wyckoff letter ('a', 'b',...,'A')  
 
-`A`: atom type (0 stands for empty, 1=H, ..., 118=Og)
+`A`: atom type ('H', 'He', ...,, 'Og')
 
-`X`: factional coordinate
+`X`: factional coordinates
 
 `L`: lattice vector [a,b,c, $\alpha$, $\beta$, $\gamma$]
 
- `P(W_i| ...)`are `P(A_i| ...)`  are categorical distributuions. 
+`P(W_i| ...)` and `P(A_i| ...)`  are categorical distributuions. 
 
-`P(X_i| ...)`  is the mixture of von Mises distribution. 
+`P(X_i| ...)` is the mixture of von Mises distribution. 
 
 `P(L| ...)`  is the mixture of Gaussian distribution. 
 
-Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precision issue when sampling (such as 0.5001). 
+We only consider symmetry inequivalent atoms. The remaining atoms are restored based on the space group and Wyckoff letter information. Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where discrete Wyckoff letters can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling. 
 
 ## Installation
 
