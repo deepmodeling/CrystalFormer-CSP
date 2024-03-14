@@ -2,6 +2,15 @@
 <img align="middle" src="data/crystalformer.png" width="400" alt="logo"/>
 </div>
 
+# CrystalFormer: Crystal Generation with Transformer
+
+## Contents
+
+- [Introduction](#introduction)
+- [Model card](#model-card)
+- [Installation](#installation)
+- [How to run](#how-to-run)
+- [Citation](#how-to-cite)
 
 ## Model card
 
