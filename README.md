@@ -1,12 +1,14 @@
 <div align="center">
-<img align="middle" src="data/crystalformer.png" width="400" alt="logo"/>
+	<img align="middle" src="data/crystalformer.png" width="400" alt="logo"/>
+  <h2> Crystal Generation with Space Group Informed Transformer</h2> 
 </div>
 
-# CrystalFormer: Space Group-Controlled Crystal Generation with Transformer
+<div align="center">
+  <img align="middle" src="data/output.gif" width="400">
+  <h3> Generating Cs<sub>2</sub>ZnFe(CN)<sub>6</sub> Crystal (<a href=https://next-gen.materialsproject.org/materials/mp-570545>mp-570545</a>) </h3>
+</div>
 
-<p align="center">
-  <img src="data/output.gif" width="400">
-</p>
+
 
 ## Contents
 
