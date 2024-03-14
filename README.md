@@ -6,33 +6,40 @@
 
 ## Contents
 
-- [Introduction](#introduction)
-- [Model card](#model-card)
-- [Installation](#installation)
-- [How to run](#how-to-run)
-- [Citation](#how-to-cite)
+- [CrystalFormer: Crystal Generation with Transformer](#crystalformer-crystal-generation-with-transformer)
+  - [Contents](#contents)
+  - [Model card](#model-card)
+  - [Installation](#installation)
+    - [install required packages](#install-required-packages)
+    - [CUDA (GPU) installation](#cuda-gpu-installation)
+  - [Available Weights](#available-weights)
+  - [How to run](#how-to-run)
+    - [train](#train)
+    - [sample](#sample)
+    - [evaluate](#evaluate)
+  - [How to cite](#how-to-cite)
 
 ## Model card
 
-The model is an autoregressive transformer for the space group conditioned crystal probability distributuion `P(C|g) = P (W_1 | ... ) P ( A_1 | ... ) P(X_1| ...) P(W_2|...) ... P(L| ...)`, where
+The model is an autoregressive transformer for the space group conditioned crystal probability distribution `P(C|g) = P (W_1 | ... ) P ( A_1 | ... ) P(X_1| ...) P(W_2|...) ... P(L| ...)`, where
 
-`g`: space group nubmer 1-230
+`g`: space group number 1-230
 
-`W`: wyckoff letter (0=empty, 1=a, 2=b, 3=c, ..., 27=A)  
+`W`: Wyckoff letter (0=empty, 1=a, 2=b, 3=c, ..., 27=A)  
 
 `A`: atom type (0 stands for empty, 1=H, ..., 118=Og)
 
-`X`: factional coordiate
+`X`: factional coordinate
 
-`L`: lattice vector [a,b,c,alpha,beta,gamma]
+`L`: lattice vector [a,b,c, $\alpha$, $\beta$, $\gamma$]
 
  `P(W_i| ...)`are `P(A_i| ...)`  are categorical distributuions. 
 
-`P(X_i| ...)`  is mixture of von Mises distributuion. 
+`P(X_i| ...)`  is the mixture of von Mises distribution. 
 
-`P(L| ...)`  is mixture of Gaussian distributuion. 
+`P(L| ...)`  is the mixture of Gaussian distribution. 
 
-Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
+Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precision issue when sampling (such as 0.5001). 
 
 ## Installation
 
@@ -44,11 +51,16 @@ pip install -r requirements.txt
 
 ### CUDA (GPU) installation
 
-If you intent to use CUDA (GPU) to speed up the training, it is important to install the appropriate version of `JAX` and `jaxlib`. It is recommended to check the [JAX docs](https://github.com/google/jax?tab=readme-ov-file#installation) for the installation guide. The basic installation command is given below:
+If you intend to use CUDA (GPU) to speed up the training, it is important to install the appropriate version of `JAX` and `jaxlib`. It is recommended to check the [JAX docs](https://github.com/google/jax?tab=readme-ov-file#installation) for the installation guide. The basic installation command is given below:
 
 ```bash
 pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
+
+## Available Weights
+
+We release the weights of the model trained on the MP-20 dataset. More details can be seen in the [model](./model/README.md) folder.
+
 
 
 ## How to run
