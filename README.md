@@ -3,7 +3,7 @@
 </div>
 
 
-## model card
+## Model card
 
 The model is an autoregressive transformer for the space group conditioned crystal probability distributuion `P(C|g) = P (W_1 | ... ) P ( A_1 | ... ) P(X_1| ...) P(W_2|...) ... P(L| ...)`, where
 
@@ -25,8 +25,24 @@ The model is an autoregressive transformer for the space group conditioned cryst
 
 Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Since the Wyckoff symbols are discrete objects, they can be used to gauge the numerical precesion issue when sampling (such as 0.5001). 
 
+## Installation
 
-## how to run
+### install required packages
+
+```bash
+pip install -r requirements.txt
+```
+
+### CUDA (GPU) installation
+
+If you intent to use CUDA (GPU) to speed up the training, it is important to install the appropriate version of `JAX` and `jaxlib`. It is recommended to check the [JAX docs](https://github.com/google/jax?tab=readme-ov-file#installation) for the installation guide. The basic installation command is given below:
+
+```bash
+pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+
+
+## How to run
 
 ### train
 
