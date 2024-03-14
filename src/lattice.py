@@ -1,6 +1,5 @@
 import jax
-import jax.numpy as jnp 
-import haiku as hk 
+import jax.numpy as jnp
 
 def make_lattice_mask():
     '''
@@ -46,6 +45,6 @@ if __name__ == '__main__':
     lattice = jax.random.normal(key, (6,))
 
     G = jnp.array([25, 99, 221])
-    L = jax.vmap(make_spacegroup_lattice, (0, None))(G, lattice)
+    L = jax.vmap(symmetrize_lattice (0, None))(G, lattice)
     print (L)
 
