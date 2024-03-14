@@ -1,8 +1,15 @@
 from config import *
 
-from utils import to_A_W, to_AW, GLXAW_from_file, GLXA_to_csv
+from utils import GLXYZAW_from_file, GLXA_to_csv
 from wyckoff import mult_table
 
+def calc_n(G, W):
+    @jax.vmap
+    def lookup(G, W):
+        return mult_table[G-1, W] # (n_max, )
+    M = lookup(G, W) # (batchsize, n_max)
+    N = M.sum(axis=-1)
+    return N
 
 def test_utils():
 
@@ -12,7 +19,7 @@ def test_utils():
     dim = 3
     csv_file = '../data/mini.csv'
 
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, mult_types, n_max, dim)
+    G, L, X, A, W = GLXYZAW_from_file(csv_file, atom_types, mult_types, n_max, dim)
     
     assert G.ndim == 1
     assert L.ndim == 2 
@@ -21,27 +28,10 @@ def test_utils():
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
-    A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
     print ("A:\n", A)
-    @jax.vmap
-    def lookup(G, W):
-        return mult_table[G-1, W] # (n_max, )
-    M = lookup(G, W) # (batchsize, n_max)
-    N = M.sum(axis=-1)
+    N = calc_n(G, W)
 
     assert jnp.all(N==5)
-
-def test_A_W():
-    A = jnp.array([1, 2, 3, 0])
-    W = jnp.array([4, 5, 6, 0])
-    atom_types = 119
-
-    AW = to_AW(A[None, :], W[None, :], atom_types)
-
-    A_back, W_back = to_A_W(AW[None, :], atom_types)
-    
-    assert jnp.allclose(A, A_back)
-    assert jnp.allclose(W, W_back)
 
 def test_io():
 
@@ -54,15 +44,16 @@ def test_io():
     csv_file = '../data/mini.csv'
     out_file = 'temp_out.csv'
 
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
-    A, W = to_A_W(AW, atom_types)
+    G, L, X, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
 
-    GLXA_to_csv(G[:num_test], L[:num_test], X[:num_test], A[:num_test], num_worker=2, filename=out_file)
-    G_io, L_io, X_io, AW_io = GLXAW_from_file(out_file, atom_types, wyck_types, n_max, dim)
-    A_io, W_io = to_A_W(AW_io, atom_types)
-    if True:
-        G, L, X, AW = GLXAW_from_file(out_file, atom_types, wyck_types, n_max, dim)
-        A, W = to_A_W(AW, atom_types)
+    length, angle = jnp.split(L, 2, axis=-1)
+    num_atoms = calc_n(G, W) 
+    length = length*num_atoms[:, None]**(1/3)
+    angle = angle * (180.0 / jnp.pi) # to deg
+    L = jnp.concatenate([length, angle], axis=-1)
+
+    GLXA_to_csv(G[:num_test], L[:num_test], X[:num_test], A[:num_test], num_worker=1, filename=out_file)
+    G_io, L_io, X_io, A, W_io = GLXYZAW_from_file(out_file, atom_types, wyck_types, n_max, dim)
     os.remove(out_file)
 
     assert jnp.allclose(A[:num_test], A_io)
@@ -75,6 +66,5 @@ def test_io():
 if __name__ == '__main__':
 
     test_utils()
-    test_A_W()
     test_io()
 

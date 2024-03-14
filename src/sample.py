@@ -4,8 +4,18 @@ from functools import partial
 
 from von_mises import sample_von_mises
 from lattice import symmetrize_lattice
-from wyckoff import mult_table
-from augmentation import project_xyz
+from wyckoff import mult_table, symops
+
+def project_xyz(g, w, x, idx):
+    '''
+    apply the randomly sampled Wyckoff symmetry op to sampled fc, which 
+    should be (or close to) the first WP
+    '''
+    op = symops[g-1, w, idx].reshape(3, 4)
+    affine_point = jnp.array([*x, 1]) # (4, )
+    x = jnp.dot(op, affine_point)  # (3, )
+    x -= jnp.floor(x)
+    return x 
 
 @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, 0), out_axes=0) # batch 
 def inference(model, params, g, W, A, X, Y, Z):
