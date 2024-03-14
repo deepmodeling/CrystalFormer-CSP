@@ -1,4 +1,7 @@
-#https://github.com/pyro-ppl/numpyro/blob/master/numpyro/distributions/directional.py
+# https://github.com/pyro-ppl/numpyro/blob/master/numpyro/distributions/util.py
+# Copyright Contributors to the Pyro project.
+# SPDX-License-Identifier: Apache-2.0
+
 import jax
 from jax import jit, lax, random
 import jax.numpy as jnp
