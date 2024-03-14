@@ -4,9 +4,13 @@
 
 # CrystalFormer: Space Group-Controlled Crystal Generation with Transformer
 
+<p align="center">
+  <img src="data/output.gif" width="400">
+</p>
+
 ## Contents
 
-- [CrystalFormer: Crystal Generation with Transformer](#crystalformer-crystal-generation-with-transformer)
+- [CrystalFormer: Space Group-Controlled Crystal Generation with Transformer](#crystalformer-space-group-controlled-crystal-generation-with-transformer)
   - [Contents](#contents)
   - [Model card](#model-card)
   - [Installation](#installation)
@@ -27,7 +31,7 @@ The model is an autoregressive transformer for the space group conditioned cryst
 
 `W`: Wyckoff letter ('a', 'b',...,'A')  
 
-`A`: atom type ('H', 'He', ...,, 'Og')
+`A`: atom type ('H', 'He', ..., 'Og')
 
 `X`: factional coordinates
 

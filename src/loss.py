@@ -9,6 +9,22 @@ from wyckoff import mult_table, fc_mask_table
 
 
 def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
+    """
+    Args:
+      n_max: maximum number of atoms in the unit cell
+      atom_types: number of atom types
+      wyck_types: number of wyckoff types
+      Kx: number of von mises components for x, y, z
+      Kl: number of Guassian mixture components for lattice parameters
+      transformer: model
+      lamb_a: weight for atom type loss
+      lamb_w: weight for wyckoff position loss
+      lamb_l: weight for lattice parameter loss
+
+    Returns:
+      loss_fn: loss function
+      logp_fn: log probability function
+    """
     
     coord_types = 3*Kx
     lattice_mask = make_lattice_mask()
