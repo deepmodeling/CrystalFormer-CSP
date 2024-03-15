@@ -84,12 +84,18 @@ python ../src/main.py --Nf 5 --n_max 21 --atom_types 119 --wyck_types 28 --folde
 
 ### evaluate
 
+Transform the generated `L, W, A, X` to the `cif` format:
+```bash
+python ../scripts/awl2struct.py --output_path YOUR_PATH  --num_io_process 40
+```
+
+Calculate the structure and composition validity of the generated structures:
 ```bash
 python ../scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset/mp_20/symm_data/ --filename out_structure.csv --output_path ./ --num_io_process 40
 ```
+More details about the post-processing can be seen in the [scripts](./scripts/README.md) folder.
 
 ## How to cite
-
 
 ```bibtex
 @article{crystalformer2024,

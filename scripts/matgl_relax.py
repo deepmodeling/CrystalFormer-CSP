@@ -18,6 +18,19 @@ from ast import literal_eval
 
 
 def relax_structures(pot, structures, relaxations):
+    """
+    Relax structures using M3GNet potential
+
+    Args:
+      pot: M3GNet potential
+      structures: list of pymatgen.Structure objects
+      relaxations: boolean, whether to perform relaxation
+
+    Returns:
+        initial_energies: list of initial energies of the structures
+        final_energies: list of final energies of the structures
+        relaxed_cif_strings: list of relaxed structures in cif format
+    """
     if relaxations:
         print("Relaxing structures with M3GNet...")
         relaxer = Relaxer(potential=pot)

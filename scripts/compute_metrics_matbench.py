@@ -37,7 +37,7 @@ def main(args):
                          )
     
     # all_metrics = gen_metrics.metrics
-    all_metrics['validity'] = gen_metrics.validity
+    # all_metrics['validity'] = gen_metrics.validity
     all_metrics['novelty'] = gen_metrics.novelty
     all_metrics['uniqueness'] = gen_metrics.uniqueness
 

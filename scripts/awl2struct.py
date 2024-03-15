@@ -16,6 +16,20 @@ from wyckoff import symmetrize_atoms
 
 
 def get_struct_from_lawx(G, L, A, W, X):
+    """
+    Get the pymatgen.Structure object from the input data
+
+    Args:
+        G: space group number
+        L: lattice parameters
+        A: element number list
+        W: wyckoff letter list
+        X: fractional coordinates list
+    
+    Returns:
+        struct: pymatgen.Structure object
+        xs_list: list of atomic coordinates after symmetrization
+    """
     A = np.array(A)
     X = np.array(X)
     L = np.array(L)
@@ -39,7 +53,7 @@ def get_struct_from_lawx(G, L, A, W, X):
 
 
 def main(args):
-    input_path = args.output_path + f'output_{args.label}_awxl.csv'
+    input_path = args.output_path + f'output_{args.label}.csv'
     origin_data = pd.read_csv(input_path)
     L,X,A,W = origin_data['L'],origin_data['X'],origin_data['A'],origin_data['W']
     L = L.apply(lambda x: literal_eval(x))
@@ -48,6 +62,7 @@ def main(args):
     W = W.apply(lambda x: literal_eval(x))
     # M = M.apply(lambda x: literal_eval(x))
 
+    ### Multiprocessing. Use it if only run on CPU
     # p = multiprocessing.Pool(args.num_io_process)
     # G = np.array([int(args.label) for _ in range(len(L))])
     # structures = p.starmap_async(get_struct_from_lawx, zip(G, L, A, W, X)).get()

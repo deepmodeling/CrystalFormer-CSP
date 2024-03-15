@@ -52,6 +52,17 @@ def generate_CSE(structure, m3gnet_energy):
 
 
 def get_strutures_ehull(mpr, structures, energies):
+    """
+    Get the e_above_hull for a list of structures
+
+    Args:
+        mpr: MPRester object
+        structures: list of pymatgen.Structure objects
+        energies: list of energies of the structures
+    
+    Returns:
+        ehull_list: list of e_above_hull values
+    """
     ehull_list = []
     for s, e in zip(structures, energies):
         # entry = PDEntry(s.composition, e)
