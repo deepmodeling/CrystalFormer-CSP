@@ -43,8 +43,9 @@ if __name__ == '__main__':
 
     key = jax.random.PRNGKey(42)
     lattice = jax.random.normal(key, (6,))
+    lattice = lattice.reshape([1, 6]).repeat(3, axis=0)
 
     G = jnp.array([25, 99, 221])
-    L = jax.vmap(symmetrize_lattice (0, None))(G, lattice)
+    L = jax.vmap(symmetrize_lattice)(G, lattice)
     print (L)
 

@@ -10,15 +10,15 @@ import numpy as np
 import multiprocessing
 from pathlib import Path
 
-from pymatgen.core.structure import Structure
-# from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
+from pymatgen.core.structure import Structure, Composition
+from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
 from matminer.featurizers.composition.composite import ElementProperty
 
 from eval_utils import (
     smact_validity, structure_validity)
 
 # TODO: AttributeError in CrystalNNFP
-# CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
+CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
 CompFP = ElementProperty.from_preset('magpie')
 
 
@@ -62,20 +62,20 @@ class Crystal(object):
             self.struct_valid = False
         self.valid = self.comp_valid and self.struct_valid
 
-    # def get_fingerprints(self):
-    #     elem_counter = Counter(self.atom_types)
-    #     comp = Composition(elem_counter)
-    #     self.comp_fp = CompFP.featurize(comp)
-    #     try:
-    #         site_fps = [CrystalNNFP.featurize(
-    #             self.structure, i) for i in range(len(self.structure))]
-    #     except Exception:
-    #         # counts crystal as invalid if fingerprint cannot be constructed.
-    #         self.valid = False
-    #         self.comp_fp = None
-    #         self.struct_fp = None
-    #         return
-    #     self.struct_fp = np.array(site_fps).mean(axis=0)
+    def get_fingerprints(self):
+        elem_counter = Counter(self.atom_types)
+        comp = Composition(elem_counter)
+        self.comp_fp = CompFP.featurize(comp)
+        try:
+            site_fps = [CrystalNNFP.featurize(
+                self.structure, i) for i in range(len(self.structure))]
+        except Exception:
+            # counts crystal as invalid if fingerprint cannot be constructed.
+            self.valid = False
+            self.comp_fp = None
+            self.struct_fp = None
+            return
+        self.struct_fp = np.array(site_fps).mean(axis=0)
 
 
 def get_validity(crys):
@@ -85,7 +85,15 @@ def get_validity(crys):
     return {'comp_valid': comp_valid,
             'struct_valid': struct_valid,
             'valid': valid}
-        
+
+def get_crystal(cif_dict):
+    try: return Crystal(cif_dict)
+    except:
+        print("Crystal construction failed")
+        # print(cif_dict)
+        struct = Structure.from_dict(cif_dict)
+        print(struct)
+        return None # return None if Crystal construction fails
 
 def main(args):
     all_metrics = {}
@@ -96,7 +104,10 @@ def main(args):
 
     p = multiprocessing.Pool(args.num_io_process)
     crys_dict = p.map_async(literal_eval, cif_strings).get()
-    crys = p.map_async(Crystal, crys_dict).get()
+    # crys = p.map_async(Crystal, crys_dict).get()
+    crys = p.map_async(get_crystal, crys_dict).get()
+    crys = [c for c in crys if c is not None]
+    print(f"Number of valid crystals: {len(crys)}")
     p.close()
     p.join()
 
