@@ -1,10 +1,10 @@
 <div align="center">
-	<img align="middle" src="data/crystalformer.png" width="400" alt="logo"/>
+	<img align="middle" src="imgs/crystalformer.png" width="400" alt="logo"/>
   <h2> Crystal Generation with Space Group Informed Transformer</h2> 
 </div>
 
 <div align="center">
-  <img align="middle" src="data/output.gif" width="400">
+  <img align="middle" src="imgs/output.gif" width="400">
   <h3> Generating Cs<sub>2</sub>ZnFe(CN)<sub>6</sub> Crystal (<a href=https://next-gen.materialsproject.org/materials/mp-570545>mp-570545</a>) </h3>
 </div>
 
@@ -12,18 +12,17 @@
 
 ## Contents
 
-- [CrystalFormer: Space Group-Controlled Crystal Generation with Transformer](#crystalformer-space-group-controlled-crystal-generation-with-transformer)
-  - [Contents](#contents)
-  - [Model card](#model-card)
-  - [Installation](#installation)
-    - [install required packages](#install-required-packages)
-    - [CUDA (GPU) installation](#cuda-gpu-installation)
-  - [Available Weights](#available-weights)
-  - [How to run](#how-to-run)
-    - [train](#train)
-    - [sample](#sample)
-    - [evaluate](#evaluate)
-  - [How to cite](#how-to-cite)
+- [Contents](#contents)
+- [Model card](#model-card)
+- [Installation](#installation)
+  - [install required packages](#install-required-packages)
+  - [CUDA (GPU) installation](#cuda-gpu-installation)
+- [Available Weights](#available-weights)
+- [How to run](#how-to-run)
+  - [train](#train)
+  - [sample](#sample)
+  - [evaluate](#evaluate)
+- [How to cite](#how-to-cite)
 
 ## Model card
 
