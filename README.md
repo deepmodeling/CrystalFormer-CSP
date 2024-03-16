@@ -73,18 +73,29 @@ We release the weights of the model trained on the MP-20 dataset. More details c
 ### train
 
 ```bash 
-python ../src/main.py  --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mpsort-xyz-embed/w-a-x-y-z-periodic-fixed-size-embed-eb630/ --Nf 5 --Kx 16 --Kl 4 --h0_size 256 --transformer_layers 8 --num_heads 8 --key_size 32 --model_size 64 --embed_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 100 --epochs 10000 --optimizer adam --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --lamb_a 1.0 --lamb_w 1.0 --lamb_l 1.0
+python ../src/main.py --folder ./ --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv      
 ```
+`folder`: the folder to save the model and logs  
+`train_path`: the path to the training dataset  
+`valid_path`: the path to the validation dataset  
+`test_path`: the path to the test dataset
 
 ### sample
 
 ```bash 
-python ../src/main.py --Nf 5 --n_max 21 --atom_types 119 --wyck_types 28 --folder /data/wanglei/crystalgpt/mp-mp-wyckoff-debug-sortx-sortw-fc_mask-dropout-permloss-mult-aw_max-aw_params-pyxtal/mp-8b827/ --Kx 16 --Kl 4 --h0_size 256 --transformer_layers 4 --num_heads 8 --key_size 32 --model_size 64 --embed_size 32 --lr 0.0001 --lr_decay 0.0 --weight_decay 0.0 --clip_grad 1.0 --batchsize 10000 --epochs 50000 --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --dropout_rate 0.3 --num_io_process 40 --restore_path /data/wanglei/crystalgpt/mp-mpsort-xyz/w-a-x-y-z-periodic-7ea88/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_4_H_8_k_32_m_64_drop_0.3/ --spacegroup 160 --num_samples 100
+python ../src/main.py --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0
 ```
+
+`optimizer`: the optimizer to use, `none` means no training, only sampling  
+`restore_path`: the path to the model weights  
+`spacegroup`: the space group number to sample  
+`num_samples`: the number of samples to generate  
+`batchsize`: the batch size for sampling  
+`temperature`: the temperature for sampling  
 
 ### evaluate
 
-Transform the generated `L, W, A, X` to the `cif` format:
+Transform the generated `G, L, W, A, X` to the `cif` format:
 ```bash
 python ../scripts/awl2struct.py --output_path YOUR_PATH  --num_io_process 40
 ```
