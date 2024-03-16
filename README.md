@@ -83,7 +83,7 @@ python ../src/main.py --folder ./ --train_path /home/wanglei/cdvae/data/mp_20/tr
 ### sample
 
 ```bash 
-python ../src/main.py --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0
+python ../src/main.py --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0 --use_foriloop
 ```
 
 `optimizer`: the optimizer to use, `none` means no training, only sampling  
@@ -92,6 +92,7 @@ python ../src/main.py --optimizer none --train_path /home/wanglei/cdvae/data/mp_
 `num_samples`: the number of samples to generate  
 `batchsize`: the batch size for sampling  
 `temperature`: the temperature for sampling  
+`use_foriloop`: use `lax.fori_loop` to speed up the sampling
 
 ### evaluate
 
