@@ -76,7 +76,7 @@ We release the weights of the model trained on the MP-20 dataset. More details c
 ### train
 
 ```bash 
-python ../src/main.py --folder ./ --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv      
+python ./src/main.py --folder ./data/ --train_path YOUR_PATH/mp_20/train.csv --valid_path YOUR_PATH/mp_20/val.csv
 ```
 - `folder`: the folder to save the model and logs  
 - `train_path`: the path to the training dataset  
@@ -86,7 +86,7 @@ python ../src/main.py --folder ./ --train_path /home/wanglei/cdvae/data/mp_20/tr
 ### sample
 
 ```bash 
-python ../src/main.py --optimizer none --train_path /home/wanglei/cdvae/data/mp_20/train.csv --valid_path /home/wanglei/cdvae/data/mp_20/val.csv --test_path /home/wanglei/cdvae/data/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0 --use_foriloop
+python ./src/main.py --optimizer none --test_path YOUR_PATH/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0 --use_foriloop
 ```
 
 - `optimizer`: the optimizer to use, `none` means no training, only sampling  
@@ -104,7 +104,7 @@ You can also use the `element` to sample the specific element. For example, `--e
 
 Before evaluating the generated structures, you need to transform the generated `g, W, A, X, L` to the `cif` format. You can use the following command to transform the generated structures to the `cif` format and save as the `csv` file:
 ```bash
-python ../scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --num_io_process 40
+python ./scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --num_io_process 40
 ```
 - `output_path`: the path to read the generated `L, W, A, X` and save the `cif` files
 - `label`: the label to save the `cif` files, which is the space group number `g`
@@ -112,7 +112,7 @@ python ../scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --n
 
 Calculate the structure and composition validity of the generated structures:
 ```bash
-python ../scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset/mp_20/symm_data/ --filename out_structure.csv --output_path ./ --num_io_process 40
+python ./scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset/mp_20/symm_data/ --filename out_structure.csv --output_path ./ --num_io_process 40
 ```
 - `root_path`: the path to the dataset
 - `filename`: the filename of the generated structures
@@ -121,7 +121,7 @@ python ../scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset
   
 Calculate the novelty and uniqueness of the generated structures:
 ```bash
-python ../scripts/compute_metrics_matbench.py --train_path TRAIN_PATH --test_path TEST_PATH --gen_path GEN_PATH --output_path OUTPUT_PATH --label SPACE_GROUP --num_io_process 40
+python ./scripts/compute_metrics_matbench.py --train_path TRAIN_PATH --test_path TEST_PATH --gen_path GEN_PATH --output_path OUTPUT_PATH --label SPACE_GROUP --num_io_process 40
 ```
 - `train_path`: the path to the training dataset
 - `test_path`: the path to the test dataset
