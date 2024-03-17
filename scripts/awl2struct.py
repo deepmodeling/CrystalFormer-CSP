@@ -2,9 +2,6 @@ import sys
 sys.path.append('./src/')
 
 import pandas as pd
-import jax.numpy as jnp
-from jax.config import config
-config.update("jax_enable_x64", True)
 import numpy as np
 from ast import literal_eval
 import multiprocessing
@@ -12,8 +9,51 @@ import itertools
 import argparse
 
 from pymatgen.core import Structure, Lattice
-from wyckoff import symmetrize_atoms
+from wyckoff import wmax_table, mult_table, symops
 
+symops = np.array(symops)
+mult_table = np.array(mult_table)
+wmax_table = np.array(wmax_table)
+
+
+def symmetrize_atoms(g, w, x):
+    '''
+    symmetrize atoms via, apply all sg symmetry op, finding the generator, and lastly apply symops 
+    we need to do that because the sampled atom might not be at the first WP
+    Args:
+       g: int 
+       w: int
+       x: (3,)
+    Returns:
+       xs: (m, 3) symmetrize atom positions
+    '''
+
+    # (1) apply all space group symmetry op to the x 
+    w_max = wmax_table[g-1].item()
+    m_max = mult_table[g-1, w_max].item()
+    ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
+    affine_point = np.array([*x, 1]) # (4, )
+    coords = ops@affine_point # (m_max, 3) 
+    coords -= np.floor(coords)
+
+    # (2) search for the generator which satisfies op0(x) = x , i.e. the first Wyckoff position 
+    # here we solve it in a jit friendly way by looking for the minimal distance solution for the lhs and rhs  
+    #https://github.com/qzhu2017/PyXtal/blob/82e7d0eac1965c2713179eeda26a60cace06afc8/pyxtal/wyckoff_site.py#L115
+    def dist_to_op0x(coord):
+        diff = np.dot(symops[g-1, w, 0], np.array([*coord, 1])) - coord
+        diff -= np.floor(diff)
+        return np.sum(diff**2) 
+   #  loc = np.argmin(jax.vmap(dist_to_op0x)(coords))
+    loc = np.argmin([dist_to_op0x(coord) for coord in coords])
+    x = coords[loc].reshape(3,)
+
+    # (3) lastly, apply the given symmetry op to x
+    m = mult_table[g-1, w] 
+    ops = symops[g-1, w, :m]   # (m, 3, 4)
+    affine_point = np.array([*x, 1]) # (4, )
+    xs = ops@affine_point # (m, 3)
+    xs -= np.floor(xs) # wrap back to 0-1 
+    return xs
 
 def get_struct_from_lawx(G, L, A, W, X):
     """
@@ -28,29 +68,18 @@ def get_struct_from_lawx(G, L, A, W, X):
     
     Returns:
         struct: pymatgen.Structure object
-        xs_list: list of atomic coordinates after symmetrization
     """
-    A = np.array(A)
-    X = np.array(X)
-    L = np.array(L)
-    W = np.array(W)
-
     A = A[np.nonzero(A)]
     X = X[np.nonzero(A)]
     W = W[np.nonzero(A)]
 
     lattice = Lattice.from_parameters(*L)
-    # xs_list = [symmetrize_atoms(G, jnp.array(w), jnp.array(x)) for w, x in zip(W, X)]
-    xs_list = []
-    for w, x in zip(W, X):
-        xs = symmetrize_atoms(jnp.array(G), jnp.array(w), jnp.array(x))
-        xs_list.append(np.array(xs))
+    xs_list = [symmetrize_atoms(G, w, x) for w, x in zip(W, X)]
     as_list = [[A[idx] for _ in range(len(xs))] for idx, xs in enumerate(xs_list)]
     A_list = list(itertools.chain.from_iterable(as_list))
     X_list = list(itertools.chain.from_iterable(xs_list))
     struct = Structure(lattice, A_list, X_list)
-    return struct, xs_list
-
+    return struct.as_dict()
 
 def main(args):
     input_path = args.output_path + f'output_{args.label}.csv'
@@ -62,19 +91,19 @@ def main(args):
     W = W.apply(lambda x: literal_eval(x))
     # M = M.apply(lambda x: literal_eval(x))
 
-    ### Multiprocessing. Use it if only run on CPU
-    # p = multiprocessing.Pool(args.num_io_process)
-    # G = np.array([int(args.label) for _ in range(len(L))])
-    # structures = p.starmap_async(get_struct_from_lawx, zip(G, L, A, W, X)).get()
-    # p.close()
-    # p.join()
+    # convert array of list to numpy ndarray
+    L = np.array(L.tolist())
+    X = np.array(X.tolist())
+    A = np.array(A.tolist())
+    W = np.array(W.tolist())
+    print(L.shape,X.shape,A.shape,W.shape)
 
-    structures = []
+    ### Multiprocessing. Use it if only run on CPU
+    p = multiprocessing.Pool(args.num_io_process)
     G = np.array([int(args.label) for _ in range(len(L))])
-    print(G)
-    for idx, (g, l, a, w, x) in enumerate(zip(G, L, A, W, X)):
-        struct, _ = get_struct_from_lawx(g, l, a, w, x)
-        structures.append(struct.as_dict())
+    structures = p.starmap_async(get_struct_from_lawx, zip(G, L, A, W, X)).get()
+    p.close()
+    p.join()
 
     output_path = args.output_path + f'output_{args.label}_struct.csv'
 
