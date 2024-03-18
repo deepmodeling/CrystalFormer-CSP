@@ -51,6 +51,13 @@ The model is an autoregressive transformer for the space group conditioned cryst
 We only consider symmetry inequivalent atoms. The remaining atoms are restored based on the space group and Wyckoff letter information. Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where discrete Wyckoff letters can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling. 
 
 ## Installation
+Create a new environment and install the required packages, we recommend using python `3.10.*` and conda to create the environment:
+  
+  ```bash
+  conda create -n crystalgpt python=3.10
+  conda activate crystalgpt
+  ```
+
 Before installing the required packages, you need to install `jax` and `jaxlib` first. 
 
 ### CPU installation
@@ -64,6 +71,14 @@ pip install -U "jax[cpu]"
 If you intend to use CUDA (GPU) to speed up the training, it is important to install the appropriate version of `jax` and `jaxlib`. It is recommended to check the [jax docs](https://github.com/google/jax?tab=readme-ov-file#installation) for the installation guide. The basic installation command is given below:
 
 ```bash
+pip install --upgrade pip
+
+# CUDA 12 installation
+# Note: wheels only available on linux.
+pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# CUDA 11 installation
+# Note: wheels only available on linux.
 pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
