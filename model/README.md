@@ -1,6 +1,7 @@
 ## Pretrained model
 
-The pretrained model is available at [Google Drive](https://drive.google.com/file/d/1koHC6n38BqsY2_z3xHTi40HcFbVesUKd/view?usp=sharing). It can be downloaded using `wget` or `gdown`.
+The pre-trained model is available on [Google Drive](https://drive.google.com/file/d/1koHC6n38BqsY2_z3xHTi40HcFbVesUKd/view?usp=sharing). It can be downloaded using `wget`, `gdown`, or just by clicking the link. 
+
 
 ## Model Parameters
 

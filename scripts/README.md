@@ -9,6 +9,7 @@
   - [Relaxation](#relaxation)
   - [Energy Above the Hull](#energy-above-the-hull)
   - [Embedding Visualization](#embedding-visualization)
+  - [Structure Visualization](#structure-visualization)
 
 ### Transform
 `awl2struct.py` is a script to transform the generated `L, W, A, X` to the `cif` format. 
@@ -48,8 +49,7 @@ Note that the training, test, and generated datasets should contain the structur
 
 
 ### Relaxation
-`matgl_relax.py` is a script to relax the generated structures using the `matgl` package.
-    
+`matgl_relax.py` is a script to relax the generated structures using the `matgl` package. You can install the `matgl` following the instructions in the [matgl repository](https://github.com/materialsvirtuallab/matgl?tab=readme-ov-file).
 ```bash
 python matgl_relax.py --restore_path RESTORE_PATH --filename FILENAME --relaxation --model_path MODEL_PATH
 ```
@@ -60,7 +60,7 @@ python matgl_relax.py --restore_path RESTORE_PATH --filename FILENAME --relaxati
 
 
 ### Energy Above the Hull
-`e_above_hull.py` is a script to calculate the energy above the hull of the generated structures based on the Materials Project database.
+`e_above_hull.py` is a script to calculate the energy above the hull of the generated structures based on the Materials Project database. To calculate the energy above the hull, the API key of the Materials Project is required, which can be obtained from the [Materials Project website](https://next-gen.materialsproject.org/). Furthermore, the `mp_api` package should be installed.
 
 ```bash
 python e_above_hull.py --restore_path RESTORE_PATH --filename FILENAME --api_key API_KEY --label LABEL --relaxation
@@ -79,3 +79,6 @@ python plot_embeddings.py --restore_path RESTORE_PATH
 ```
 
 - `restore_path`: the path to the model checkpoint
+
+### Structure Visualization
+`structure_visualization.ipynb` is a notebook to visualize the generated structures.

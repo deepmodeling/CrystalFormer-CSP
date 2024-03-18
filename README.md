@@ -18,8 +18,9 @@ crystal space, which is crucial for data and compute efficient generative modeli
 - [Contents](#contents)
 - [Model card](#model-card)
 - [Installation](#installation)
-  - [install required packages](#install-required-packages)
+  - [CPU installation](#cpu-installation)
   - [CUDA (GPU) installation](#cuda-gpu-installation)
+  - [install required packages](#install-required-packages)
 - [Available Weights](#available-weights)
 - [How to run](#how-to-run)
   - [train](#train)
@@ -50,11 +51,12 @@ The model is an autoregressive transformer for the space group conditioned cryst
 We only consider symmetry inequivalent atoms. The remaining atoms are restored based on the space group and Wyckoff letter information. Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where discrete Wyckoff letters can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling. 
 
 ## Installation
+Before installing the required packages, you need to install `jax` and `jaxlib` first. 
 
-### install required packages
+### CPU installation
 
-```bash
-pip install -r requirements.txt
+```bash 
+pip install -U "jax[cpu]"
 ```
 
 ### CUDA (GPU) installation
@@ -63,6 +65,12 @@ If you intend to use CUDA (GPU) to speed up the training, it is important to ins
 
 ```bash
 pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+
+### install required packages
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Available Weights
