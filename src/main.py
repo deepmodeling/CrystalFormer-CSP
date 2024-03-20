@@ -20,33 +20,33 @@ import argparse
 parser = argparse.ArgumentParser(description='')
 
 group = parser.add_argument_group('training parameters')
-group.add_argument('--epochs', type=int, default=1000000, help='')
+group.add_argument('--epochs', type=int, default=10000, help='')
 group.add_argument('--batchsize', type=int, default=100, help='')
 group.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-group.add_argument('--lr_decay', type=float, default=1e-5, help='lr decay')
-group.add_argument('--weight_decay', type=float, default=1e-3, help='weight decay')
+group.add_argument('--lr_decay', type=float, default=0.0, help='lr decay')
+group.add_argument('--weight_decay', type=float, default=0.0, help='weight decay')
 group.add_argument('--clip_grad', type=float, default=1.0, help='clip gradient')
-group.add_argument("--optimizer", type=str, default="adamw", choices=["none", "adam", "adamw"], help="optimizer type")
+group.add_argument("--optimizer", type=str, default="adam", choices=["none", "adam", "adamw"], help="optimizer type")
 
 group.add_argument("--folder", default="../data/", help="the folder to save data")
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
 group = parser.add_argument_group('dataset')
-group.add_argument('--train_path', default='/home/wanglei/cdvae/data/perov_5/train.csv', help='')
-group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/perov_5/val.csv', help='')
-group.add_argument('--test_path', default='/home/wanglei/cdvae/data/perov_5/test.csv', help='')
+group.add_argument('--train_path', default='/home/wanglei/cdvae/data/mp_20/train.csv', help='')
+group.add_argument('--valid_path', default='/home/wanglei/cdvae/data/mp_20/val.csv', help='')
+group.add_argument('--test_path', default='/home/wanglei/cdvae/data/mp_20/test.csv', help='')
 
 group = parser.add_argument_group('transformer parameters')
 group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
 group.add_argument('--Kx', type=int, default=16, help='number of modes in x')
-group.add_argument('--Kl', type=int, default=1, help='number of modes in lattice')
-group.add_argument('--h0_size', type=int, default=0, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
-group.add_argument('--transformer_layers', type=int, default=4, help='The number of layers in transformer')
-group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
-group.add_argument('--key_size', type=int, default=32, help='The key size')
-group.add_argument('--model_size', type=int, default=8, help='The model size')
-group.add_argument('--embed_size', type=int, default=8, help='The enbedding size')
-group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate')
+group.add_argument('--Kl', type=int, default=4, help='number of modes in lattice')
+group.add_argument('--h0_size', type=int, default=256, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
+group.add_argument('--transformer_layers', type=int, default=16, help='The number of layers in transformer')
+group.add_argument('--num_heads', type=int, default=16, help='The number of heads')
+group.add_argument('--key_size', type=int, default=64, help='The key size')
+group.add_argument('--model_size', type=int, default=64, help='The model size')
+group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
+group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate')
 
 group = parser.add_argument_group('loss parameters')
 group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part relative to fc")
@@ -54,7 +54,7 @@ group.add_argument("--lamb_w", type=float, default=1.0, help="weight for the w p
 group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part relative to fc")
 
 group = parser.add_argument_group('physics parameters')
-group.add_argument('--n_max', type=int, default=5, help='The maximum number of atoms in the cell')
+group.add_argument('--n_max', type=int, default=21, help='The maximum number of atoms in the cell')
 group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
 group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
@@ -63,8 +63,8 @@ group.add_argument('--spacegroup', type=int, help='The space group id to be samp
 group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
 group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
 group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
-group.add_argument('--num_io_process', type=int, default=10, help='number of process used in multiprocessing io')
-group.add_argument('--num_samples', type=int, default=1, help='number of test samples')
+group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
+group.add_argument('--num_samples', type=int, default=1000, help='number of test samples')
 group.add_argument('--use_foriloop', action='store_true', help='use lax.fori_loop in sampling')
 group.add_argument('--output_filename', type=str, default='output.csv', help='outfile to save sampled structures')
 
@@ -109,7 +109,7 @@ print ("# of transformer params", ravel_pytree(params)[0].size)
 
 ################### Train #############################
 
-loss_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.lamb_a, args.lamb_w, args.lamb_l)
+loss_fn, logp_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer, args.lamb_a, args.lamb_w, args.lamb_l)
 
 print("\n========== Prepare logs ==========")
 if args.optimizer != "none" or args.restore_path is None:
@@ -227,5 +227,35 @@ else:
         print ("L:\n", L)  # lattice
         for a in A:
            print([element_list[i] for i in a])
-        GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
+
+        # output L, X, A, W, M, AW to csv file
+        # output logp_w, logp_xyz, logp_a, logp_l to csv file
+        import pandas as pd
+        data = pd.DataFrame()
+        data['L'] = np.array(L).tolist()
+        data['X'] = np.array(XYZ).tolist()
+        data['A'] = np.array(A).tolist()
+        data['W'] = np.array(W).tolist()
+        data['M'] = np.array(M).tolist()
+
+        num_atoms = jnp.sum(M, axis=1)
+        length, angle = jnp.split(L, 2, axis=-1)
+        length = length/num_atoms[:, None]**(1/3)
+        angle = angle * (jnp.pi / 180) # to rad
+        L = jnp.concatenate([length, angle], axis=-1)
+
+        G = args.spacegroup * jnp.ones((n_sample), dtype=int)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
+
+        data['logp_w'] = np.array(logp_w).tolist()
+        data['logp_xyz'] = np.array(logp_xyz).tolist()
+        data['logp_a'] = np.array(logp_a).tolist()
+        data['logp_l'] = np.array(logp_l).tolist()
+        data['logp'] = np.array(logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l).tolist()
+
+        data = data.sort_values(by='logp', ascending=False) # sort by logp
+        header = False if os.path.exists(filename) else True
+        data.to_csv(filename, mode='a', index=False, header=header)
+
+        # GLXA_to_csv(args.spacegroup, L, XYZ, A, num_worker=args.num_io_process, filename=filename)
         print ("Wrote samples to %s"%filename)

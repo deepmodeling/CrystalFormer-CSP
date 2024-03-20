@@ -9,6 +9,22 @@ from wyckoff import mult_table, fc_mask_table
 
 
 def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
+    """
+    Args:
+      n_max: maximum number of atoms in the unit cell
+      atom_types: number of atom types
+      wyck_types: number of wyckoff types
+      Kx: number of von mises components for x, y, z
+      Kl: number of Guassian mixture components for lattice parameters
+      transformer: model
+      lamb_a: weight for atom type loss
+      lamb_w: weight for wyckoff position loss
+      lamb_l: weight for lattice parameter loss
+
+    Returns:
+      loss_fn: loss function
+      logp_fn: log probability function
+    """
     
     coord_types = 3*Kx
     lattice_mask = make_lattice_mask()
@@ -76,7 +92,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0,
 
         return loss_xyz + lamb_a* loss_a + lamb_w*loss_w + lamb_l*loss_l, (loss_w, loss_a, loss_xyz, loss_l)
         
-    return loss_fn
+    return loss_fn, logp_fn
 
 if __name__=='__main__':
     from utils import GLXYZAW_from_file
@@ -96,7 +112,7 @@ if __name__=='__main__':
 
     params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
  
-    loss_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
+    loss_fn, _ = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
     value = jax.jit(loss_fn, static_argnums=7)(params, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], True)
     print (value)

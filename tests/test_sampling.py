@@ -82,4 +82,4 @@ def test_sample_top_p():
     print (k)
 
 test_sample_top_p()
-#test_symops()
+test_symops()

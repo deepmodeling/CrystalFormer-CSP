@@ -7,7 +7,6 @@ from pymatgen.core import Structure, Lattice
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from functools import partial
 import multiprocessing
-import itertools
 import os
 
 from wyckoff import mult_table
@@ -15,14 +14,13 @@ from elements import element_list
 
 @jax.vmap
 def sort_atoms(W, A, X):
-    '''
+    """
     lex sort atoms according W, X, Y, Z
 
     W: (n, )
     A: (n, )
     X: (n, dim) int
-    '''
-
+    """
     W_temp = jnp.where(W>0, W, 9999) # change 0 to 9999 so they remain in the end after sort
 
     X -= jnp.floor(X)
@@ -34,21 +32,38 @@ def sort_atoms(W, A, X):
     return A, X
 
 def letter_to_number(letter):
-    '''
+    """
     'a' to 1 , 'b' to 2 , 'z' to 26, and 'A' to 27 
-    '''
+    """
     return ord(letter) - ord('a') + 1 if 'a' <= letter <= 'z' else 27 if letter == 'A' else None
 
 def shuffle(key, data):
-    '''
+    """
     shuffle data along batch dimension
-    '''
+    """
     G, L, XYZ, A, W = data
     idx = jax.random.permutation(key, jnp.arange(len(L)))
     return G[idx], L[idx], XYZ[idx], A[idx], W[idx]
     
 def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
+    """
     # taken from https://anonymous.4open.science/r/DiffCSP-PP-8F0D/diffcsp/common/data_utils.py
+    Process one cif string to get G, L, XYZ, A, W
+
+    Args:
+      cif: cif string
+      atom_types: number of atom types
+      wyck_types: number of wyckoff types
+      n_max: maximum number of atoms in the unit cell
+      tol: tolerance for pyxtal
+
+    Returns:
+      G: space group number
+      L: lattice parameters
+      XYZ: fractional coordinates
+      A: atom types
+      W: wyckoff letters
+    """
     crystal = Structure.from_str(cif, fmt='cif')
     spga = SpacegroupAnalyzer(crystal, symprec=tol)
     crystal = spga.get_refined_structure()
@@ -110,6 +125,24 @@ def process_one(cif, atom_types, wyck_types, n_max, tol=0.01):
     return g, l, fc, aa, ww 
 
 def GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, num_workers=1):
+    """
+    Read cif strings from csv file and convert them to G, L, XYZ, A, W
+    Note that cif strings must be in the column 'cif'
+
+    Args:
+      csv_file: csv file containing cif strings
+      atom_types: number of atom types
+      wyck_types: number of wyckoff types
+      n_max: maximum number of atoms in the unit cell
+      num_workers: number of workers for multiprocessing
+
+    Returns:
+      G: space group number
+      L: lattice parameters
+      XYZ: fractional coordinates
+      A: atom types
+      W: wyckoff letters
+    """
     data = pd.read_csv(csv_file)
     cif_strings = data['cif']
 
@@ -132,7 +165,18 @@ def GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, num_workers=1):
     return G, L, XYZ, A, W
 
 def GLXA_to_structure_single(G, L, X, A):
+    """
+    Convert G, L, X, A to pymatgen structure. Do not use this function due to the bug in pymatgen.
 
+    Args:
+      G: space group number
+      L: lattice parameters
+      X: fractional coordinates
+      A: atom types
+    
+    Returns:
+      structure: pymatgen structure
+    """
     lattice = Lattice.from_parameters(*L)
     # filter out padding atoms
     idx = np.where(A > 0)

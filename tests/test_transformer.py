@@ -1,6 +1,6 @@
 from config import * 
 
-from utils import GLXAW_from_file, to_A_W
+from utils import GLXYZAW_from_file
 from wyckoff import mult_table
 from transformer import make_transformer
 
@@ -14,10 +14,9 @@ def test_autoregressive():
     dim = 3
     dropout_rate = 0.0
 
-    csv_file = '../data/mini.csv'
-    G, L, X, AW = GLXAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
+    csv_file = os.path.join(datadir, 'mini.csv')
+    G, L, X, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max, dim)
         
-    A, W = jax.vmap(to_A_W, (0, None))(AW, atom_types)
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )
@@ -71,30 +70,4 @@ def test_perm():
     print (W)
     assert jnp.allclose(W, W[idx])
 
-def test_forward():
-
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G[:batchsize], X[:batchsize], A[:batchsize], W[:batchsize], M[:batchsize], False)
-    print ("outputs.shape", outputs.shape)
-
-    outputs = outputs.reshape(args.batchsize, args.n_max+1, 2, aw_types)
-    aw_logit = outputs[:, :, 0, :] # (batchsize, n_max+1, aw_types)
-    print ("aw_logit.shape", aw_logit.shape)
-
-    # sample given ground truth
-    key, key_aw = jax.random.split(key)
-    AW_sample = jax.random.categorical(key_aw, aw_logit, axis=-1) # (batchsize, n_max+1, )
-    A_sample, W_sample = jax.vmap(to_A_W, (0, None))(AW_sample, args.atom_types)
-    print ("A_sample\n", A_sample)
-    print ("W_sample\n", W_sample)
-
-    outputs = outputs.reshape(batchsize, args.n_max+1, 2, aw_types)[:, :, 1, :]
-    offset = args.Kx+2*args.Kx*args.dim 
-    l_logit, mu, sigma = jnp.split(outputs[jnp.arange(batchsize), num_sites[:batchsize], 
-                                                      offset:offset+args.Kl+2*6*args.Kl], 
-                                                      [args.Kl, args.Kl+6*args.Kl], axis=-1)
-    print (L[:batchsize])
-    print (jnp.exp(l_logit))
-    print (mu.reshape(batchsize, args.Kl, 6))
-    print (sigma.reshape(batchsize, args.Kl, 6))
-
-test_perm()
+test_autoregressive()
