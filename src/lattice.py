@@ -1,23 +1,29 @@
 import jax
-import jax.numpy as jnp 
-import haiku as hk 
+import jax.numpy as jnp
 
-def make_spacegroup_mask(spacegroup):
+def make_lattice_mask():
     '''
-    return mask for those independent lattice params
+    return mask for independent lattice params 
     '''
+    # 1-2
+    # 3-15 
+    # 16-74
+    # 75-142
+    # 143-194
+    # 195-230    
+    mask = [1, 1, 1, 1, 1, 1] * 2 +\
+           [1, 1, 1, 0, 1, 0] * 13+\
+           [1, 1, 1, 0, 0, 0] * 59+\
+           [1, 0, 1, 0, 0, 0] * 68+\
+           [1, 0, 1, 0, 0, 0] * 52+\
+           [1, 0, 0, 0, 0, 0] * 36
 
-    mask = jnp.array([1, 1, 1, 1, 1, 1])
+    return jnp.array(mask).reshape(230, 6)
 
-    mask = jnp.where(spacegroup <= 2,   mask, jnp.array([1, 1, 1, 0, 1, 0]))
-    mask = jnp.where(spacegroup <= 15,  mask, jnp.array([1, 1, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 74,  mask, jnp.array([1, 0, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 142, mask, jnp.array([1, 0, 1, 0, 0, 0]))
-    mask = jnp.where(spacegroup <= 194, mask, jnp.array([1, 0, 0, 0, 0, 0]))
-    
-    return mask
-
-def make_spacegroup_lattice(spacegroup, lattice):
+def symmetrize_lattice(spacegroup, lattice):
+    '''
+    place lattice params into lattice according to the space group 
+    '''
 
     a, b, c, alpha, beta, gamma = lattice
 
@@ -30,45 +36,16 @@ def make_spacegroup_lattice(spacegroup, lattice):
 
     return L
 
-class LatticeMLP(hk.Module):
-    def __init__(self, dim, hdim, name=None):
-        super().__init__(name=name)
-        self.dim = dim
-        self.hdim = hdim
-
-    def __call__(self, G):
-        '''
-        G: (230, ) a one hot encoder of the space group number, conditioned on it we will compute the lattice parameters 
-        '''
-        mlp = hk.Sequential([
-            hk.Linear(self.hdim), jax.nn.elu,
-            hk.Linear(self.hdim), jax.nn.elu,
-            hk.Linear(self.dim*2), jax.nn.softplus # lattice should be positive
-        ])
-        output = mlp(G) # note that we any way predict 6 outputs 
-        mu, sigma = jnp.split(output, 2)
-        return mu, sigma
-
-def make_lattice_mlp(rng, dim, hdim):
-
-    @hk.without_apply_rng
-    @hk.transform
-    def forward_fn(x):
-        return LatticeMLP(dim, hdim)(x)
-    params = forward_fn.init(rng, jnp.zeros((230, )))
-    return params, forward_fn.apply
-
 if __name__ == '__main__':
     
-    dim = 6 
-    hdim = 32 
+    mask = make_lattice_mask()
+    print (mask)
 
-    rng = jax.random.PRNGKey(42)
-    params, lattice_mlp = make_lattice_mlp(rng, dim, hdim)
-    
-    G = jnp.array([99])
-    G = jax.nn.one_hot(G-1, 230).reshape(230,)
-    print (G.shape)
+    key = jax.random.PRNGKey(42)
+    lattice = jax.random.normal(key, (6,))
+    lattice = lattice.reshape([1, 6]).repeat(3, axis=0)
 
-    print (lattice_mlp(params, G))
+    G = jnp.array([25, 99, 221])
+    L = jax.vmap(symmetrize_lattice)(G, lattice)
+    print (L)
 

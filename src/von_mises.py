@@ -1,4 +1,7 @@
-#https://github.com/pyro-ppl/numpyro/blob/master/numpyro/distributions/directional.py
+# https://github.com/pyro-ppl/numpyro/blob/master/numpyro/distributions/util.py
+# Copyright Contributors to the Pyro project.
+# SPDX-License-Identifier: Apache-2.0
+
 import jax
 from jax import jit, lax, random
 import jax.numpy as jnp
@@ -100,3 +103,11 @@ def von_mises_logpdf(x, loc, concentration):
     '''
     return -(jnp.log(2 * jnp.pi) + jnp.log(jax.scipy.special.i0e(concentration))
               ) + concentration * (jnp.cos((x - loc) % (2 * jnp.pi)) - 1)
+
+if __name__=='__main__':
+    key = jax.random.PRNGKey(42)
+    loc = jnp.array([-1.0, 1.0, 0.0])
+    kappa = jnp.array([10.0, 10.0, 100.0])
+    x = sample_von_mises(key, loc, kappa, (3, ))
+    print (x)
+

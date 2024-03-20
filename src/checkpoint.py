@@ -3,6 +3,19 @@ import os
 import re
 
 def find_ckpt_filename(path_or_file):
+    """
+    Find the latest checkpoint file in the given directory or the given file.
+    If path_or_file is a file, it should be a checkpoint file.
+    If path_or_file is a directory, it should contain checkpoint files.
+    Returns the filename of the latest checkpoint file and the epoch number.
+
+    Args:
+      path_or_file (str): The directory containing checkpoint files or a checkpoint file.
+    
+    Returns:
+      fname: The filename of the latest checkpoint file.
+      epoch: The epoch number of the latest checkpoint file.
+    """
     if os.path.isfile(path_or_file):
         epoch = int(re.search('epoch_([0-9]*).pkl', path_or_file).group(1))
         return path_or_file, epoch
