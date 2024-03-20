@@ -109,7 +109,7 @@ python ./src/main.py --folder ./data/ --train_path YOUR_PATH/mp_20/train.csv --v
 ### sample
 
 ```bash 
-python ./src/main.py --optimizer none --test_path YOUR_PATH/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 100  --batchsize 10000 --temperature 1.0 --use_foriloop
+python ./src/main.py --optimizer none --test_path YOUR_PATH/mp_20/test.csv --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 1000  --batchsize 1000 --temperature 1.0 --use_foriloop
 ```
 
 - `optimizer`: the optimizer to use, `none` means no training, only sampling  
@@ -135,11 +135,10 @@ python ./scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --nu
 
 Calculate the structure and composition validity of the generated structures:
 ```bash
-python ./scripts/compute_metrics.py --root_path /data/zdcao/crystal_gpt/dataset/mp_20/symm_data/ --filename out_structure.csv --output_path ./ --num_io_process 40
+python ./scripts/compute_metrics.py --root_path YOUR_PATH --filename YOUR_FILE --num_io_process 40
 ```
 - `root_path`: the path to the dataset
 - `filename`: the filename of the generated structures
-- `output_path`: the path to save the metrics results
 - `num_io_process`: the number of processes
   
 Calculate the novelty and uniqueness of the generated structures:

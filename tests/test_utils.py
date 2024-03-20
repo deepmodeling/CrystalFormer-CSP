@@ -1,6 +1,6 @@
 from config import *
 
-from utils import GLXYZAW_from_file, GLXA_to_csv
+from utils import GLXYZAW_from_file
 from wyckoff import mult_table
 
 def calc_n(G, W):
