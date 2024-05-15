@@ -72,10 +72,11 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             w_logit = w_logit[:, :wyck_types]
         
             key, subkey = jax.random.split(key)
-            w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0) 
+            if w_mask is not None:
+                w_logit = w_logit.at[:, w_mask[i]].set(w_logit[:, w_mask[i]] + 1e10)
             w = sample_top_p(subkey, w_logit, top_p, temperature)
             W = W.at[:, i].set(w)
-
+ 
             # (2) A
             h_al = inference(transformer, params, g, W, A, X, Y, Z)[:, 5*i+1] # (batchsize, output_size)
             a_logit = h_al[:, :atom_types]
@@ -155,7 +156,8 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
             w_logit = w_logit[:, :wyck_types]
         
             key, subkey = jax.random.split(key)
-            w_logit = w_logit + jnp.where(w_mask, 1e10, 0.0) 
+            if w_mask is not None:
+                w_logit = w_logit.at[:, w_mask[i]].set(w_logit[:, w_mask[i]] + 1e10)
             w = sample_top_p(subkey, w_logit, top_p, temperature)
         
             W = jnp.concatenate([W, w[:, None]], axis=1)

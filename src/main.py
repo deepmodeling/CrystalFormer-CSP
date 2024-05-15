@@ -99,12 +99,14 @@ else:
 
     if args.wyckoff is not None:
         idx = [letter_to_number(w) for w in args.wyckoff]
-        w_mask = [1]+[1 if w in idx else 0 for w in range(1, args.wyck_types)]
-        w_mask = jnp.array(w_mask)
+        # padding 0 until the length is args.n_max
+        w_mask = idx + [0]*(args.n_max -len(idx))
+        # w_mask = [1 if w in idx else 0 for w in range(1, args.wyck_types+1)]
+        w_mask = jnp.array(w_mask, dtype=int)
         print ('sampling structure formed by these Wyckoff positions:', args.wyckoff)
         print (w_mask)
     else:
-        w_mask = jnp.zeros((args.wyck_types), dtype=int)
+        w_mask = None
 
 ################### Model #############################
 params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
