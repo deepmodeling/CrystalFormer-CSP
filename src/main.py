@@ -66,6 +66,7 @@ group.add_argument('--elements', type=str, default=None, nargs='+', help='name o
 group.add_argument('--remove_radioactive', action='store_true', help='remove radioactive elements and noble gas')
 group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
 group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
+group.add_argument('--T1', type=float, default=None, help='temperature used for sampling the first atom type')
 group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 group.add_argument('--num_samples', type=int, default=1000, help='number of test samples')
 group.add_argument('--use_foriloop', action='store_true', help='use lax.fori_loop in sampling')
@@ -235,6 +236,11 @@ else:
 
     if args.seed is not None:
         key = jax.random.PRNGKey(args.seed) # reset key for sampling if seed is provided
+    
+    if args.T1 is not None:
+        T1 = args.T1
+    else:
+        T1 = args.temperature
 
     num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
@@ -245,7 +251,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_mask, atom_mask, args.top_p, args.temperature, args.use_foriloop)
+        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_mask, atom_mask, args.top_p, args.temperature, T1, args.use_foriloop)
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
