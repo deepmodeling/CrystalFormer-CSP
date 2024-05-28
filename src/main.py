@@ -92,23 +92,48 @@ else:
     test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
     
     if args.elements is not None:
-        idx = [element_dict[e] for e in args.elements]
-        atom_mask = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
-        atom_mask = jnp.array(atom_mask)
-        print ('sampling structure formed by these elements:', args.elements)
-        print (atom_mask)
+        # judge that if the input elements is a json file
+        if args.elements[0].endswith('.json'): 
+            import json
+            with open(args.elements[0], 'r') as f:
+                atoms_list = json.load(f)["atom_mask"]
+
+            assert len(atoms_list) == len(args.wyckoff)
+            print ('sampling structure formed by these elements:', atoms_list)
+            atom_mask = []
+            for elements in atoms_list:
+                idx = [element_dict[e] for e in elements]
+                atom_mask_ = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
+                atom_mask.append(atom_mask_)
+            
+            # padding 0 until the atom_mask shape is (args.n_max, args.atom_types)
+            atom_mask = jnp.array(atom_mask)
+            atom_mask = jnp.pad(atom_mask, ((0, args.n_max-atom_mask.shape[0]), (0, 0)), mode='constant')
+            print(atom_mask)
+        else:
+            idx = [element_dict[e] for e in args.elements]
+            atom_mask = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
+            atom_mask = jnp.array(atom_mask)
+            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+            print ('sampling structure formed by these elements:', args.elements)
+            print (atom_mask)
+
     else:
         if args.remove_radioactive:
             from elements import radioactive_elements_dict, noble_gas_dict
             # remove radioactive elements and noble gas
             atom_mask = [1] + [1 if i not in radioactive_elements_dict.values() and i not in noble_gas_dict.values() else 0 for i in range(1, args.atom_types)]
             atom_mask = jnp.array(atom_mask)
+            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
             print('sampling structure formed by non-radioactive elements and non-noble gas')
             print(atom_mask)
             
         else:
             atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
-    print(f'there is total {jnp.sum(atom_mask)-1} elements')
+            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+            print(atom_mask)
+    # print(f'there is total {jnp.sum(atom_mask)-1} elements')
+    print(atom_mask.shape)      
 
     if args.wyckoff is not None:
         idx = [letter_to_number(w) for w in args.wyckoff]
