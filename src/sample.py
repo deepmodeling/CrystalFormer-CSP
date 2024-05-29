@@ -59,8 +59,8 @@ def sample_x(key, h_x, Kx, top_p, temperature, batchsize):
     x = (x+ jnp.pi)/(2.0*jnp.pi) # wrap into [0, 1]
     return key, x 
 
-@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 12, 14, 15))
-def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_types, Kx, Kl, g, w_mask, atom_mask, top_p, temperature, T1, use_foriloop):
+@partial(jax.jit, static_argnums=(1, 3, 4, 5, 6, 7, 8, 9, 12, 14, 16))
+def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_types, Kx, Kl, g, w_mask, atom_mask, top_p, temperature, T1, constraints, use_foriloop):
 
     if use_foriloop: 
        
@@ -87,7 +87,11 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
                                  true_fun=lambda x: jnp.array(T1, dtype=float),
                                  false_fun=lambda x: temperature,
                                  operand=None)
-            a = sample_top_p(subkey, a_logit, top_p, _temp)  # use T1 for the first atom type
+            _a = sample_top_p(subkey, a_logit, top_p, _temp)  # use T1 for the first atom type
+            a = jax.lax.cond(constraints[i] < i,
+                             lambda x, y: y,
+                             lambda x, y: x,
+                             _a, A[:, constraints[i]])
             A = A.at[:, i].set(a)
         
             lattice_params = h_al[:, atom_types:atom_types+Kl+2*6*Kl]

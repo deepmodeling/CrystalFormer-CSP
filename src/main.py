@@ -91,12 +91,22 @@ else:
     assert (args.spacegroup is not None) # for inference we need to specify space group
     test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
     
+    # jnp.set_printoptions(threshold=jnp.inf)  # print full array 
+    constraints = jnp.arange(0, args.n_max, 1)
+
     if args.elements is not None:
         # judge that if the input elements is a json file
         if args.elements[0].endswith('.json'): 
             import json
             with open(args.elements[0], 'r') as f:
-                atoms_list = json.load(f)["atom_mask"]
+                _data = json.load(f)
+                atoms_list = _data["atom_mask"]
+                _constraints = _data["constraints"]
+            print(_constraints)
+
+            for old_val, new_val in _constraints:
+                constraints = jnp.where(constraints == new_val, constraints[old_val], constraints)  # update constraints
+            print(constraints)
 
             assert len(atoms_list) == len(args.wyckoff)
             print ('sampling structure formed by these elements:', atoms_list)
@@ -276,7 +286,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_mask, atom_mask, args.top_p, args.temperature, T1, args.use_foriloop)
+        XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_mask, atom_mask, args.top_p, args.temperature, T1, constraints, args.use_foriloop)
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
