@@ -2,6 +2,10 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
+from wyckoff import fc_mask_table
+
+get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
+
 
 @partial(jax.jit, static_argnums=0)
 def mcmc(logp_fn, params, x_init, key, mc_steps, mc_width):
@@ -22,11 +26,14 @@ def mcmc(logp_fn, params, x_init, key, mc_steps, mc_width):
     def step(i, state):
         x, logp, key, num_accepts = state
         G, L, XYZ, A, W = x
-        key, key_proposal, key_accept, key_logp = jax.random.split(key, 4)
+        key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
         
-        # x_proposal = x + mc_width * jax.random.normal(key_proposal, x.shape)
-        A_proposal = A
-        XYZ_proposal = XYZ          #TODO: do not change, just for testing
+        _A = jax.random.choice(key_proposal_A, jnp.arange(1, 118), shape=A.shape)
+        A_proposal = jnp.where(A == 0, A, _A)
+
+        fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
+        _XYZ = XYZ + mc_width * jax.random.normal(key_proposal_XYZ, XYZ.shape) # TODO: von-mises 
+        XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
         x_proposal = (G, L, XYZ_proposal, A_proposal, W)
 
         logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
@@ -45,8 +52,10 @@ def mcmc(logp_fn, params, x_init, key, mc_steps, mc_width):
     key, subkey = jax.random.split(key)
     logp_w, logp_xyz, logp_a, _ = logp_fn(params, subkey, *x_init, False)
     logp_init = logp_w + logp_xyz + logp_a
+    # print("logp_init", logp_init)
     
     x, logp, key, num_accepts = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0.))
+    # print("logp", logp)
     accept_rate = num_accepts / (mc_steps * x[0].shape[0])
     return x, accept_rate
 
@@ -73,13 +82,13 @@ if __name__  == "__main__":
     loss_fn, logp_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
 
     # MCMC sampling test
-    mc_steps = 2
+    mc_steps = 200
     mc_width = 0.1
-    x_init = (G[:1], L[:1], XYZ[:1], A[:1], W[:1])
+    x_init = (G[:5], L[:5], XYZ[:5], A[:5], W[:5])
 
     value = jax.jit(logp_fn, static_argnums=7)(params, key, *x_init, False)
 
-    key, subkey = jax.random.split(key)
-    x, acc = mcmc(logp_fn, params, x_init=x_init, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
-    print(x_init)
-    print(x)
+    for i in range(5):
+        key, subkey = jax.random.split(key)
+        x, acc = mcmc(logp_fn, params, x_init=x_init, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
+        print(i, acc)
