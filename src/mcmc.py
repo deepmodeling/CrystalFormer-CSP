@@ -4,60 +4,75 @@ from functools import partial
 
 from wyckoff import fc_mask_table
 
+
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
 
+def make_mcmc_step(params, n_max, atom_mask=None):
 
-@partial(jax.jit, static_argnums=0)
-def mcmc(logp_fn, params, x_init, key, mc_steps, mc_width):
-    """
-        Markov Chain Monte Carlo sampling algorithm.
+    if atom_mask is None:
+        atom_mask = jnp.arange(1, 119)  # do not consider the padding atom type
+        # stack it to n_max
+        atom_mask = jnp.stack([atom_mask] * n_max, axis=0)
 
-    INPUT:
-        logp_fn: callable that evaluate log-probability of a batch of configuration x.
-            The signature is logp_fn(x), where x has shape (batch, n, dim).
-        x_init: initial value of x, with shape (batch, n, dim).
-        key: initial PRNG key.
-        mc_steps: total number of Monte Carlo steps.
-        mc_width: size of the Monte Carlo proposal.
+    else:
+        raise NotImplementedError  # TODO: transform atom_mask
 
-    OUTPUT:
-        x: resulting batch samples, with the same shape as `x_init`.
-    """
-    def step(i, state):
-        x, logp, key, num_accepts = state
-        G, L, XYZ, A, W = x
-        key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
+    @partial(jax.jit, static_argnums=0)
+    def mcmc(logp_fn, x_init, key, mc_steps, mc_width):
+        """
+            Markov Chain Monte Carlo sampling algorithm.
+
+        INPUT:
+            logp_fn: callable that evaluate log-probability of a batch of configuration x.
+                The signature is logp_fn(x), where x has shape (batch, n, dim).
+            x_init: initial value of x, with shape (batch, n, dim).
+            key: initial PRNG key.
+            mc_steps: total number of Monte Carlo steps.
+            mc_width: size of the Monte Carlo proposal.
+
+        OUTPUT:
+            x: resulting batch samples, with the same shape as `x_init`.
+        """
+        def step(i, state):
+            x, logp, key, num_accepts = state
+            G, L, XYZ, A, W = x
+            key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
+            
+            _a = jax.random.choice(key_proposal_A, atom_mask[i%n_max], shape=(A.shape[0], )) 
+            _A = A.at[:, i%n_max].set(_a)
+            A_proposal = jnp.where(A == 0, A, _A)
+
+            fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
+            _xyz = XYZ[:, i%n_max] + mc_width * jax.random.normal(key_proposal_XYZ, XYZ[:, i%n_max].shape) 
+            _XYZ = XYZ.at[:, i%n_max].set(_xyz)
+            _XYZ -= jnp.floor(_XYZ)   # wrap to [0, 1)
+            XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
+            x_proposal = (G, L, XYZ_proposal, A_proposal, W)
+
+            logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
+            logp_proposal = logp_w + logp_xyz + logp_a
+
+            ratio = jnp.exp((logp_proposal - logp))
+            accept = jax.random.uniform(key_accept, ratio.shape) < ratio
+
+            A_new = jnp.where(accept[:, None], A_proposal, A)  # update atom types
+            XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
+            x_new = (G, L, XYZ_new, A_new, W)
+            logp_new = jnp.where(accept, logp_proposal, logp)
+            num_accepts += accept.sum()
+            return x_new, logp_new, key, num_accepts
         
-        _A = jax.random.choice(key_proposal_A, jnp.arange(1, 118), shape=A.shape)
-        A_proposal = jnp.where(A == 0, A, _A)
-
-        fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
-        _XYZ = XYZ + mc_width * jax.random.normal(key_proposal_XYZ, XYZ.shape) # TODO: von-mises 
-        XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
-        x_proposal = (G, L, XYZ_proposal, A_proposal, W)
-
-        logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
-        logp_proposal = logp_w + logp_xyz + logp_a
-
-        ratio = jnp.exp((logp_proposal - logp))
-        accept = jax.random.uniform(key_accept, ratio.shape) < ratio
-
-        A_new = jnp.where(accept[:, None], A_proposal, A)  # update atom types
-        XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
-        x_new = (G, L, XYZ_new, A_new, W)
-        logp_new = jnp.where(accept, logp_proposal, logp)
-        num_accepts += accept.sum()
-        return x_new, logp_new, key, num_accepts
+        key, subkey = jax.random.split(key)
+        logp_w, logp_xyz, logp_a, _ = logp_fn(params, subkey, *x_init, False)
+        logp_init = logp_w + logp_xyz + logp_a
+        # print("logp_init", logp_init)
+        
+        x, logp, key, num_accepts = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0.))
+        # print("logp", logp)
+        accept_rate = num_accepts / (mc_steps * x[0].shape[0])
+        return x, accept_rate
     
-    key, subkey = jax.random.split(key)
-    logp_w, logp_xyz, logp_a, _ = logp_fn(params, subkey, *x_init, False)
-    logp_init = logp_w + logp_xyz + logp_a
-    # print("logp_init", logp_init)
-    
-    x, logp, key, num_accepts = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0.))
-    # print("logp", logp)
-    accept_rate = num_accepts / (mc_steps * x[0].shape[0])
-    return x, accept_rate
+    return mcmc
 
 
 if __name__  == "__main__":
@@ -82,13 +97,24 @@ if __name__  == "__main__":
     loss_fn, logp_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
 
     # MCMC sampling test
-    mc_steps = 200
+    mc_steps = 21
     mc_width = 0.1
     x_init = (G[:5], L[:5], XYZ[:5], A[:5], W[:5])
 
     value = jax.jit(logp_fn, static_argnums=7)(params, key, *x_init, False)
 
+    jnp.set_printoptions(threshold=jnp.inf)
+    mcmc = make_mcmc_step(params, n_max=n_max)
+
     for i in range(5):
         key, subkey = jax.random.split(key)
-        x, acc = mcmc(logp_fn, params, x_init=x_init, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
+        x, acc = mcmc(logp_fn, x_init=x_init, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
         print(i, acc)
+
+    print("check if the atom type is changed")
+    print(x_init[3])
+    print(x[3])
+
+    print("check if the atom position is changed")
+    print(x_init[2])
+    print(x[2])
