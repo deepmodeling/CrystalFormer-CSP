@@ -278,3 +278,44 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
                            axis=-1)
 
     return XYZ, A, W, M, L
+
+
+def make_update_lattice(transformer, params, atom_types, Kl, top_p, temperature):
+
+    @jax.jit
+    def update_lattice(key, G, XYZ, A, W):
+
+        num_sites = jnp.sum(A!=0, axis=1) # (batchsize, )
+        M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
+        #num_atoms = jnp.sum(M)
+        batchsize = XYZ.shape[0]
+
+        h = jax.vmap(transformer, in_axes=(None, None, 0, 0, 0, 0, 0, None))(params, key, G, XYZ, A, W, M, False)
+
+        l_logit, mu, sigma = jax.vmap(lambda h, num_site: jnp.split(h[1::5][num_site,
+                                                                    atom_types:atom_types+Kl+2*6*Kl], [Kl, Kl+Kl*6], axis=-1),
+                                        in_axes=(0, 0))(h, num_sites)
+        
+        key, key_k, key_l = jax.random.split(key, 3)
+        # k is (batchsize, ) integer array whose value in [0, Kl) 
+        k = sample_top_p(key_k, l_logit, top_p, temperature)
+
+        mu = mu.reshape(batchsize, Kl, 6)
+        mu = mu[jnp.arange(batchsize), k]       # (batchsize, 6)
+        sigma = sigma.reshape(batchsize, Kl, 6)
+        sigma = sigma[jnp.arange(batchsize), k] # (batchsize, 6)
+        L = jax.random.normal(key_l, (batchsize, 6)) * sigma*jnp.sqrt(temperature) + mu # (batchsize, 6)
+        
+        num_atoms = jnp.sum(M, axis=1)
+        #scale length according to atom number since we did reverse of that when loading data
+        length, angle = jnp.split(L, 2, axis=-1)
+        length = length*num_atoms[:, None]**(1/3)
+        angle = angle * (180.0 / jnp.pi) # to deg
+        L = jnp.concatenate([length, angle], axis=-1)
+
+        #impose space group constraint to lattice params
+        L = jax.vmap(symmetrize_lattice, (0, 0))(G, L)  
+
+        return L
+
+    return update_lattice
