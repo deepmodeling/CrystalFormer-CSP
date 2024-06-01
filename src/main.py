@@ -74,8 +74,7 @@ group.add_argument('--output_filename', type=str, default='output.csv', help='ou
 
 group = parser.add_argument_group('MCMC parameters')
 group.add_argument('--mcmc', action='store_true', help='use MCMC to sample')
-group.add_argument('--iterations', type=int, default=5, help='number of MCMC iterations')
-group.add_argument('--mc_steps', type=int, default=200, help='number of MCMC steps')
+group.add_argument('--nsweeps', type=int, default=10, help='number of sweeps')
 group.add_argument('--mc_width', type=float, default=0.1, help='width of MCMC step')
 
 args = parser.parse_args()
@@ -283,6 +282,8 @@ else:
     else:
         T1 = args.temperature
 
+    mc_steps = args.nsweeps * args.n_max
+    print("mc_steps", mc_steps)
     mcmc = make_mcmc_step(params, n_max=args.n_max, atom_types=args.atom_types, atom_mask=atom_mask)
     update_lattice = make_update_lattice(transformer, params, args.atom_types, args.Kl, args.top_p, args.temperature)
 
@@ -296,28 +297,17 @@ else:
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
         XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, args.spacegroup, w_mask, atom_mask, args.top_p, args.temperature, T1, constraints)
-        
-        # print ("XYZ:\n", XYZ)  # fractional coordinate 
-        # print ("A:\n", A)  # element type
-        # print ("W:\n", W)  # Wyckoff positions
-        # print ("M:\n", M)  # multiplicity 
-        # print ("N:\n", M.sum(axis=-1)) # total number of atoms
-        # print ("L:\n", L)  # lattice
-        # for a in A:
-        #    print([element_list[i] for i in a])
 
         G = args.spacegroup * jnp.ones((n_sample), dtype=int)
-        
         if args.mcmc:
-            x_init = (G, L, XYZ, A, W)
-            for i in range(args.iterations):
-                key, subkey = jax.random.split(key)
-                x, acc = mcmc(logp_fn, x_init=x_init, key=subkey, mc_steps=args.mc_steps, mc_width=args.mc_width)
-                print("acc", i, acc)
+            x = (G, L, XYZ, A, W)
+            key, subkey = jax.random.split(key)
+            x, acc = mcmc(logp_fn, x_init=x, key=subkey, mc_steps=mc_steps, mc_width=args.mc_width)
+            print("acc", acc)
 
             G, L, XYZ, A, W = x
             key, subkey = jax.random.split(key)
-            L = update_lattice(key, G, XYZ, A, W)
+            L = update_lattice(subkey, G, XYZ, A, W)
         
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
