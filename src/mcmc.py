@@ -3,14 +3,29 @@ import jax.numpy as jnp
 from functools import partial
 
 from wyckoff import fc_mask_table
+from von_mises import sample_von_mises
 
 
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
 
-def make_mcmc_step(params, n_max, atom_types, atom_mask=None):
+def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
 
     if atom_mask is None or jnp.all(atom_mask == 0):
         atom_mask = jnp.ones((n_max, atom_types))
+
+    if constraints is None:
+        constraints = jnp.arange(0, n_max, 1)
+
+    def update_A(i, A, a, constraints):
+        def body_fn(j, A):
+            A = jax.lax.cond(constraints[j] == constraints[i],
+                            lambda _: A.at[:, j].set(a),
+                            lambda _: A,
+                            None)
+            return A
+
+        A = jax.lax.fori_loop(0, A.shape[1], body_fn, A)
+        return A
 
     @partial(jax.jit, static_argnums=0)
     def mcmc(logp_fn, x_init, key, mc_steps, mc_width):
@@ -33,12 +48,14 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None):
             G, L, XYZ, A, W = x
             key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
             
-            _a = jax.random.choice(key_proposal_A, a=atom_types, p=atom_mask[i%n_max], shape=(A.shape[0], )) 
-            _A = A.at[:, i%n_max].set(_a)
+            p_normalized = atom_mask[i%n_max] / jnp.sum(atom_mask[i%n_max])  # only propose atom types that are allowed
+            _a = jax.random.choice(key_proposal_A, a=atom_types, p=p_normalized, shape=(A.shape[0], )) 
+            # _A = A.at[:, i%n_max].set(_a)
+            _A = update_A(i%n_max, A, _a, constraints)
             A_proposal = jnp.where(A == 0, A, _A)
 
             fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
-            _xyz = XYZ[:, i%n_max] + mc_width * jax.random.normal(key_proposal_XYZ, XYZ[:, i%n_max].shape) 
+            _xyz = XYZ[:, i%n_max] + sample_von_mises(key_proposal_XYZ, 0, 1/mc_width**2, XYZ[:, i%n_max].shape)
             _XYZ = XYZ.at[:, i%n_max].set(_xyz)
             _XYZ -= jnp.floor(_XYZ)   # wrap to [0, 1)
             XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
