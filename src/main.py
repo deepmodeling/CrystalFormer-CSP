@@ -111,7 +111,7 @@ else:
 
             for old_val, new_val in _constraints:
                 constraints = jnp.where(constraints == new_val, constraints[old_val], constraints)  # update constraints
-            print(constraints)
+            print("constraints", constraints)
 
             assert len(atoms_list) == len(args.wyckoff)
             print ('sampling structure formed by these elements:', atoms_list)
@@ -284,7 +284,7 @@ else:
 
     mc_steps = args.nsweeps * args.n_max
     print("mc_steps", mc_steps)
-    mcmc = make_mcmc_step(params, n_max=args.n_max, atom_types=args.atom_types, atom_mask=atom_mask)
+    mcmc = make_mcmc_step(params, n_max=args.n_max, atom_types=args.atom_types, atom_mask=atom_mask, constraints=constraints)
     update_lattice = make_update_lattice(transformer, params, args.atom_types, args.Kl, args.top_p, args.temperature)
 
     num_batches = math.ceil(args.num_samples / args.batchsize)

@@ -44,36 +44,50 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
             x: resulting batch samples, with the same shape as `x_init`.
         """
         def step(i, state):
-            x, logp, key, num_accepts = state
-            G, L, XYZ, A, W = x
-            key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
+
+            def true_func(i, state):
+                x, logp, key, num_accepts = state
+                G, L, XYZ, A, W = x
+                key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
+                
+                p_normalized = atom_mask[i%n_max] / jnp.sum(atom_mask[i%n_max])  # only propose atom types that are allowed
+                _a = jax.random.choice(key_proposal_A, a=atom_types, p=p_normalized, shape=(A.shape[0], )) 
+                # _A = A.at[:, i%n_max].set(_a)
+                _A = update_A(i%n_max, A, _a, constraints)
+                A_proposal = jnp.where(A == 0, A, _A)
+
+                fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
+                _xyz = XYZ[:, i%n_max] + sample_von_mises(key_proposal_XYZ, 0, 1/mc_width**2, XYZ[:, i%n_max].shape)
+                _XYZ = XYZ.at[:, i%n_max].set(_xyz)
+                _XYZ -= jnp.floor(_XYZ)   # wrap to [0, 1)
+                XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
+                x_proposal = (G, L, XYZ_proposal, A_proposal, W)
+
+                logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
+                logp_proposal = logp_w + logp_xyz + logp_a
+
+                ratio = jnp.exp((logp_proposal - logp))
+                accept = jax.random.uniform(key_accept, ratio.shape) < ratio
+
+                A_new = jnp.where(accept[:, None], A_proposal, A)  # update atom types
+                XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
+                x_new = (G, L, XYZ_new, A_new, W)
+                logp_new = jnp.where(accept, logp_proposal, logp)
+                num_accepts += accept.sum()   
+                return x_new, logp_new, key, num_accepts
+
+            def false_func(i, state):
+                x, logp, key, num_accepts = state
+                return x, logp, key, num_accepts
             
-            p_normalized = atom_mask[i%n_max] / jnp.sum(atom_mask[i%n_max])  # only propose atom types that are allowed
-            _a = jax.random.choice(key_proposal_A, a=atom_types, p=p_normalized, shape=(A.shape[0], )) 
-            # _A = A.at[:, i%n_max].set(_a)
-            _A = update_A(i%n_max, A, _a, constraints)
-            A_proposal = jnp.where(A == 0, A, _A)
+            x, logp, key, num_accepts = state
+            A = x[3]
+            x, logp, key, num_accepts = jax.lax.cond(A[:, i%n_max].sum() != 0,
+                                                     lambda _: true_func(i, state),
+                                                     lambda _: false_func(i, state),
+                                                     None)
+            return x, logp, key, num_accepts
 
-            fc_mask = jax.vmap(get_fc_mask, in_axes=(0, 0))(G, W)
-            _xyz = XYZ[:, i%n_max] + sample_von_mises(key_proposal_XYZ, 0, 1/mc_width**2, XYZ[:, i%n_max].shape)
-            _XYZ = XYZ.at[:, i%n_max].set(_xyz)
-            _XYZ -= jnp.floor(_XYZ)   # wrap to [0, 1)
-            XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
-            x_proposal = (G, L, XYZ_proposal, A_proposal, W)
-
-            logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
-            logp_proposal = logp_w + logp_xyz + logp_a
-
-            ratio = jnp.exp((logp_proposal - logp))
-            accept = jax.random.uniform(key_accept, ratio.shape) < ratio
-
-            A_new = jnp.where(accept[:, None], A_proposal, A)  # update atom types
-            XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
-            x_new = (G, L, XYZ_new, A_new, W)
-            logp_new = jnp.where(accept, logp_proposal, logp)
-            num_accepts += accept.sum()
-            return x_new, logp_new, key, num_accepts
-        
         key, subkey = jax.random.split(key)
         logp_w, logp_xyz, logp_a, _ = logp_fn(params, subkey, *x_init, False)
         logp_init = logp_w + logp_xyz + logp_a
@@ -81,7 +95,9 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
         
         x, logp, key, num_accepts = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0.))
         # print("logp", logp)
-        accept_rate = num_accepts / (mc_steps * x[0].shape[0])
+        A = x[3]
+        scale = jnp.sum(A != 0)/(A.shape[0]*n_max)
+        accept_rate = num_accepts / (scale * mc_steps * x[0].shape[0])
         return x, accept_rate
     
     return mcmc
