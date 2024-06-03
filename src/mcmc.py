@@ -73,7 +73,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
                 XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
                 x_new = (G, L, XYZ_new, A_new, W)
                 logp_new = jnp.where(accept, logp_proposal, logp)
-                num_accepts += accept.sum()   
+                num_accepts += jnp.sum(accept*jnp.where(A[:, i%n_max]==0, 0, 1))
                 return x_new, logp_new, key, num_accepts
 
             def false_func(i, state):
