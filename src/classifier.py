@@ -25,11 +25,17 @@ def make_classifier(key,
         h : (sequence_length, ouputs_size)
         """
         h = jnp.mean(h, axis=-2) 
-        h = hk.nets.MLP([*hidden_sizes, num_classes],
-                        activation=jax.nn.relu,
-                        w_init=hk.initializers.TruncatedNormal(stddev=0.01),
-                        b_init=jnp.zeros
-                        )(h)
+
+        h = hk.Linear(hidden_sizes[0])(h)
+        h = jax.nn.relu(h)
+
+        for hidden_size in hidden_sizes[1: -1]:
+            h = jax.nn.relu(hk.Linear(hidden_size)(h)) + h
+
+        h = hk.Linear(hidden_sizes[-1])(h)
+        h = jax.nn.relu(h)
+        h = hk.Linear(num_classes)(h)
+    
         return h
         
     h = jnp.zeros((sequence_length, ouputs_size))
@@ -269,7 +275,8 @@ if __name__  == "__main__":
         hidden_sizes = [128, 128, 64]
         num_classes = 7
         restore_path = "/data/zdcao/crystal_gpt/classifier/"
-        lr = 1e-3
+        lr = 1e-4
+        lr_decay = 1e-5
         epochs = 1000
         batchsize = 1000
 
@@ -307,7 +314,8 @@ if __name__  == "__main__":
         else:
             print("No checkpoint file found. Start from scratch.")
 
-        optimizer = optax.adam(lr)
+        schedule = lambda t: lr/(1+lr_decay*t)
+        optimizer = optax.adam(learning_rate=schedule)
         opt_state = optimizer.init(params)
 
         print("\n========== Start training ==========")
