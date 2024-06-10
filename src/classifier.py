@@ -15,7 +15,7 @@ from transformer import _layer_norm
 
 def make_classifier(key,
                     sequence_length=105,
-                    ouputs_size=171,
+                    ouputs_size=64,
                     hidden_sizes=[128, 128],
                     num_classes=2):
 
@@ -24,14 +24,12 @@ def make_classifier(key,
         """
         h : (sequence_length, ouputs_size)
         """
-        h = _layer_norm(h)
+        h = jnp.mean(h, axis=-2) 
         h = hk.nets.MLP([*hidden_sizes, num_classes],
                         activation=jax.nn.relu,
                         w_init=hk.initializers.TruncatedNormal(stddev=0.01),
                         b_init=jnp.zeros
                         )(h)
-        h = jnp.mean(h, axis=-2) # (sequence_length, num_classes) -> (num_classes)
-        h = jax.nn.softmax(h)
         return h
         
     h = jnp.zeros((sequence_length, ouputs_size))
@@ -120,7 +118,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
 
         train_loss = train_loss / num_batches
 
-        if epoch % 1 == 0:
+        if epoch % 10 == 0:
             valid_inputs, valid_targets = valid_data 
             valid_loss = 0.0 
             valid_accuracy = 0.0
@@ -165,7 +163,7 @@ if __name__  == "__main__":
     from transformer import make_transformer  
     from wyckoff import mult_table
 
-    def get_inputs(key, batchsize, train_data, params, transformer):
+    def get_inputs(key, batchsize, train_data, params, state, transformer):
 
         train_G, train_L, train_X, train_A, train_W = train_data 
         num_samples = len(train_L)
@@ -185,12 +183,13 @@ if __name__  == "__main__":
 
             key, subkey = jax.random.split(key)
 
-            h = jax.vmap(transformer, in_axes=(None, None, 0, 0, 0, 0, 0, None))(params, subkey, G, XYZ, A, W, M, False)
+            h, state = jax.vmap(transformer, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))(params, state, subkey, G, XYZ, A, W, M, False)
 
+            last_hidden_state = state['~']['last_hidden_state']
             if batch_idx == 0:
-                train_inputs = h
+                train_inputs = last_hidden_state
             else:
-                train_inputs = jnp.concatenate((train_inputs, h), axis=0)
+                train_inputs = jnp.concatenate([train_inputs, last_hidden_state], axis=0)
 
         # save the train_inputs
         print(train_inputs.shape)
@@ -226,12 +225,12 @@ if __name__  == "__main__":
         valid_data = GLXYZAW_from_file(valid_path, atom_types, wyck_types, n_max, num_io_process)
 
 
-        params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
-                                            h0_size, 
-                                            transformer_layers, num_heads, 
-                                            key_size, model_size, embed_size, 
-                                            atom_types, wyck_types,
-                                            dropout_rate)
+        params, state, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
+                                                      h0_size, 
+                                                      transformer_layers, num_heads, 
+                                                      key_size, model_size, embed_size, 
+                                                      atom_types, wyck_types,
+                                                      dropout_rate)
 
         print("\n========== Load checkpoint==========")
         ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path) 
@@ -244,34 +243,34 @@ if __name__  == "__main__":
 
         
         key, subkey = jax.random.split(key)
-        train_inputs = get_inputs(subkey, batchsize, train_data, params, transformer)
+        train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
         train_targets = get_labels(train_path, 'band_gap',
                                    upper_bound=6.5,
                                    lower_bound=-0.5,
                                    interval=1)
-        _, _, _, _, train_W = train_data
-        jnp.savez("train_data.npz", w=train_W, inputs=train_inputs, targets=train_targets)
+        # _, _, _, _, train_W = train_data
+        jnp.savez("train_data.npz", inputs=train_inputs, targets=train_targets)
 
         key, subkey = jax.random.split(key)
-        valid_inputs = get_inputs(subkey, batchsize, valid_data, params, transformer)
+        valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
         valid_targets = get_labels(valid_path, 'band_gap',
                                    upper_bound=6.5,
                                    lower_bound=-0.5,
                                    interval=1)
-        _, _, _, _, valid_W = valid_data
-        jnp.savez("valid_data.npz", w=valid_W, inputs=valid_inputs, targets=valid_targets)
+        # _, _, _, _, valid_W = valid_data
+        jnp.savez("valid_data.npz", inputs=valid_inputs, targets=valid_targets)
 
     elif mode == "train":
         
-        train_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/train_data.npz'
-        valid_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/valid_data.npz'
+        train_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/last_hidden_state/train_data.npz'
+        valid_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/last_hidden_state/valid_data.npz'
         sequence_length = 105
-        outputs_size = 171
-        hidden_sizes = [128, 128]
+        outputs_size = 64
+        hidden_sizes = [128, 128, 64]
         num_classes = 7
         restore_path = "/data/zdcao/crystal_gpt/classifier/"
         lr = 1e-3
-        epochs = 11
+        epochs = 1000
         batchsize = 1000
 
         data = jnp.load(train_path)

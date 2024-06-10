@@ -23,7 +23,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
         h_x = jnp.concatenate([x_logit, x_loc, x_kappa, jnp.zeros((n, output_size - coord_types))], axis=-1)  
         return h_x
 
-    @hk.transform
+    @hk.transform_with_state
     def network(G, XYZ, A, W, M, is_train):
         '''
         Args:
@@ -148,6 +148,9 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
             h = h + h_dense
 
         h = _layer_norm(h)
+        last_hidden_state = hk.get_state("last_hidden_state", shape=h.shape, dtype=float, init=jnp.ones)
+        hk.set_state("last_hidden_state", h)
+
         h = hk.Linear(output_size, w_init=initializer)(h) # (5*n, output_size)
         
         h = h.reshape(n, 5, -1)
@@ -232,8 +235,8 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
     W = jnp.zeros((n_max, ), dtype=int) 
     M = jnp.zeros((n_max, ), dtype=int) 
 
-    params = network.init(key, G, XYZ, A, W, M, True)
-    return params, network.apply
+    params, state = network.init(key, G, XYZ, A, W, M, True)
+    return params, state, network.apply
 
 def _layer_norm(x: jax.Array) -> jax.Array:
     """Applies a unique LayerNorm to `x` with default settings."""
