@@ -54,48 +54,26 @@ def make_classifier(key,
 
 def make_classifier_loss(classifier):
 
-    @partial(jax.vmap, in_axes=(None, None, 0, 0))
-    def logp_fn(params, key, w, h):
-        logits = classifier(params, key, w, h)
-        return jax.nn.log_softmax(logits)
-
-    def loss(params, key, w, h, y):
-        logp = logp_fn(params, key, w, h)
-        return -jnp.mean(jnp.sum(logp * y, axis=-1))
-
     @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
-    def accuracy_fn(params, key, w, h, y):
-        logits = classifier(params, key, w, h)
-        return jnp.argmax(logits, axis=-1) == jnp.argmax(y, axis=-1)
+    def mae_loss(params, key, w, h, labels):
+        y = classifier(params, key, w, h)
+        return jnp.abs(y - labels)
     
-    return logp_fn, loss, accuracy_fn
+    def loss_fn(params, key, w, h, labels):
+        loss = jnp.mean(mae_loss(params, key, w, h, labels))
+        return loss
+    
+    return loss_fn
 
 
-def get_labels(csv_file, label_col, upper_bound, lower_bound, interval):
+def get_labels(csv_file, label_col):
     data = pd.read_csv(csv_file)
-
-    # when band_gap exceeds the upper bound, set it to upper bound
-    # when band_gap is lower than the lower bound, set it to lower bound
-    data.loc[data[label_col] > upper_bound, label_col] = upper_bound
-    data.loc[data[label_col] < lower_bound, label_col] = lower_bound
-
-    outputs = pd.cut(data['band_gap'],
-                     bins=np.arange(lower_bound, upper_bound+interval, interval),
-                     include_lowest=True)
-
-    # transform the outputs into one-hot encoding
-    outputs = pd.get_dummies(outputs)
-
-    # convert to numpy 0/1 array
-    outputs = outputs.to_numpy()
-    outputs = outputs.astype(np.float32)
-
-    outputs = jnp.array(outputs)
-
-    return outputs
+    labels = data[label_col].values
+    labels = jnp.array(labels, dtype=float)
+    return labels
 
 
-def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path, accuracy_fn):
+def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
            
     @jax.jit
     def update(params, key, opt_state, data):
@@ -110,7 +88,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch t_loss v_loss accuracy\n")
+        f.write("epoch t_loss v_loss\n")
  
     for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
@@ -137,7 +115,6 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         if epoch % 10 == 0:
             valid_w, valid_inputs, valid_targets = valid_data 
             valid_loss = 0.0 
-            valid_accuracy = 0.0
             num_samples = len(valid_targets)
             num_batches = math.ceil(num_samples / batchsize)
             for batch_idx in range(num_batches):
@@ -151,16 +128,10 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                 loss = loss_fn(params, subkey, w, inputs, targets)
                 valid_loss = valid_loss + loss
 
-                key, subkey = jax.random.split(key)
-                accuracy = accuracy_fn(params, subkey, w, inputs, targets)
-                accuracy = jnp.mean(accuracy)
-                valid_accuracy = valid_accuracy + accuracy
-
             valid_loss = valid_loss / num_batches
-            valid_accuracy = valid_accuracy / num_batches
 
-            f.write( ("%6d" + 3*"  %.6f" + "\n") % (epoch, 
-                                                    train_loss,   valid_loss, valid_accuracy
+            f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, 
+                                                    train_loss,   valid_loss
                                                     ))
             
             ckpt = {"params": params,
@@ -262,31 +233,25 @@ if __name__  == "__main__":
         
         key, subkey = jax.random.split(key)
         train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
-        train_targets = get_labels(train_path, 'band_gap',
-                                   upper_bound=7,
-                                   lower_bound=0,
-                                   interval=1)
+        train_targets = get_labels(train_path, 'band_gap')
         _, _, _, _, train_W = train_data
         jnp.savez("train_data.npz", w=train_W, inputs=train_inputs, targets=train_targets)
 
         key, subkey = jax.random.split(key)
         valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
-        valid_targets = get_labels(valid_path, 'band_gap',
-                                   upper_bound=7,
-                                   lower_bound=0,
-                                   interval=1)
+        valid_targets = get_labels(valid_path, 'band_gap')
         _, _, _, _, valid_W = valid_data
         jnp.savez("valid_data.npz", w=valid_W, inputs=valid_inputs, targets=valid_targets)
 
     elif mode == "train":
         
-        train_path = '/home/zdcao/pipeline_crystalgpt/crystal_gpt/train_data.npz'
-        valid_path = '/home/zdcao/pipeline_crystalgpt/crystal_gpt/valid_data.npz'
+        train_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/train_data.npz'
+        valid_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/valid_data.npz'
         n_max = 21
         sequence_length = 105
         outputs_size = 64
         hidden_sizes = [128, 128, 64]
-        num_classes = 7
+        num_classes = 1
         restore_path = "/data/zdcao/crystal_gpt/classifier/"
         lr = 1e-4
         lr_decay = 0
@@ -312,7 +277,7 @@ if __name__  == "__main__":
 
         print ("# of classifier params", ravel_pytree(params)[0].size) 
 
-        logp_fn, loss_fn, accuracy_fn = make_classifier_loss(classifier)
+        loss_fn = make_classifier_loss(classifier)
 
         print("\n========== Prepare logs ==========")
 
@@ -335,7 +300,7 @@ if __name__  == "__main__":
 
         print("\n========== Start training ==========")
         key, subkey = jax.random.split(key)
-        params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, output_path, accuracy_fn)
+        params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, output_path)
 
     elif mode == "test":
         raise NotImplementedError
