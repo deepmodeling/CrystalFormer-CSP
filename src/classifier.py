@@ -29,7 +29,13 @@ def make_classifier(key,
         mask = jnp.repeat(mask, 5, axis=-1)
         # mask = hk.Reshape((sequence_length, ))(mask)
         h = h * mask[:, None]
-        h = jnp.mean(h, axis=-2) 
+
+        w = jnp.mean(h[0::5, :], axis=-2)
+        a = jnp.mean(h[1::5, :], axis=-2)
+        xyz = jnp.mean(h[2::5, :], axis=-2) + jnp.mean(h[3::5, :], axis=-2) + jnp.mean(h[4::5, :], axis=-2)
+
+        h = jnp.concatenate([w, a, xyz], axis=0) 
+        h = hk.Flatten()(h)
 
         h = hk.Linear(hidden_sizes[0])(h)
         h = jax.nn.relu(h)
