@@ -19,9 +19,10 @@ def make_classifier(key,
                     num_classes=2):
 
     @hk.transform
-    def network(w, h):
+    def network(l, w, h):
         """
         sequence_length = n_max * 5
+        l : (6, )
         w : (n_max,)
         h : (sequence_length, ouputs_size)
         """
@@ -34,7 +35,10 @@ def make_classifier(key,
         a = jnp.mean(h[1::5, :], axis=-2)
         xyz = jnp.mean(h[2::5, :], axis=-2) + jnp.mean(h[3::5, :], axis=-2) + jnp.mean(h[4::5, :], axis=-2)
 
-        h = jnp.concatenate([w, a, xyz], axis=0) 
+        # embedding l to (ouputs_size, )
+        l = hk.Linear(outputs_size)(l)
+
+        h = jnp.concatenate([w, a, xyz, l], axis=0) 
         h = hk.Flatten()(h)
 
         h = hk.Linear(hidden_sizes[0])(h)
@@ -50,26 +54,22 @@ def make_classifier(key,
         return h
         
     w = jnp.ones(n_max)
+    l = jnp.ones(6)
     h = jnp.zeros((sequence_length, ouputs_size))
 
-    params = network.init(key, w, h)
+    params = network.init(key, l, w, h)
     return params, network.apply
 
 
 def make_classifier_loss(classifier):
 
-    # @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
-    # def mae_loss(params, key, w, h, labels):
-    #     y = classifier(params, key, w, h)
-    #     return jnp.abs(y - labels)
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0))
+    def mae_loss(params, key, l, w, h, labels):
+        y = classifier(params, key, l, w, h)
+        return jnp.abs(y - labels)
     
-    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
-    def rmse_loss(params, key, w, h, labels):
-        y = classifier(params, key, w, h)
-        return jnp.square((y - labels)**2)
-    
-    def loss_fn(params, key, w, h, labels):
-        loss = jnp.mean(rmse_loss(params, key, w, h, labels))
+    def loss_fn(params, key, l, w, h, labels):
+        loss = jnp.mean(mae_loss(params, key, l, w, h, labels))
         return loss
     
     return loss_fn
@@ -86,8 +86,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
            
     @jax.jit
     def update(params, key, opt_state, data):
-        w, inputs, targets = data
-        value, grad = jax.value_and_grad(loss_fn)(params, key, w, inputs, targets)
+        l, w, inputs, targets = data
+        value, grad = jax.value_and_grad(loss_fn)(params, key, l, w, inputs, targets)
         # jnp.set_printoptions(threshold=jnp.inf)
         # jax.debug.print("grad {x}", x=grad)
         updates, opt_state = optimizer.update(grad, opt_state, params)
@@ -103,7 +103,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         key, subkey = jax.random.split(key)
         train_data = jax.tree_map(lambda x: jax.random.permutation(subkey, x), train_data)
 
-        train_w, train_inputs, train_targets = train_data 
+        train_l, train_w, train_inputs, train_targets = train_data 
 
         train_loss = 0.0 
         num_samples = len(train_targets)
@@ -111,7 +111,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batchsize
             end_idx = min(start_idx + batchsize, num_samples)
-            data = train_w[start_idx:end_idx], \
+            data = train_l[start_idx:end_idx], \
+                   train_w[start_idx:end_idx], \
                    train_inputs[start_idx:end_idx], \
                    train_targets[start_idx:end_idx]
                   
@@ -122,19 +123,20 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         train_loss = train_loss / num_batches
 
         if epoch % 10 == 0:
-            valid_w, valid_inputs, valid_targets = valid_data 
+            valid_l, valid_w, valid_inputs, valid_targets = valid_data 
             valid_loss = 0.0 
             num_samples = len(valid_targets)
             num_batches = math.ceil(num_samples / batchsize)
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * batchsize
                 end_idx = min(start_idx + batchsize, num_samples)
-                w, inputs, targets = valid_w[start_idx:end_idx], \
-                                     valid_inputs[start_idx:end_idx], \
-                                     valid_targets[start_idx:end_idx]
+                l, w, inputs, targets = valid_l[start_idx:end_idx], \
+                                        valid_w[start_idx:end_idx], \
+                                        valid_inputs[start_idx:end_idx], \
+                                        valid_targets[start_idx:end_idx]
 
                 key, subkey = jax.random.split(key)
-                loss = loss_fn(params, subkey, w, inputs, targets)
+                loss = loss_fn(params, subkey, l, w, inputs, targets)
                 valid_loss = valid_loss + loss
 
             valid_loss = valid_loss / num_batches
@@ -245,20 +247,20 @@ if __name__  == "__main__":
         key, subkey = jax.random.split(key)
         train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
         train_targets = get_labels(train_path, 'band_gap')
-        _, _, _, _, train_W = train_data
-        jnp.savez("train_data.npz", w=train_W, inputs=train_inputs, targets=train_targets)
+        _, train_L, _, _, train_W = train_data
+        jnp.savez("train_data.npz", l=train_L, w=train_W, inputs=train_inputs, targets=train_targets)
 
         key, subkey = jax.random.split(key)
         valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
         valid_targets = get_labels(valid_path, 'band_gap')
-        _, _, _, _, valid_W = valid_data
-        jnp.savez("valid_data.npz", w=valid_W, inputs=valid_inputs, targets=valid_targets)
+        _, valid_L, _, _, valid_W = valid_data
+        jnp.savez("valid_data.npz", l=valid_L, w=valid_W, inputs=valid_inputs, targets=valid_targets)
 
         key, subkey = jax.random.split(key)
         test_inputs = get_inputs(subkey, batchsize, test_data, params, state, transformer)
         test_targets = get_labels(test_path, 'band_gap')
-        _, _, _, _, test_W = test_data
-        jnp.savez("test_data.npz", w=test_W, inputs=test_inputs, targets=test_targets)
+        _, test_L, _, _, test_W = test_data
+        jnp.savez("test_data.npz", l=test_L, w=test_W, inputs=test_inputs, targets=test_targets)
 
     elif mode == "train":
         
@@ -276,10 +278,10 @@ if __name__  == "__main__":
         batchsize = 256
 
         data = jnp.load(train_path)
-        train_data = data['w'], data['inputs'], data['targets']
+        train_data = data['l'], data['w'], data['inputs'], data['targets']
 
         data = jnp.load(valid_path)
-        valid_data = data['w'], data['inputs'], data['targets']
+        valid_data = data['l'], data['w'], data['inputs'], data['targets']
 
         print(train_data[0].shape, train_data[1].shape)
         print(valid_data[0].shape, valid_data[1].shape)
