@@ -14,7 +14,7 @@ import checkpoint
 def make_classifier(key,
                     n_max = 21,
                     sequence_length=105,
-                    ouputs_size=64,
+                    outputs_size=64,
                     hidden_sizes=[128, 128],
                     num_classes=2):
 
@@ -55,7 +55,7 @@ def make_classifier(key,
         
     w = jnp.ones(n_max)
     l = jnp.ones(6)
-    h = jnp.zeros((sequence_length, ouputs_size))
+    h = jnp.zeros((sequence_length, outputs_size))
 
     params = network.init(key, l, w, h)
     return params, network.apply
@@ -290,7 +290,7 @@ if __name__  == "__main__":
         params, classifier = make_classifier(subkey,
                                              n_max=n_max,
                                              sequence_length=sequence_length,
-                                             ouputs_size=outputs_size,
+                                             outputs_size=outputs_size,
                                              hidden_sizes=hidden_sizes,
                                              num_classes=num_classes)
 
