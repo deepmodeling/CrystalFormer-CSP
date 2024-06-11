@@ -14,16 +14,23 @@ from transformer import _layer_norm
 
 
 def make_classifier(key,
+                    n_max = 21,
                     sequence_length=105,
                     ouputs_size=64,
                     hidden_sizes=[128, 128],
                     num_classes=2):
 
     @hk.transform
-    def network(h):
+    def network(w, h):
         """
+        sequence_length = n_max * 5
+        w : (n_max,)
         h : (sequence_length, ouputs_size)
         """
+        mask = jnp.where(w > 0, 1, 0)
+        mask = jnp.repeat(mask, 5, axis=-1)
+        # mask = hk.Reshape((sequence_length, ))(mask)
+        h = h * mask[:, None]
         h = jnp.mean(h, axis=-2) 
 
         h = hk.Linear(hidden_sizes[0])(h)
@@ -38,26 +45,28 @@ def make_classifier(key,
     
         return h
         
+    w = jnp.ones(n_max)
     h = jnp.zeros((sequence_length, ouputs_size))
 
-    params = network.init(key, h)
+    params = network.init(key, w, h)
     return params, network.apply
 
 
 def make_classifier_loss(classifier):
 
-    @partial(jax.vmap, in_axes=(None, None, 0))
-    def logp_fn(params, key, h):
-        logits = classifier(params, key, h)
+    @partial(jax.vmap, in_axes=(None, None, 0, 0))
+    def logp_fn(params, key, w, h):
+        logits = classifier(params, key, w, h)
         return jax.nn.log_softmax(logits)
 
-    def loss(params, key, h, y):
-        logp = logp_fn(params, key, h)
+    def loss(params, key, w, h, y):
+        logp = logp_fn(params, key, w, h)
         return -jnp.mean(jnp.sum(logp * y, axis=-1))
 
-    def accuracy_fn(params, key, h, y):
-        logits = classifier(params, key, h)
-        return jnp.mean(jnp.argmax(logits, axis=-1) == jnp.argmax(y, axis=-1))
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
+    def accuracy_fn(params, key, w, h, y):
+        logits = classifier(params, key, w, h)
+        return jnp.argmax(logits, axis=-1) == jnp.argmax(y, axis=-1)
     
     return logp_fn, loss, accuracy_fn
 
@@ -90,8 +99,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
            
     @jax.jit
     def update(params, key, opt_state, data):
-        inputs, targets = data
-        value, grad = jax.value_and_grad(loss_fn)(params, key, inputs, targets)
+        w, inputs, targets = data
+        value, grad = jax.value_and_grad(loss_fn)(params, key, w, inputs, targets)
         # jnp.set_printoptions(threshold=jnp.inf)
         # jax.debug.print("grad {x}", x=grad)
         updates, opt_state = optimizer.update(grad, opt_state, params)
@@ -107,7 +116,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         key, subkey = jax.random.split(key)
         train_data = jax.tree_map(lambda x: jax.random.permutation(subkey, x), train_data)
 
-        train_inputs, train_targets = train_data 
+        train_w, train_inputs, train_targets = train_data 
 
         train_loss = 0.0 
         num_samples = len(train_targets)
@@ -115,7 +124,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batchsize
             end_idx = min(start_idx + batchsize, num_samples)
-            data = train_inputs[start_idx:end_idx], \
+            data = train_w[start_idx:end_idx], \
+                   train_inputs[start_idx:end_idx], \
                    train_targets[start_idx:end_idx]
                   
             key, subkey = jax.random.split(key)
@@ -125,7 +135,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         train_loss = train_loss / num_batches
 
         if epoch % 10 == 0:
-            valid_inputs, valid_targets = valid_data 
+            valid_w, valid_inputs, valid_targets = valid_data 
             valid_loss = 0.0 
             valid_accuracy = 0.0
             num_samples = len(valid_targets)
@@ -133,15 +143,17 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * batchsize
                 end_idx = min(start_idx + batchsize, num_samples)
-                inputs, targets = valid_inputs[start_idx:end_idx], \
-                                  valid_targets[start_idx:end_idx]
+                w, inputs, targets = valid_w[start_idx:end_idx], \
+                                     valid_inputs[start_idx:end_idx], \
+                                     valid_targets[start_idx:end_idx]
 
                 key, subkey = jax.random.split(key)
-                loss = loss_fn(params, subkey, inputs, targets)
+                loss = loss_fn(params, subkey, w, inputs, targets)
                 valid_loss = valid_loss + loss
 
                 key, subkey = jax.random.split(key)
-                accuracy = accuracy_fn(params, subkey, inputs, targets)
+                accuracy = accuracy_fn(params, subkey, w, inputs, targets)
+                accuracy = jnp.mean(accuracy)
                 valid_accuracy = valid_accuracy + accuracy
 
             valid_loss = valid_loss / num_batches
@@ -251,46 +263,48 @@ if __name__  == "__main__":
         key, subkey = jax.random.split(key)
         train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
         train_targets = get_labels(train_path, 'band_gap',
-                                   upper_bound=6.5,
-                                   lower_bound=-0.5,
+                                   upper_bound=7,
+                                   lower_bound=0,
                                    interval=1)
-        # _, _, _, _, train_W = train_data
-        jnp.savez("train_data.npz", inputs=train_inputs, targets=train_targets)
+        _, _, _, _, train_W = train_data
+        jnp.savez("train_data.npz", w=train_W, inputs=train_inputs, targets=train_targets)
 
         key, subkey = jax.random.split(key)
         valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
         valid_targets = get_labels(valid_path, 'band_gap',
-                                   upper_bound=6.5,
-                                   lower_bound=-0.5,
+                                   upper_bound=7,
+                                   lower_bound=0,
                                    interval=1)
-        # _, _, _, _, valid_W = valid_data
-        jnp.savez("valid_data.npz", inputs=valid_inputs, targets=valid_targets)
+        _, _, _, _, valid_W = valid_data
+        jnp.savez("valid_data.npz", w=valid_W, inputs=valid_inputs, targets=valid_targets)
 
     elif mode == "train":
         
-        train_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/last_hidden_state/train_data.npz'
-        valid_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/last_hidden_state/valid_data.npz'
+        train_path = '/home/zdcao/pipeline_crystalgpt/crystal_gpt/train_data.npz'
+        valid_path = '/home/zdcao/pipeline_crystalgpt/crystal_gpt/valid_data.npz'
+        n_max = 21
         sequence_length = 105
         outputs_size = 64
         hidden_sizes = [128, 128, 64]
         num_classes = 7
         restore_path = "/data/zdcao/crystal_gpt/classifier/"
         lr = 1e-4
-        lr_decay = 1e-5
+        lr_decay = 0
         epochs = 1000
-        batchsize = 1000
+        batchsize = 256
 
         data = jnp.load(train_path)
-        train_data = data['inputs'], data['targets']
+        train_data = data['w'], data['inputs'], data['targets']
 
         data = jnp.load(valid_path)
-        valid_data = data['inputs'], data['targets']
+        valid_data = data['w'], data['inputs'], data['targets']
 
         print(train_data[0].shape, train_data[1].shape)
         print(valid_data[0].shape, valid_data[1].shape)
 
         key, subkey = jax.random.split(key)
         params, classifier = make_classifier(subkey,
+                                             n_max=n_max,
                                              sequence_length=sequence_length,
                                              ouputs_size=outputs_size,
                                              hidden_sizes=hidden_sizes,
@@ -315,6 +329,7 @@ if __name__  == "__main__":
             print("No checkpoint file found. Start from scratch.")
 
         schedule = lambda t: lr/(1+lr_decay*t)
+        # optimizer = optax.sgd(learning_rate=schedule, momentum=0.9)
         optimizer = optax.adam(learning_rate=schedule)
         opt_state = optimizer.init(params)
 
