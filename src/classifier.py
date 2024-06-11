@@ -13,13 +13,14 @@ import checkpoint
 
 def make_classifier(key,
                     n_max = 21,
+                    embed_size=32,
                     sequence_length=105,
                     outputs_size=64,
                     hidden_sizes=[128, 128],
                     num_classes=2):
 
     @hk.transform
-    def network(l, w, h):
+    def network(g, l, w, h):
         """
         sequence_length = n_max * 5
         l : (6, )
@@ -37,8 +38,9 @@ def make_classifier(key,
 
         # embedding l to (ouputs_size, )
         l = hk.Linear(outputs_size)(l)
+        g = hk.Linear(outputs_size)(g)
 
-        h = jnp.concatenate([w, a, xyz, l], axis=0) 
+        h = jnp.concatenate([g, w, a, xyz, l], axis=0) 
         h = hk.Flatten()(h)
 
         h = hk.Linear(hidden_sizes[0])(h)
@@ -53,23 +55,24 @@ def make_classifier(key,
     
         return h
         
+    g = jnp.ones(embed_size)
     w = jnp.ones(n_max)
     l = jnp.ones(6)
     h = jnp.zeros((sequence_length, outputs_size))
 
-    params = network.init(key, l, w, h)
+    params = network.init(key, g, l, w, h)
     return params, network.apply
 
 
 def make_classifier_loss(classifier):
 
-    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0))
-    def mae_loss(params, key, l, w, h, labels):
-        y = classifier(params, key, l, w, h)
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0))
+    def mae_loss(params, key, g, l, w, h, labels):
+        y = classifier(params, key, g, l, w, h)
         return jnp.abs(y - labels)
     
-    def loss_fn(params, key, l, w, h, labels):
-        loss = jnp.mean(mae_loss(params, key, l, w, h, labels))
+    def loss_fn(params, key, g, l, w, h, labels):
+        loss = jnp.mean(mae_loss(params, key, g, l, w, h, labels))
         return loss
     
     return loss_fn
@@ -86,8 +89,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
            
     @jax.jit
     def update(params, key, opt_state, data):
-        l, w, inputs, targets = data
-        value, grad = jax.value_and_grad(loss_fn)(params, key, l, w, inputs, targets)
+        g, l, w, inputs, targets = data
+        value, grad = jax.value_and_grad(loss_fn)(params, key, g, l, w, inputs, targets)
         # jnp.set_printoptions(threshold=jnp.inf)
         # jax.debug.print("grad {x}", x=grad)
         updates, opt_state = optimizer.update(grad, opt_state, params)
@@ -103,7 +106,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         key, subkey = jax.random.split(key)
         train_data = jax.tree_map(lambda x: jax.random.permutation(subkey, x), train_data)
 
-        train_l, train_w, train_inputs, train_targets = train_data 
+        train_g, train_l, train_w, train_inputs, train_targets = train_data 
 
         train_loss = 0.0 
         num_samples = len(train_targets)
@@ -111,7 +114,8 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batchsize
             end_idx = min(start_idx + batchsize, num_samples)
-            data = train_l[start_idx:end_idx], \
+            data = train_g[start_idx:end_idx], \
+                   train_l[start_idx:end_idx], \
                    train_w[start_idx:end_idx], \
                    train_inputs[start_idx:end_idx], \
                    train_targets[start_idx:end_idx]
@@ -123,20 +127,21 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         train_loss = train_loss / num_batches
 
         if epoch % 10 == 0:
-            valid_l, valid_w, valid_inputs, valid_targets = valid_data 
+            valid_g, valid_l, valid_w, valid_inputs, valid_targets = valid_data 
             valid_loss = 0.0 
             num_samples = len(valid_targets)
             num_batches = math.ceil(num_samples / batchsize)
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * batchsize
                 end_idx = min(start_idx + batchsize, num_samples)
-                l, w, inputs, targets = valid_l[start_idx:end_idx], \
-                                        valid_w[start_idx:end_idx], \
-                                        valid_inputs[start_idx:end_idx], \
-                                        valid_targets[start_idx:end_idx]
+                g, l, w, inputs, targets = valid_g[start_idx:end_idx], \
+                                           valid_l[start_idx:end_idx], \
+                                           valid_w[start_idx:end_idx], \
+                                           valid_inputs[start_idx:end_idx], \
+                                           valid_targets[start_idx:end_idx]
 
                 key, subkey = jax.random.split(key)
-                loss = loss_fn(params, subkey, l, w, inputs, targets)
+                loss = loss_fn(params, subkey, g, l, w, inputs, targets)
                 valid_loss = valid_loss + loss
 
             valid_loss = valid_loss / num_batches
@@ -186,14 +191,17 @@ if __name__  == "__main__":
             h, state = jax.vmap(transformer, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))(params, state, subkey, G, XYZ, A, W, M, False)
 
             last_hidden_state = state['~']['last_hidden_state']
+            _g_embeddings = state['~']['_g_embeddings']
             if batch_idx == 0:
                 train_inputs = last_hidden_state
+                g_embeddings = _g_embeddings
             else:
                 train_inputs = jnp.concatenate([train_inputs, last_hidden_state], axis=0)
+                g_embeddings = jnp.concatenate([g_embeddings, _g_embeddings], axis=0)
 
         # save the train_inputs
         print(train_inputs.shape)
-        return train_inputs
+        return g_embeddings, train_inputs
 
 
     key = jax.random.PRNGKey(42)
@@ -245,22 +253,28 @@ if __name__  == "__main__":
 
         
         key, subkey = jax.random.split(key)
-        train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
+        train_g_embeddings, train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
         train_targets = get_labels(train_path, 'band_gap')
         _, train_L, _, _, train_W = train_data
-        jnp.savez("train_data.npz", l=train_L, w=train_W, inputs=train_inputs, targets=train_targets)
+        jnp.savez("train_data.npz", g=train_g_embeddings,
+                                    l=train_L, w=train_W,
+                                    inputs=train_inputs, targets=train_targets)
 
         key, subkey = jax.random.split(key)
-        valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
+        valid_g_embeddings, valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
         valid_targets = get_labels(valid_path, 'band_gap')
         _, valid_L, _, _, valid_W = valid_data
-        jnp.savez("valid_data.npz", l=valid_L, w=valid_W, inputs=valid_inputs, targets=valid_targets)
+        jnp.savez("valid_data.npz", g=valid_g_embeddings,
+                                    l=valid_L, w=valid_W, 
+                                    inputs=valid_inputs, targets=valid_targets)
 
         key, subkey = jax.random.split(key)
-        test_inputs = get_inputs(subkey, batchsize, test_data, params, state, transformer)
+        test_g_embeddings, test_inputs = get_inputs(subkey, batchsize, test_data, params, state, transformer)
         test_targets = get_labels(test_path, 'band_gap')
         _, test_L, _, _, test_W = test_data
-        jnp.savez("test_data.npz", l=test_L, w=test_W, inputs=test_inputs, targets=test_targets)
+        jnp.savez("test_data.npz", g=test_g_embeddings,
+                                   l=test_L, w=test_W,
+                                   inputs=test_inputs, targets=test_targets)
 
     elif mode == "train":
         
@@ -278,10 +292,10 @@ if __name__  == "__main__":
         batchsize = 256
 
         data = jnp.load(train_path)
-        train_data = data['l'], data['w'], data['inputs'], data['targets']
+        train_data = data['g'], data['l'], data['w'], data['inputs'], data['targets']
 
         data = jnp.load(valid_path)
-        valid_data = data['l'], data['w'], data['inputs'], data['targets']
+        valid_data = data['g'], data['l'], data['w'], data['inputs'], data['targets']
 
         print(train_data[0].shape, train_data[1].shape)
         print(valid_data[0].shape, valid_data[1].shape)

@@ -117,6 +117,9 @@ if __name__=='__main__':
     h, state = jax.vmap(transformer, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))(params, state, key, G, XYZ, A, W, M, False)
     print (state['~']['last_hidden_state'])
 
+    print(state['~']['_g_embeddings'].shape)
+    print(state['~']['_g_embeddings'])
+
     loss_fn, _ = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
     value = jax.jit(loss_fn, static_argnums=8)(params, state, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], True)
