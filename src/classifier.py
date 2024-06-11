@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-import numpy as np
 import pandas as pd
 from functools import partial
 import os
@@ -10,7 +9,6 @@ import optax
 import math
 
 import checkpoint
-from transformer import _layer_norm
 
 
 def make_classifier(key,
@@ -54,13 +52,18 @@ def make_classifier(key,
 
 def make_classifier_loss(classifier):
 
+    # @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
+    # def mae_loss(params, key, w, h, labels):
+    #     y = classifier(params, key, w, h)
+    #     return jnp.abs(y - labels)
+    
     @partial(jax.vmap, in_axes=(None, None, 0, 0, 0))
-    def mae_loss(params, key, w, h, labels):
+    def rmse_loss(params, key, w, h, labels):
         y = classifier(params, key, w, h)
-        return jnp.abs(y - labels)
+        return jnp.square((y - labels)**2)
     
     def loss_fn(params, key, w, h, labels):
-        loss = jnp.mean(mae_loss(params, key, w, h, labels))
+        loss = jnp.mean(rmse_loss(params, key, w, h, labels))
         return loss
     
     return loss_fn
@@ -192,6 +195,7 @@ if __name__  == "__main__":
 
         train_path = "/data/zdcao/crystal_gpt/dataset/mp_20/train.csv"
         valid_path = "/data/zdcao/crystal_gpt/dataset/mp_20/val.csv"
+        test_path = "/data/zdcao/crystal_gpt/dataset/mp_20/test.csv"
         atom_types = 119
         wyck_types = 28
         n_max = 21
@@ -212,6 +216,7 @@ if __name__  == "__main__":
 
         train_data = GLXYZAW_from_file(train_path, atom_types, wyck_types, n_max, num_io_process)
         valid_data = GLXYZAW_from_file(valid_path, atom_types, wyck_types, n_max, num_io_process)
+        test_data = GLXYZAW_from_file(test_path, atom_types, wyck_types, n_max, num_io_process)
 
 
         params, state, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
@@ -242,6 +247,12 @@ if __name__  == "__main__":
         valid_targets = get_labels(valid_path, 'band_gap')
         _, _, _, _, valid_W = valid_data
         jnp.savez("valid_data.npz", w=valid_W, inputs=valid_inputs, targets=valid_targets)
+
+        key, subkey = jax.random.split(key)
+        test_inputs = get_inputs(subkey, batchsize, test_data, params, state, transformer)
+        test_targets = get_labels(test_path, 'band_gap')
+        _, _, _, _, test_W = test_data
+        jnp.savez("test_data.npz", w=test_W, inputs=test_inputs, targets=test_targets)
 
     elif mode == "train":
         
