@@ -17,10 +17,11 @@ def make_classifier(key,
                     sequence_length=105,
                     outputs_size=64,
                     hidden_sizes=[128, 128],
-                    num_classes=2):
+                    num_classes=2,
+                    dropout_rate=0.3):
 
     @hk.transform
-    def network(g, l, w, h):
+    def network(g, l, w, h, is_training):
         """
         sequence_length = n_max * 5
         l : (6, )
@@ -46,6 +47,8 @@ def make_classifier(key,
         h = hk.Linear(hidden_sizes[0])(h)
         h = jax.nn.relu(h)
 
+        h = hk.dropout(hk.next_rng_key(), dropout_rate, h) if is_training else h  # Dropout after the first ReLU
+
         for hidden_size in hidden_sizes[1: -1]:
             h = jax.nn.relu(hk.Linear(hidden_size)(h)) + h
 
@@ -60,19 +63,19 @@ def make_classifier(key,
     l = jnp.ones(6)
     h = jnp.zeros((sequence_length, outputs_size))
 
-    params = network.init(key, g, l, w, h)
+    params = network.init(key, g, l, w, h, True)
     return params, network.apply
 
 
 def make_classifier_loss(classifier):
 
-    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0))
-    def mae_loss(params, key, g, l, w, h, labels):
-        y = classifier(params, key, g, l, w, h)
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, None))
+    def mae_loss(params, key, g, l, w, h, labels, is_training):
+        y = classifier(params, key, g, l, w, h, is_training)
         return jnp.abs(y - labels)
     
-    def loss_fn(params, key, g, l, w, h, labels):
-        loss = jnp.mean(mae_loss(params, key, g, l, w, h, labels))
+    def loss_fn(params, key, g, l, w, h, labels, is_training):
+        loss = jnp.mean(mae_loss(params, key, g, l, w, h, labels, is_training))
         return loss
     
     return loss_fn
@@ -90,7 +93,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
     @jax.jit
     def update(params, key, opt_state, data):
         g, l, w, inputs, targets = data
-        value, grad = jax.value_and_grad(loss_fn)(params, key, g, l, w, inputs, targets)
+        value, grad = jax.value_and_grad(loss_fn)(params, key, g, l, w, inputs, targets, True)
         # jnp.set_printoptions(threshold=jnp.inf)
         # jax.debug.print("grad {x}", x=grad)
         updates, opt_state = optimizer.update(grad, opt_state, params)
@@ -141,7 +144,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                                            valid_targets[start_idx:end_idx]
 
                 key, subkey = jax.random.split(key)
-                loss = loss_fn(params, subkey, g, l, w, inputs, targets)
+                loss = loss_fn(params, subkey, g, l, w, inputs, targets, False)
                 valid_loss = valid_loss + loss
 
             valid_loss = valid_loss / num_batches
