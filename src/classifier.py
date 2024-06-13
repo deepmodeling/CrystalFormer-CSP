@@ -37,20 +37,18 @@ def make_classifier(key,
         a = jnp.mean(h[1::5, :], axis=-2)
         xyz = jnp.mean(h[2::5, :], axis=-2) + jnp.mean(h[3::5, :], axis=-2) + jnp.mean(h[4::5, :], axis=-2)
 
-        # embedding l to (ouputs_size, )
-        l = hk.Linear(outputs_size)(l)
-        g = hk.Linear(outputs_size)(g)
-
-        h = jnp.concatenate([g, w, a, xyz, l], axis=0) 
+        h = jnp.concatenate([w, a, xyz], axis=0) 
         h = hk.Flatten()(h)
 
-        h = hk.Linear(hidden_sizes[0])(h)
-        h = jax.nn.relu(h)
+        h = jnp.concatenate([g, h, l], axis=0)
 
+        h = jax.nn.relu(hk.Linear(hidden_sizes[0])(h))
         h = hk.dropout(hk.next_rng_key(), dropout_rate, h) if is_training else h  # Dropout after the first ReLU
 
         for hidden_size in hidden_sizes[1: -1]:
-            h = jax.nn.relu(hk.Linear(hidden_size)(h)) + h
+            h_dense = jax.nn.relu(hk.Linear(hidden_size)(h))
+            h_dense = hk.dropout(hk.next_rng_key(), dropout_rate, h_dense) if is_training else h_dense
+            h = h + h_dense
 
         h = hk.Linear(hidden_sizes[-1])(h)
         h = jax.nn.relu(h)
