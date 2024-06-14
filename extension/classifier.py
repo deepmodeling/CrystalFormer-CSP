@@ -8,6 +8,7 @@ import os
 import optax
 import math
 
+from config import *
 import checkpoint
 
 

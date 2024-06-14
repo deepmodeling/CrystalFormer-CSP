@@ -39,8 +39,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0,
 
         return logp_x
 
-    @partial(jax.vmap, in_axes=(None, None, None, 0, 0, 0, 0, 0, None), out_axes=0) # batch 
-    def logp_fn(params, state, key, G, L, XYZ, A, W, is_train):
+    @partial(jax.vmap, in_axes=(None, None, 0, 0, 0, 0, 0, None), out_axes=0) # batch 
+    def logp_fn(params, key, G, L, XYZ, A, W, is_train):
         '''
         G: scalar 
         L: (6,) [a, b, c, alpha, beta, gamma] 
@@ -53,7 +53,7 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0,
         M = mult_table[G-1, W]  # (n_max,) multplicities
         #num_atoms = jnp.sum(M)
 
-        h, _ = transformer(params, state, key, G, XYZ, A, W, M, is_train) # (5*n_max+1, ...)
+        h = transformer(params, key, G, XYZ, A, W, M, is_train) # (5*n_max+1, ...)
         w_logit = h[0::5, :wyck_types] # (n_max+1, wyck_types) 
         w_logit = w_logit[:-1] # (n_max, wyck_types)
         a_logit = h[1::5, :atom_types] 
@@ -83,8 +83,8 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0,
         
         return logp_w, logp_xyz, logp_a, logp_l
 
-    def loss_fn(params, state, key, G, L, XYZ, A, W, is_train):
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, state, key, G, L, XYZ, A, W, is_train)
+    def loss_fn(params, key, G, L, XYZ, A, W, is_train):
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, G, L, XYZ, A, W, is_train)
         loss_w = -jnp.mean(logp_w)
         loss_xyz = -jnp.mean(logp_xyz)
         loss_a = -jnp.mean(logp_a)
@@ -110,20 +110,12 @@ if __name__=='__main__':
 
     key = jax.random.PRNGKey(42)
 
-    params, state, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
-    print(state['~']['last_hidden_state'])
-
-    M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
-    h, state = jax.vmap(transformer, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))(params, state, key, G, XYZ, A, W, M, False)
-    print (state['~']['last_hidden_state'])
-
-    print(state['~']['_g_embeddings'].shape)
-    print(state['~']['_g_embeddings'])
-
+    params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
+ 
     loss_fn, _ = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
     
-    value = jax.jit(loss_fn, static_argnums=8)(params, state, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], True)
+    value = jax.jit(loss_fn, static_argnums=7)(params, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], True)
     print (value)
 
-    value = jax.jit(loss_fn, static_argnums=8)(params, state, key, G[:1], L[:1], XYZ[:1]+1.0, A[:1], W[:1], True)
+    value = jax.jit(loss_fn, static_argnums=7)(params, key, G[:1], L[:1], XYZ[:1]+1.0, A[:1], W[:1], True)
     print (value)
