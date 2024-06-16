@@ -52,7 +52,6 @@ if __name__  == "__main__":
     num_classes = 1
     restore_path = "/data/zdcao/crystal_gpt/classifier/"
     lr = 1e-4
-    lr_decay = 0
     epochs = 1000
     batchsize = 256
 
@@ -103,11 +102,10 @@ if __name__  == "__main__":
     
     loss_fn = make_classifier_loss(transformer, classifier)
 
-    schedule = lambda t: lr/(1+lr_decay*t)   
-    optimizer = optax.adam(learning_rate=schedule)  #TODO: Change to multi_transform
+    param_labels = ('transformer', 'classifier')
+    optimizer = optax.multi_transform({'transformer': optax.adam(lr*0.1), 'classifier': optax.adam(lr)},
+                                      param_labels)
     opt_state = optimizer.init(params)
-
-    # print(jax.jit(loss_fn, static_argnums=9)(params, state, key, *train_data, False))
 
     print("\n========== Start training ==========")
     key, subkey = jax.random.split(key)
