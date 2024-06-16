@@ -96,9 +96,15 @@ if __name__  == "__main__":
     if ckpt_filename is not None:
         print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
         ckpt = checkpoint.load_data(ckpt_filename)
-        params = ckpt["params"]
+        _params = ckpt["params"]
     else:
         print("No checkpoint file found. Start from scratch.")
+
+    if len(_params) == len(params):
+        params = _params
+    else:
+        params = (_params, params[1])  # only restore transformer params
+        print("only restore transformer params")
     
     loss_fn = make_classifier_loss(transformer, classifier)
 
