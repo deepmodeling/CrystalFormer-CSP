@@ -34,7 +34,7 @@ def make_classifier_loss(transformer, classifier):
         loss = jnp.mean(mae_loss(params, state, key, G, L, XYZ, A, W, labels, is_training))
         return loss
     
-    return loss_fn
+    return loss_fn, forward_fn
 
 
 if __name__ == "__main__":
@@ -66,7 +66,7 @@ if __name__ == "__main__":
                                                     num_classes=1)
 
     params = (transformer_params, classifier_params)
-    loss_fn = make_classifier_loss(transformer, classifier)
+    loss_fn, _ = make_classifier_loss(transformer, classifier)
 
     # M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
     # value, state = jax.vmap(transformer,

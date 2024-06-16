@@ -106,7 +106,7 @@ if __name__  == "__main__":
         params = (_params, params[1])  # only restore transformer params
         print("only restore transformer params")
     
-    loss_fn = make_classifier_loss(transformer, classifier)
+    loss_fn, _ = make_classifier_loss(transformer, classifier)
 
     param_labels = ('transformer', 'classifier')
     optimizer = optax.multi_transform({'transformer': optax.adam(lr*0.1), 'classifier': optax.adam(lr)},
