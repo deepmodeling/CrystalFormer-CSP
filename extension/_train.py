@@ -6,14 +6,12 @@ import math
 import checkpoint
 
 
-def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
+def train(key, optimizer, opt_state, loss_fn, params, state, epoch_finished, epochs, batchsize, train_data, valid_data, path):
            
     @jax.jit
-    def update(params, key, opt_state, data):
-        g, l, w, inputs, targets = data
-        value, grad = jax.value_and_grad(loss_fn)(params, key, g, l, w, inputs, targets, True)
-        # jnp.set_printoptions(threshold=jnp.inf)
-        # jax.debug.print("grad {x}", x=grad)
+    def update(params, state, key, opt_state, data):
+        G, L, X, A, W, labels = data
+        value, grad = jax.value_and_grad(loss_fn)(params, state, key, G, L, X, A, W, labels, True)
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
@@ -27,42 +25,44 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         key, subkey = jax.random.split(key)
         train_data = jax.tree_map(lambda x: jax.random.permutation(subkey, x), train_data)
 
-        train_g, train_l, train_w, train_inputs, train_targets = train_data 
+        train_G, train_L, train_X, train_A, train_W, train_labels = train_data
 
         train_loss = 0.0 
-        num_samples = len(train_targets)
+        num_samples = len(train_labels)
         num_batches = math.ceil(num_samples / batchsize)
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batchsize
             end_idx = min(start_idx + batchsize, num_samples)
-            data = train_g[start_idx:end_idx], \
-                   train_l[start_idx:end_idx], \
-                   train_w[start_idx:end_idx], \
-                   train_inputs[start_idx:end_idx], \
-                   train_targets[start_idx:end_idx]
-                  
+            data = train_G[start_idx:end_idx], \
+                   train_L[start_idx:end_idx], \
+                   train_X[start_idx:end_idx], \
+                   train_A[start_idx:end_idx], \
+                   train_W[start_idx:end_idx], \
+                   train_labels[start_idx:end_idx]
+
             key, subkey = jax.random.split(key)
-            params, opt_state, loss = update(params, subkey, opt_state, data)
+            params, opt_state, loss = update(params, state, subkey, opt_state, data)
             train_loss = train_loss + loss
 
         train_loss = train_loss / num_batches
 
         if epoch % 10 == 0:
-            valid_g, valid_l, valid_w, valid_inputs, valid_targets = valid_data 
+            valid_G, valid_L, valid_X, valid_A, valid_W, valid_labels = valid_data 
             valid_loss = 0.0 
-            num_samples = len(valid_targets)
+            num_samples = len(valid_labels)
             num_batches = math.ceil(num_samples / batchsize)
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * batchsize
                 end_idx = min(start_idx + batchsize, num_samples)
-                g, l, w, inputs, targets = valid_g[start_idx:end_idx], \
-                                           valid_l[start_idx:end_idx], \
-                                           valid_w[start_idx:end_idx], \
-                                           valid_inputs[start_idx:end_idx], \
-                                           valid_targets[start_idx:end_idx]
+                G, L, X, A, W, labels = valid_G[start_idx:end_idx], \
+                                        valid_L[start_idx:end_idx], \
+                                        valid_X[start_idx:end_idx], \
+                                        valid_A[start_idx:end_idx], \
+                                        valid_W[start_idx:end_idx], \
+                                        valid_labels[start_idx:end_idx]
 
                 key, subkey = jax.random.split(key)
-                loss = loss_fn(params, subkey, g, l, w, inputs, targets, False)
+                loss = loss_fn(params, state, subkey, G, L, X, A, W, labels, False)
                 valid_loss = valid_loss + loss
 
             valid_loss = valid_loss / num_batches

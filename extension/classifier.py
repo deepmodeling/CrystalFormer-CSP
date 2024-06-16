@@ -1,11 +1,8 @@
 import jax
 import jax.numpy as jnp
-import haiku as hk
-
 import pandas as pd
 import os
 import optax
-import math
 
 from config import *
 import checkpoint
@@ -22,7 +19,6 @@ if __name__  == "__main__":
     from jax.flatten_util import ravel_pytree
 
     from utils import GLXYZAW_from_file
-    from wyckoff import mult_table
 
     from _model import make_classifier
     from _transformer import make_transformer  
@@ -30,173 +26,89 @@ if __name__  == "__main__":
     from _loss import make_classifier_loss
 
 
-    def get_inputs(key, batchsize, train_data, params, state, transformer):
-
-        train_G, train_L, train_X, train_A, train_W = train_data 
-        num_samples = len(train_L)
-        num_batches = math.ceil(num_samples / batchsize)
-
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * batchsize
-            end_idx = min(start_idx + batchsize, num_samples)
-
-            G = train_G[start_idx:end_idx]
-            L = train_L[start_idx:end_idx]
-            XYZ = train_X[start_idx:end_idx]
-            A = train_A[start_idx:end_idx]
-            W = train_W[start_idx:end_idx]
-
-            M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
-
-            key, subkey = jax.random.split(key)
-
-            h, state = jax.vmap(transformer, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))(params, state, subkey, G, XYZ, A, W, M, False)
-
-            last_hidden_state = state['~']['last_hidden_state']
-            _g_embeddings = state['~']['_g_embeddings']
-            if batch_idx == 0:
-                train_inputs = last_hidden_state
-                g_embeddings = _g_embeddings
-            else:
-                train_inputs = jnp.concatenate([train_inputs, last_hidden_state], axis=0)
-                g_embeddings = jnp.concatenate([g_embeddings, _g_embeddings], axis=0)
-
-        # save the train_inputs
-        print(train_inputs.shape)
-        return g_embeddings, train_inputs
-
-
     key = jax.random.PRNGKey(42)
-    mode = "train"
+   
+    train_path = "/data/zdcao/crystal_gpt/dataset/mp_20/train.csv"
+    valid_path = "/data/zdcao/crystal_gpt/dataset/mp_20/val.csv"
+    test_path = "/data/zdcao/crystal_gpt/dataset/mp_20/test.csv"
+    atom_types = 119
+    wyck_types = 28
+    n_max = 21
+    num_io_process = 40
+    Nf = 5
+    Kx = 16
+    Kl = 4
+    h0_size = 256
+    transformer_layers = 4
+    num_heads = 8
+    key_size = 32
+    model_size = 64
+    embed_size = 32
+    dropout_rate = 0.3
 
-    if mode == "data":
+    sequence_length = 105
+    outputs_size = 64
+    hidden_sizes = [128, 128, 64]
+    num_classes = 1
+    restore_path = "/data/zdcao/crystal_gpt/classifier/"
+    lr = 1e-4
+    lr_decay = 0
+    epochs = 1000
+    batchsize = 256
 
-        train_path = "/data/zdcao/crystal_gpt/dataset/mp_20/train.csv"
-        valid_path = "/data/zdcao/crystal_gpt/dataset/mp_20/val.csv"
-        test_path = "/data/zdcao/crystal_gpt/dataset/mp_20/test.csv"
-        atom_types = 119
-        wyck_types = 28
-        n_max = 21
-        num_io_process = 40
-        Nf = 5
-        Kx = 16
-        Kl = 4
-        h0_size = 256
-        transformer_layers = 16
-        num_heads = 16
-        key_size = 64
-        model_size = 64
-        embed_size = 32
-        dropout_rate = 0.5
-        restore_path = "/home/zdcao/pipeline_crystalgpt/crystal_gpt/experimental/"
+    train_data = GLXYZAW_from_file(train_path, atom_types, wyck_types, n_max, num_io_process)
+    valid_data = GLXYZAW_from_file(valid_path, atom_types, wyck_types, n_max, num_io_process)
+    # test_data = GLXYZAW_from_file(test_path, atom_types, wyck_types, n_max, num_io_process)
 
-        batchsize = 2000
+    test_labels = get_labels(train_path, "band_gap")
+    valid_labels = get_labels(valid_path, "band_gap")
 
-        train_data = GLXYZAW_from_file(train_path, atom_types, wyck_types, n_max, num_io_process)
-        valid_data = GLXYZAW_from_file(valid_path, atom_types, wyck_types, n_max, num_io_process)
-        test_data = GLXYZAW_from_file(test_path, atom_types, wyck_types, n_max, num_io_process)
+    train_data = (*train_data, test_labels)
+    valid_data = (*valid_data, valid_labels)
 
+    ################### Model #############################
+    transformer_params, state, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
+                                                              h0_size, 
+                                                              transformer_layers, num_heads, 
+                                                              key_size, model_size, embed_size, 
+                                                              atom_types, wyck_types,
+                                                              dropout_rate)
+    print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
+    
+    key, subkey = jax.random.split(key)
+    classifier_params, classifier = make_classifier(subkey,
+                                                    n_max=n_max,
+                                                    embed_size=embed_size,
+                                                    sequence_length=sequence_length,
+                                                    outputs_size=outputs_size,
+                                                    hidden_sizes=hidden_sizes,
+                                                    num_classes=num_classes)
 
-        params, state, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
-                                                      h0_size, 
-                                                      transformer_layers, num_heads, 
-                                                      key_size, model_size, embed_size, 
-                                                      atom_types, wyck_types,
-                                                      dropout_rate)
+    print ("# of classifier params", ravel_pytree(classifier_params)[0].size) 
 
-        print("\n========== Load checkpoint==========")
-        ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path) 
-        if ckpt_filename is not None:
-            print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
-            ckpt = checkpoint.load_data(ckpt_filename)
-            params = ckpt["params"]
-        else:
-            print("No checkpoint file found. Start from scratch.")
+    params = (transformer_params, classifier_params)
 
-        
-        key, subkey = jax.random.split(key)
-        train_g_embeddings, train_inputs = get_inputs(subkey, batchsize, train_data, params, state, transformer)
-        train_targets = get_labels(train_path, 'band_gap')
-        _, train_L, _, _, train_W = train_data
-        jnp.savez("train_data.npz", g=train_g_embeddings,
-                                    l=train_L, w=train_W,
-                                    inputs=train_inputs, targets=train_targets)
+    print("\n========== Prepare logs ==========")
+    output_path = os.path.dirname(restore_path)
+    print("Will output samples to: %s" % output_path)
 
-        key, subkey = jax.random.split(key)
-        valid_g_embeddings, valid_inputs = get_inputs(subkey, batchsize, valid_data, params, state, transformer)
-        valid_targets = get_labels(valid_path, 'band_gap')
-        _, valid_L, _, _, valid_W = valid_data
-        jnp.savez("valid_data.npz", g=valid_g_embeddings,
-                                    l=valid_L, w=valid_W, 
-                                    inputs=valid_inputs, targets=valid_targets)
+    print("\n========== Load checkpoint==========")
+    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path) 
+    if ckpt_filename is not None:
+        print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
+        ckpt = checkpoint.load_data(ckpt_filename)
+        params = ckpt["params"]
+    else:
+        print("No checkpoint file found. Start from scratch.")
+    
+    loss_fn = make_classifier_loss(transformer, classifier)
 
-        key, subkey = jax.random.split(key)
-        test_g_embeddings, test_inputs = get_inputs(subkey, batchsize, test_data, params, state, transformer)
-        test_targets = get_labels(test_path, 'band_gap')
-        _, test_L, _, _, test_W = test_data
-        jnp.savez("test_data.npz", g=test_g_embeddings,
-                                   l=test_L, w=test_W,
-                                   inputs=test_inputs, targets=test_targets)
+    schedule = lambda t: lr/(1+lr_decay*t)   
+    optimizer = optax.adam(learning_rate=schedule)  #TODO: Change to multi_transform
+    opt_state = optimizer.init(params)
 
-    elif mode == "train":
-        
-        train_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/train_data.npz'
-        valid_path = '/data/zdcao/crystal_gpt/dataset/mp_20/classifier/bandgap/valid_data.npz'
-        n_max = 21
-        sequence_length = 105
-        outputs_size = 64
-        hidden_sizes = [128, 128, 64]
-        num_classes = 1
-        restore_path = "/data/zdcao/crystal_gpt/classifier/"
-        lr = 1e-4
-        lr_decay = 0
-        epochs = 1000
-        batchsize = 256
+    # print(jax.jit(loss_fn, static_argnums=9)(params, state, key, *train_data, False))
 
-        data = jnp.load(train_path)
-        train_data = data['g'], data['l'], data['w'], data['inputs'], data['targets']
-
-        data = jnp.load(valid_path)
-        valid_data = data['g'], data['l'], data['w'], data['inputs'], data['targets']
-
-        print(train_data[0].shape, train_data[1].shape)
-        print(valid_data[0].shape, valid_data[1].shape)
-
-        key, subkey = jax.random.split(key)
-        params, classifier = make_classifier(subkey,
-                                             n_max=n_max,
-                                             sequence_length=sequence_length,
-                                             outputs_size=outputs_size,
-                                             hidden_sizes=hidden_sizes,
-                                             num_classes=num_classes)
-
-        print ("# of classifier params", ravel_pytree(params)[0].size) 
-
-        loss_fn = make_classifier_loss(classifier)
-
-        print("\n========== Prepare logs ==========")
-
-        output_path = os.path.dirname(restore_path)
-        print("Will output samples to: %s" % output_path)
-
-        print("\n========== Load checkpoint==========")
-        ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path or output_path) 
-        if ckpt_filename is not None:
-            print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
-            ckpt = checkpoint.load_data(ckpt_filename)
-            params = ckpt["params"]
-        else:
-            print("No checkpoint file found. Start from scratch.")
-
-        schedule = lambda t: lr/(1+lr_decay*t)
-        # optimizer = optax.sgd(learning_rate=schedule, momentum=0.9)
-        optimizer = optax.adam(learning_rate=schedule)
-        opt_state = optimizer.init(params)
-
-        print("\n========== Start training ==========")
-        key, subkey = jax.random.split(key)
-        params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, output_path)
-
-    elif mode == "test":
-        raise NotImplementedError
-
+    print("\n========== Start training ==========")
+    key, subkey = jax.random.split(key)
+    params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, state, epoch_finished, epochs, batchsize, train_data, valid_data, output_path)
