@@ -59,10 +59,10 @@ if __name__  == "__main__":
     valid_data = GLXYZAW_from_file(valid_path, atom_types, wyck_types, n_max, num_io_process)
     # test_data = GLXYZAW_from_file(test_path, atom_types, wyck_types, n_max, num_io_process)
 
-    test_labels = get_labels(train_path, "band_gap")
+    train_labels = get_labels(train_path, "band_gap")
     valid_labels = get_labels(valid_path, "band_gap")
 
-    train_data = (*train_data, test_labels)
+    train_data = (*train_data, train_labels)
     valid_data = (*valid_data, valid_labels)
 
     ################### Model #############################
