@@ -37,6 +37,34 @@ def make_classifier_loss(transformer, classifier):
     return loss_fn, forward_fn
 
 
+def make_cond_logp(logp_fn, forward_fn, target, alpha):
+    '''
+    logp_fn: function to calculate log p(x)
+    forward_fn: function to calculate p(y|x)
+    target: target label
+    alpha: hyperparameter to control the trade-off between log p(x) and log p(y|x)
+    NOTE that the logp_fn and forward_fn should be vmapped before passing to this function
+    '''
+    def cond_logp_fn(base_params, cond_params, state, key, G, L, XYZ, A, W, is_training):
+        '''
+        base_params: base model parameters
+        cond_params: conditional model parameters
+        '''
+        # calculate log p(x)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(base_params, key, G, L, XYZ, A, W, is_training)
+        logp_base = logp_xyz + logp_w + logp_a + logp_l
+
+        # calculate p(y|x)
+        y = forward_fn(cond_params, state, key, G, L, XYZ, A, W, is_training) # f(x)
+        logp_cond = jnp.abs(target - y) # |y - f(x)|
+
+        # trade-off between log p(x) and p(y|x)
+        logp = logp_base - alpha * logp_cond.squeeze()
+        return logp
+    
+    return cond_logp_fn
+
+
 if __name__ == "__main__":
     from utils import GLXYZAW_from_file
 
@@ -66,30 +94,30 @@ if __name__ == "__main__":
                                                     num_classes=1)
 
     params = (transformer_params, classifier_params)
-    loss_fn, _ = make_classifier_loss(transformer, classifier)
+    loss_fn, forward_fn = make_classifier_loss(transformer, classifier)
 
-    # M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
-    # value, state = jax.vmap(transformer,
-    #                         in_axes=(None, None, None, 0, 0, 0, 0, 0, None)
-    #                         )(transformer_params, state, key,
-    #                           G, XYZ, A, W, M, False)
-    # print(state['~']['_g_embeddings'].shape)
-    # print(state['~']['last_hidden_state'].shape)
-
-    # g = state['~']['_g_embeddings']
-    # h = state['~']['last_hidden_state']
-
-    # y = jax.vmap(classifier, in_axes=(None, None, 0, 0, 0, 0, None))(classifier_params, key, g, L, W, h, False)
-    # print(y.shape)
-    # labels = jnp.ones(G.shape)
-    # print(jnp.abs(y-labels).shape)
-
-    # test = jax.vmap(lambda x, y: x-y, in_axes=(0, 0))(y, labels)
-    # print("test shape:", test.shape)
-
+    # test loss_fn for classifier
     labels = jnp.ones(G.shape)
     value = jax.jit(loss_fn, static_argnums=9)(params, state, key, G[:1], L[:1], XYZ[:1], A[:1], W[:1], labels[:1], True)
     print (value)
 
     value = jax.jit(loss_fn, static_argnums=9)(params, state, key, G[:1], L[:1], XYZ[:1]+1.0, A[:1], W[:1], labels[:1], True)
     print (value)
+
+
+    ############### test cond_loss_fn ################
+    from loss import make_loss_fn
+    from transformer import make_transformer as make_transformer_base
+
+    base_params, base_transformer = make_transformer_base(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
+
+    loss_fn, logp_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, base_transformer)
+
+    # test_cond_loss
+    forward = jax.vmap(forward_fn, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))
+    cond_logp_fn = make_cond_logp(logp_fn, forward, 
+                                  target=1.0, 
+                                  alpha=0.1)
+    value = jax.jit(cond_logp_fn, static_argnums=9)(base_params, params, state, key, G, L, XYZ, A, W, False)
+    print(value)
+    print(value.shape)
