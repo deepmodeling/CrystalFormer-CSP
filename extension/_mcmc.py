@@ -2,9 +2,10 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from config import *
+# from config import *
 from wyckoff import fc_mask_table
 from von_mises import sample_von_mises
+from lattice import symmetrize_lattice
 
 
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
@@ -27,7 +28,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
 
         A = jax.lax.fori_loop(0, A.shape[1], body_fn, A)
         return A
-
+        
     @partial(jax.jit, static_argnums=0)
     def mcmc(logp_fn, x_init, key, mc_steps, mc_width):
         """
@@ -44,8 +45,51 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
         OUTPUT:
             x: resulting batch samples, with the same shape as `x_init`.
         """
-        def step(i, state):
 
+        def update_lattice(i, state):
+            def update_length(key, L):
+                length, angle = jnp.split(L, 2, axis=-1) 
+                length += jax.random.normal(key, length.shape) * mc_width
+                return jnp.concatenate([length, angle], axis=-1)
+
+            def update_angle(key, L):
+                length, angle = jnp.split(L, 2, axis=-1)
+                angle += jax.random.normal(key, angle.shape) * mc_width
+                return jnp.concatenate([length, angle], axis=-1)
+            
+            x, logp, key, num_accepts = state
+            G, L, XYZ, A, W = x
+            key, key_proposal_L, key_accept, key_logp = jax.random.split(key, 4)
+
+            L_proposal = jax.lax.cond(i % (n_max+2) % n_max == 0,
+                                      lambda _: update_length(key_proposal_L, L),
+                                      lambda _: update_angle(key_proposal_L, L),
+                                      None)
+            L_proposal = jax.vmap(symmetrize_lattice, (0, 0))(G, L_proposal) 
+            length, angle = jnp.split(L_proposal, 2, axis=-1)
+            angle = jnp.deg2rad(angle)  # change the unit to rad
+            L_proposal = jnp.concatenate([length, angle], axis=-1)
+            
+            x_proposal = (G, L_proposal, XYZ, A, W)
+            logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key_logp, *x_proposal, False)
+            logp_proposal = logp_w + logp_xyz + logp_a + logp_l
+
+            ratio = jnp.exp((logp_proposal - logp))
+            accept = jax.random.uniform(key_accept, ratio.shape) < ratio
+
+            L_new = jnp.where(accept[:, None], L_proposal, L)  # update lattice
+            x_new = (G, L_new, XYZ, A, W)
+            logp_new = jnp.where(accept, logp_proposal, logp)
+            num_accepts += jnp.sum(accept)
+
+            jax.debug.print("logp {x} {y}", 
+                            x=logp_new.mean(),
+                            y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
+                            )
+            return x_new, logp_new, key, num_accepts
+        
+
+        def update_a_xyz(i, state):
             def true_func(i, state):
                 x, logp, key, num_accepts = state
                 G, L, XYZ, A, W = x
@@ -64,8 +108,8 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
                 XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
                 x_proposal = (G, L, XYZ_proposal, A_proposal, W)
 
-                logp_w, logp_xyz, logp_a, _ = logp_fn(params, key_logp, *x_proposal, False)
-                logp_proposal = logp_w + logp_xyz + logp_a
+                logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key_logp, *x_proposal, False)
+                logp_proposal = logp_w + logp_xyz + logp_a + logp_l
 
                 ratio = jnp.exp((logp_proposal - logp))
                 accept = jax.random.uniform(key_accept, ratio.shape) < ratio
@@ -74,7 +118,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
                 XYZ_new = jnp.where(accept[:, None, None], XYZ_proposal, XYZ)  # update atom positions
                 x_new = (G, L, XYZ_new, A_new, W)
                 logp_new = jnp.where(accept, logp_proposal, logp)
-                num_accepts += jnp.sum(accept*jnp.where(A[:, i%n_max]==0, 0, 1))
+                num_accepts += jnp.sum(accept*jnp.where(A[:, i%n_max]==0, 0, 1)) 
                 jax.debug.print("logp {x} {y}", 
                                 x=logp_new.mean(),
                                 y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
@@ -87,15 +131,23 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
             
             x, logp, key, num_accepts = state
             A = x[3]
-            x, logp, key, num_accepts = jax.lax.cond(A[:, i%n_max].sum() != 0,
+            x, logp, key, num_accepts = jax.lax.cond(A[:, i%(n_max+2)%n_max].sum() != 0,
                                                      lambda _: true_func(i, state),
                                                      lambda _: false_func(i, state),
                                                      None)
             return x, logp, key, num_accepts
 
+        def step(i, state):
+            x, logp, key, num_accepts = state
+            x, logp, key, num_accepts = jax.lax.cond(i % (n_max+2) < n_max,
+                                                     lambda _: update_a_xyz(i, state),
+                                                     lambda _: update_lattice(i, state),
+                                                     None)
+            return x, logp, key, num_accepts
+
         key, subkey = jax.random.split(key)
-        logp_w, logp_xyz, logp_a, _ = logp_fn(params, subkey, *x_init, False)
-        logp_init = logp_w + logp_xyz + logp_a
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey, *x_init, False)
+        logp_init = logp_w + logp_xyz + logp_a + logp_l
         jax.debug.print("logp {x} {y}", 
                         x=logp_init.mean(),
                         y=jnp.std(logp_init)/jnp.sqrt(logp_init.shape[0])
@@ -105,7 +157,9 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
         # print("logp", logp)
         A = x[3]
         scale = jnp.sum(A != 0)/(A.shape[0]*n_max)
-        accept_rate = num_accepts / (scale * mc_steps * x[0].shape[0])
+        # accept_rate = num_accepts / (scale * mc_steps * x[0].shape[0])
+        accept_rate = num_accepts / (scale*mc_steps*n_max/(n_max+2) + mc_steps*2/(n_max+2))
+        accept_rate = accept_rate / x[0].shape[0]
         return x, accept_rate
     
     return mcmc
@@ -133,7 +187,7 @@ if __name__  == "__main__":
     loss_fn, logp_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer)
 
     # MCMC sampling test
-    mc_steps = 21
+    mc_steps = 23
     mc_width = 0.1
     x_init = (G[:5], L[:5], XYZ[:5], A[:5], W[:5])
 
@@ -147,9 +201,9 @@ if __name__  == "__main__":
         x, acc = mcmc(logp_fn, x_init=x_init, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
         print(i, acc)
 
-    print("check if the atom type is changed")
-    print(x_init[3])
-    print(x[3])
+    print("check if the lattice is changed")
+    print(x_init[1])
+    print(x[1])
 
     print("check if the atom position is changed")
     print(x_init[2])
