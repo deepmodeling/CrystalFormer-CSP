@@ -65,7 +65,12 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
                                       lambda _: update_length(key_proposal_L, L),
                                       lambda _: update_angle(key_proposal_L, L),
                                       None)
+
+            length, angle = jnp.split(L_proposal, 2, axis=-1)
+            angle = jnp.rad2deg(angle)  # change the unit to degree
+            L_proposal = jnp.concatenate([length, angle], axis=-1)
             L_proposal = jax.vmap(symmetrize_lattice, (0, 0))(G, L_proposal) 
+
             length, angle = jnp.split(L_proposal, 2, axis=-1)
             angle = jnp.deg2rad(angle)  # change the unit to rad
             L_proposal = jnp.concatenate([length, angle], axis=-1)
