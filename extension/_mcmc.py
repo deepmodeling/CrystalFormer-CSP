@@ -10,7 +10,7 @@ from lattice import symmetrize_lattice
 
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
 
-def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
+def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, atom_mask=None, constraints=None):
 
     if atom_mask is None or jnp.all(atom_mask == 0):
         atom_mask = jnp.ones((n_max, atom_types))
@@ -71,8 +71,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
             L_proposal = jnp.concatenate([length, angle], axis=-1)
             
             x_proposal = (G, L_proposal, XYZ, A, W)
-            logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key_logp, *x_proposal, False)
-            logp_proposal = logp_w + logp_xyz + logp_a + logp_l
+            logp_proposal = logp_fn(base_params, cond_params, model_state, key_logp, *x_proposal, False)
 
             ratio = jnp.exp((logp_proposal - logp))
             accept = jax.random.uniform(key_accept, ratio.shape) < ratio
@@ -108,8 +107,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
                 XYZ_proposal = jnp.where(fc_mask, _XYZ, XYZ)
                 x_proposal = (G, L, XYZ_proposal, A_proposal, W)
 
-                logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key_logp, *x_proposal, False)
-                logp_proposal = logp_w + logp_xyz + logp_a + logp_l
+                logp_proposal = logp_fn(base_params, cond_params, model_state, key_logp, *x_proposal, False)
 
                 ratio = jnp.exp((logp_proposal - logp))
                 accept = jax.random.uniform(key_accept, ratio.shape) < ratio
@@ -146,8 +144,7 @@ def make_mcmc_step(params, n_max, atom_types, atom_mask=None, constraints=None):
             return x, logp, key, num_accepts
 
         key, subkey = jax.random.split(key)
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey, *x_init, False)
-        logp_init = logp_w + logp_xyz + logp_a + logp_l
+        logp_init = logp_fn(base_params, cond_params, model_state, subkey, *x_init, False)
         jax.debug.print("logp {x} {y}", 
                         x=logp_init.mean(),
                         y=jnp.std(logp_init)/jnp.sqrt(logp_init.shape[0])
