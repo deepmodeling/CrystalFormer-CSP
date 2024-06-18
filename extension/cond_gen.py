@@ -1,6 +1,9 @@
 import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
+import pandas as pd
+import numpy as np
+from ast import literal_eval
 
 from config import *
 from _loss import make_classifier_loss, make_cond_logp
@@ -9,6 +12,7 @@ from _transformer import make_transformer as make_transformer_with_state
 from _mcmc import make_mcmc_step
 
 import checkpoint
+from wyckoff import mult_table
 from loss import make_loss_fn
 from transformer import make_transformer
 
@@ -103,25 +107,42 @@ if __name__  == "__main__":
     else:
         print("No checkpoint file found. Start from scratch.")
 
-    params = (base_params, cond_params)
-
     ################### Conditional Generation ############################
     forward = jax.vmap(forward_fn, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))
-    cond_logp_fn = make_cond_logp(logp_fn, forward, jnp.array(-2), 0.1)
+    cond_logp_fn = make_cond_logp(logp_fn, forward, 
+                                  target=jnp.array(-4),
+                                  alpha=1)
 
     print("\n========== Load sampled data ==========")
-    from utils import GLXYZAW_from_file
-    csv_file = '../data/mini.csv'
-    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
+    spg = 225
+    csv_file = f"/home/zdcao/pipeline_crystalgpt/crystal_gpt/experimental/output_{spg}.csv"
+    origin_data = pd.read_csv(csv_file)
+    L, XYZ, A, W = origin_data['L'], origin_data['X'], origin_data['A'], origin_data['W']
+    L = L.apply(lambda x: literal_eval(x))
+    XYZ = XYZ.apply(lambda x: literal_eval(x))
+    A = A.apply(lambda x: literal_eval(x))
+    W = W.apply(lambda x: literal_eval(x))
 
-    value = jax.jit(cond_logp_fn, static_argnums=9)(base_params, cond_params, state,
-                                                    key, G, L, XYZ, A, W, False)
-    print(value.shape)
+    # convert array of list to numpy ndarray
+    G = jnp.array([spg]*len(L))
+    L = jnp.array(L.tolist())
+    XYZ = jnp.array(XYZ.tolist())
+    A = jnp.array(A.tolist())
+    W = jnp.array(W.tolist())
+
+    M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
+    num_atoms = jnp.sum(M, axis=1)
+    length, angle = jnp.split(L, 2, axis=-1)
+    length = length/num_atoms[:, None]**(1/3)
+    angle = angle * (jnp.pi / 180) # to rad
+    L = jnp.concatenate([length, angle], axis=-1)
+
+    print(G.shape, L.shape, XYZ.shape, A.shape, W.shape)
 
     print("\n========== Start MCMC ==========")
     mcmc = make_mcmc_step(base_params, cond_params, state, n_max=n_max, atom_types=atom_types)
 
-    mc_steps = 23
+    mc_steps = 230
     mc_width = 0.1
     x = (G, L, XYZ, A, W)
 
@@ -137,7 +158,36 @@ if __name__  == "__main__":
 
     G, L, XYZ, A, W = x
 
+    key, subkey = jax.random.split(key)
+    logp_new = jax.jit(cond_logp_fn, static_argnums=9)(base_params, cond_params, state, subkey, G, L, XYZ, A, W, False)
+
+    print("====== after mcmc =====")
+    M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) 
+    num_atoms = jnp.sum(M, axis=1)
+
+    #scale length according to atom number since we did reverse of that when loading data
+    length, angle = jnp.split(L, 2, axis=-1)
+    length = length*num_atoms[:, None]**(1/3)
+    angle = angle * (180.0 / jnp.pi) # to deg
+    L = jnp.concatenate([length, angle], axis=-1)
+
     print ("XYZ:\n", XYZ)  # fractional coordinate 
     print ("A:\n", A)  # element type
     print ("W:\n", W)  # Wyckoff positions
     print ("L:\n", L)  # lattice
+
+    
+
+    data = pd.DataFrame()
+    data['L'] = np.array(L).tolist()
+    data['X'] = np.array(XYZ).tolist()
+    data['A'] = np.array(A).tolist()
+    data['W'] = np.array(W).tolist()
+    data['M'] = np.array(M).tolist()
+    data['logp'] = np.array(logp_new).tolist()
+
+    filename = f'./cond_ouput_{spg}.csv'
+    header = False if os.path.exists(filename) else True
+    data.to_csv(filename, mode='a', index=False, header=header)
+
+    print ("Wrote samples to %s"%filename)
