@@ -110,8 +110,8 @@ if __name__  == "__main__":
     ################### Conditional Generation ############################
     forward = jax.vmap(forward_fn, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))
     cond_logp_fn = make_cond_logp(logp_fn, forward, 
-                                  target=jnp.array(-4),
-                                  alpha=1)
+                                  target=jnp.array(-3),
+                                  alpha=10)
 
     print("\n========== Load sampled data ==========")
     spg = 225
@@ -142,7 +142,7 @@ if __name__  == "__main__":
     print("\n========== Start MCMC ==========")
     mcmc = make_mcmc_step(base_params, cond_params, state, n_max=n_max, atom_types=atom_types)
 
-    mc_steps = 230
+    mc_steps = 2300
     mc_width = 0.1
     x = (G, L, XYZ, A, W)
 
@@ -175,8 +175,6 @@ if __name__  == "__main__":
     print ("A:\n", A)  # element type
     print ("W:\n", W)  # Wyckoff positions
     print ("L:\n", L)  # lattice
-
-    
 
     data = pd.DataFrame()
     data['L'] = np.array(L).tolist()
