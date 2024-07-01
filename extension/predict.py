@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 
 key = jax.random.PRNGKey(42)
 spg = 225 
-test_path = f"/home/zdcao/pipeline_crystalgpt/crystal_gpt/cond_ouput_{spg}.csv"
+test_path = f"/home/zdcao/pipeline_crystalgpt/crystal_gpt/cond_output_{spg}.csv"
 # test_path = f"/home/zdcao/pipeline_crystalgpt/crystal_gpt/experimental/output_{spg}.csv"
 
 atom_types = 119

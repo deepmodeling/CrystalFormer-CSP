@@ -142,7 +142,7 @@ if __name__  == "__main__":
     print("\n========== Start MCMC ==========")
     mcmc = make_mcmc_step(base_params, cond_params, state, n_max=n_max, atom_types=atom_types)
 
-    mc_steps = 2300
+    mc_steps = 23000
     mc_width = 0.1
     init_temp = 10.0
     end_temp = 1.0
@@ -192,7 +192,7 @@ if __name__  == "__main__":
     data['M'] = np.array(M).tolist()
     data['logp'] = np.array(logp_new).tolist()
 
-    filename = f'./cond_ouput_{spg}.csv'
+    filename = f'./cond_output_{spg}.csv'
     header = False if os.path.exists(filename) else True
     data.to_csv(filename, mode='a', index=False, header=header)
 
