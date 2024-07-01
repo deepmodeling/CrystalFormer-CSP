@@ -144,8 +144,9 @@ if __name__  == "__main__":
 
     mc_steps = 2300
     mc_width = 0.1
-    init_temp = 100.0
-    decay_factor = 0.005
+    init_temp = 10.0
+    end_temp = 1.0
+    decay_step = 10
     x = (G, L, XYZ, A, W)
 
     print("====== before mcmc =====")
@@ -154,10 +155,14 @@ if __name__  == "__main__":
     print ("W:\n", W)  # Wyckoff positions
     print ("L:\n", L)  # lattice
 
-    key, subkey = jax.random.split(key)
-    x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey, mc_steps=mc_steps, mc_width=mc_width,
-                  init_temp=init_temp, decay_factor=decay_factor)
-    print("acc", acc)
+    temp = init_temp
+    for i in range(decay_step):
+        alpha = i/(decay_step-1)
+        temp = 1/(alpha/end_temp + (1-alpha)/init_temp)
+        # temp = init_temp - (init_temp - end_temp) * i / (decay_step-1)
+        key, subkey = jax.random.split(key)
+        x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey, mc_steps=mc_steps//decay_step, mc_width=mc_width, temp=temp)
+        print("i, temp, acc", i, temp, acc)
 
     G, L, XYZ, A, W = x
 

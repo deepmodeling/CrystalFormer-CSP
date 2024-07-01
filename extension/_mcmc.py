@@ -30,7 +30,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
         return A
         
     @partial(jax.jit, static_argnums=0)
-    def mcmc(logp_fn, x_init, key, mc_steps, mc_width, init_temp=1.0, end_temp=1.0, decay_factor=0.02):
+    def mcmc(logp_fn, x_init, key, mc_steps, mc_width, temp):
         """
             Markov Chain Monte Carlo sampling algorithm.
 
@@ -86,15 +86,9 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
             logp_new = jnp.where(accept, logp_proposal, logp)
             num_accepts += jnp.sum(accept)
 
-            temp = jax.lax.cond(temp > end_temp,        # temperature decay
-                    lambda _: init_temp*jnp.exp(-decay_factor*i),
-                    lambda _: end_temp,
-                    None)
-
-            jax.debug.print("logp {x} {y} {z}", 
+            jax.debug.print("logp {x} {y}", 
                             x=logp_new.mean(),
-                            y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0]),
-                            z=temp
+                            y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
                             )
             return x_new, logp_new, key, num_accepts, temp
         
@@ -129,15 +123,9 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
                 logp_new = jnp.where(accept, logp_proposal, logp)
                 num_accepts += jnp.sum(accept*jnp.where(A[:, i%n_max]==0, 0, 1)) 
 
-                temp = jax.lax.cond(temp > end_temp,        # temperature decay
-                    lambda _: init_temp*jnp.exp(-decay_factor*i),
-                    lambda _: end_temp,
-                    None)
-
-                jax.debug.print("logp {x} {y} {z}", 
+                jax.debug.print("logp {x} {y}", 
                                 x=logp_new.mean(),
-                                y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0]),
-                                z=temp
+                                y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
                                 )
                 return x_new, logp_new, key, num_accepts, temp
 
@@ -161,14 +149,12 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
 
         key, subkey = jax.random.split(key)
         logp_init = logp_fn(base_params, cond_params, model_state, subkey, *x_init, False)
-        jax.debug.print("logp {x} {y} {z}", 
+        jax.debug.print("logp {x} {y}", 
                         x=logp_init.mean(),
                         y=jnp.std(logp_init)/jnp.sqrt(logp_init.shape[0]),
-                        z=init_temp
                         )
         
-        x, logp, key, num_accepts, temp = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0., init_temp))
-        # print("logp", logp)
+        x, logp, key, num_accepts, temp = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0., temp))
         A = x[3]
         scale = jnp.sum(A != 0)/(A.shape[0]*n_max)
         # accept_rate = num_accepts / (scale * mc_steps * x[0].shape[0])
