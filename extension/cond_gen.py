@@ -144,6 +144,8 @@ if __name__  == "__main__":
 
     mc_steps = 2300
     mc_width = 0.1
+    init_temp = 100.0
+    decay_factor = 0.005
     x = (G, L, XYZ, A, W)
 
     print("====== before mcmc =====")
@@ -153,7 +155,8 @@ if __name__  == "__main__":
     print ("L:\n", L)  # lattice
 
     key, subkey = jax.random.split(key)
-    x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey, mc_steps=mc_steps, mc_width=mc_width)
+    x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey, mc_steps=mc_steps, mc_width=mc_width,
+                  init_temp=init_temp, decay_factor=decay_factor)
     print("acc", acc)
 
     G, L, XYZ, A, W = x

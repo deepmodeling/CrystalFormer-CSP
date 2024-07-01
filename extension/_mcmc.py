@@ -30,7 +30,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
         return A
         
     @partial(jax.jit, static_argnums=0)
-    def mcmc(logp_fn, x_init, key, mc_steps, mc_width):
+    def mcmc(logp_fn, x_init, key, mc_steps, mc_width, init_temp=1.0, end_temp=1.0, decay_factor=0.02):
         """
             Markov Chain Monte Carlo sampling algorithm.
 
@@ -57,7 +57,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
                 angle += jax.random.normal(key, angle.shape) * mc_width
                 return jnp.concatenate([length, angle], axis=-1)
             
-            x, logp, key, num_accepts = state
+            x, logp, key, num_accepts, temp = state
             G, L, XYZ, A, W = x
             key, key_proposal_L, key_accept, key_logp = jax.random.split(key, 4)
 
@@ -78,7 +78,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
             x_proposal = (G, L_proposal, XYZ, A, W)
             logp_proposal = logp_fn(base_params, cond_params, model_state, key_logp, *x_proposal, False)
 
-            ratio = jnp.exp((logp_proposal - logp))
+            ratio = jnp.exp((logp_proposal - logp)/ temp)
             accept = jax.random.uniform(key_accept, ratio.shape) < ratio
 
             L_new = jnp.where(accept[:, None], L_proposal, L)  # update lattice
@@ -86,16 +86,22 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
             logp_new = jnp.where(accept, logp_proposal, logp)
             num_accepts += jnp.sum(accept)
 
-            jax.debug.print("logp {x} {y}", 
+            temp = jax.lax.cond(temp > end_temp,        # temperature decay
+                    lambda _: init_temp*jnp.exp(-decay_factor*i),
+                    lambda _: end_temp,
+                    None)
+
+            jax.debug.print("logp {x} {y} {z}", 
                             x=logp_new.mean(),
-                            y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
+                            y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0]),
+                            z=temp
                             )
-            return x_new, logp_new, key, num_accepts
+            return x_new, logp_new, key, num_accepts, temp
         
 
         def update_a_xyz(i, state):
             def true_func(i, state):
-                x, logp, key, num_accepts = state
+                x, logp, key, num_accepts, temp = state
                 G, L, XYZ, A, W = x
                 key, key_proposal_A, key_proposal_XYZ, key_accept, key_logp = jax.random.split(key, 5)
                 
@@ -114,7 +120,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
 
                 logp_proposal = logp_fn(base_params, cond_params, model_state, key_logp, *x_proposal, False)
 
-                ratio = jnp.exp((logp_proposal - logp))
+                ratio = jnp.exp((logp_proposal - logp)/ temp)
                 accept = jax.random.uniform(key_accept, ratio.shape) < ratio
 
                 A_new = jnp.where(accept[:, None], A_proposal, A)  # update atom types
@@ -122,40 +128,46 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
                 x_new = (G, L, XYZ_new, A_new, W)
                 logp_new = jnp.where(accept, logp_proposal, logp)
                 num_accepts += jnp.sum(accept*jnp.where(A[:, i%n_max]==0, 0, 1)) 
-                jax.debug.print("logp {x} {y}", 
+
+                temp = jax.lax.cond(temp > end_temp,        # temperature decay
+                    lambda _: init_temp*jnp.exp(-decay_factor*i),
+                    lambda _: end_temp,
+                    None)
+
+                jax.debug.print("logp {x} {y} {z}", 
                                 x=logp_new.mean(),
-                                y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0])
+                                y=jnp.std(logp_new)/jnp.sqrt(logp_new.shape[0]),
+                                z=temp
                                 )
-                return x_new, logp_new, key, num_accepts
+                return x_new, logp_new, key, num_accepts, temp
 
             def false_func(i, state):
-                x, logp, key, num_accepts = state
-                return x, logp, key, num_accepts
+                return state
             
-            x, logp, key, num_accepts = state
+            x, logp, key, num_accepts, temp = state
             A = x[3]
-            x, logp, key, num_accepts = jax.lax.cond(A[:, i%(n_max+2)%n_max].sum() != 0,
-                                                     lambda _: true_func(i, state),
-                                                     lambda _: false_func(i, state),
-                                                     None)
-            return x, logp, key, num_accepts
+            x, logp, key, num_accepts, temp = jax.lax.cond(A[:, i%(n_max+2)%n_max].sum() != 0,
+                                                           lambda _: true_func(i, state),
+                                                           lambda _: false_func(i, state),
+                                                           None)
+            return x, logp, key, num_accepts, temp
 
         def step(i, state):
-            x, logp, key, num_accepts = state
-            x, logp, key, num_accepts = jax.lax.cond(i % (n_max+2) < n_max,
-                                                     lambda _: update_a_xyz(i, state),
-                                                     lambda _: update_lattice(i, state),
-                                                     None)
-            return x, logp, key, num_accepts
+            x, logp, key, num_accepts, temp = jax.lax.cond(i % (n_max+2) < n_max,
+                                                           lambda _: update_a_xyz(i, state),
+                                                           lambda _: update_lattice(i, state),
+                                                           None)
+            return x, logp, key, num_accepts, temp
 
         key, subkey = jax.random.split(key)
         logp_init = logp_fn(base_params, cond_params, model_state, subkey, *x_init, False)
-        jax.debug.print("logp {x} {y}", 
+        jax.debug.print("logp {x} {y} {z}", 
                         x=logp_init.mean(),
-                        y=jnp.std(logp_init)/jnp.sqrt(logp_init.shape[0])
+                        y=jnp.std(logp_init)/jnp.sqrt(logp_init.shape[0]),
+                        z=init_temp
                         )
         
-        x, logp, key, num_accepts = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0.))
+        x, logp, key, num_accepts, temp = jax.lax.fori_loop(0, mc_steps, step, (x_init, logp_init, key, 0., init_temp))
         # print("logp", logp)
         A = x[3]
         scale = jnp.sum(A != 0)/(A.shape[0]*n_max)
