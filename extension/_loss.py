@@ -65,6 +65,39 @@ def make_cond_logp(logp_fn, forward_fn, target, alpha):
     return cond_logp_fn
 
 
+def make_multi_cond_logp(logp_fn, forward_fns, targets, alphas):
+    '''
+    NOTE This Multi-conditional is now only available for TWO conditional models
+    '''
+    def cond_logp_fn(base_params, cond_params, state, key, G, L, XYZ, A, W, is_training):
+        '''
+        base_params: base model parameters
+        cond_params: conditional model parameters
+        '''
+        # calculate log p(x)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(base_params, key, G, L, XYZ, A, W, is_training)
+        logp_base = logp_xyz + logp_w + logp_a + logp_l
+
+        # calculate multiple p(y|x) 
+        forward_fn1, forward_fn2 = forward_fns
+        target1, target2 = targets
+        alpha1, alpha2 = alphas
+        cond_params1, cond_params2 = cond_params
+
+        y1 = forward_fn1(cond_params1, state, key, G, L, XYZ, A, W, is_training) # f1(x)
+        y2 = forward_fn2(cond_params2, state, key, G, L, XYZ, A, W, is_training) # f2(x)
+
+        logp_cond1 = jnp.abs(target1 - y1) # |y1 - f1(x)|
+        logp_cond2 = jnp.abs(target2 - y2)
+
+        # trade-off between log p(x) and p(y|x)
+        logp = logp_base - alpha1 * logp_cond1.squeeze() - alpha2 * logp_cond2.squeeze()
+
+        return logp
+    
+    return cond_logp_fn
+
+
 if __name__ == "__main__":
     from utils import GLXYZAW_from_file
 
@@ -119,5 +152,14 @@ if __name__ == "__main__":
                                   target=1.0, 
                                   alpha=0.1)
     value = jax.jit(cond_logp_fn, static_argnums=9)(base_params, params, state, key, G, L, XYZ, A, W, False)
+    print(value)
+    print(value.shape)
+
+    # test_multi_cond_loss
+    forward_fns = (forward, forward)
+    targets = (1.0, 1.0)
+    alphas = (0.1, 0.1)
+    multi_cond_logp_fn = make_multi_cond_logp(logp_fn, forward_fns, targets, alphas)
+    value = jax.jit(multi_cond_logp_fn, static_argnums=9)(base_params, (params, params), state, key, G, L, XYZ, A, W, False)
     print(value)
     print(value.shape)
