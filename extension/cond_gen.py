@@ -6,7 +6,7 @@ import numpy as np
 from ast import literal_eval
 
 from config import *
-from _loss import make_classifier_loss, make_cond_logp
+from _loss import make_classifier_loss, make_cond_logp, make_multi_cond_logp
 from _model import make_classifier
 from _transformer import make_transformer as make_transformer_with_state
 from _mcmc import make_mcmc_step
@@ -39,10 +39,16 @@ if __name__  == "__main__":
     outputs_size = 64
     hidden_sizes = [128, 128, 64]
     num_classes = 1
-    restore_path = "/data/zdcao/crystal_gpt/classifier/"
+    restore_path = ("/data/zdcao/crystal_gpt/classifier/", 
+                    "/data/zdcao/crystal_gpt/classifier/bandgap_mae/"
+    )
     lr = 1e-4
     epochs = 1000
     batchsize = 256
+
+    mode = "multi" # "single" or "multi"
+    target = (-3, 2) # target value for formation energy and bandgap
+    alpha = (10, 3) 
 
     ################### Load Classifier Model #############################
     transformer_params, state, cond_transformer = make_transformer_with_state(key, Nf, Kx, Kl, n_max, 
@@ -66,18 +72,33 @@ if __name__  == "__main__":
 
     cond_params = (transformer_params, classifier_params)
 
-    print("\n========== Prepare logs ==========")
-    output_path = os.path.dirname(restore_path)
-    print("Will output samples to: %s" % output_path)
+    # print("\n========== Prepare logs ==========")
+    # output_path = os.path.dirname(restore_path)
+    # print("Will output samples to: %s" % output_path)
 
     print("\n========== Load checkpoint==========")
-    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path) 
+    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path[0]) 
     if ckpt_filename is not None:
         print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
         ckpt = checkpoint.load_data(ckpt_filename)
-        cond_params = ckpt["params"]
+        cond_params1 = ckpt["params"]
     else:
         print("No checkpoint file found. Start from scratch.")
+
+    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path[1]) 
+    if ckpt_filename is not None:
+        print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
+        ckpt = checkpoint.load_data(ckpt_filename)
+        cond_params2 = ckpt["params"]
+    else:
+        print("No checkpoint file found. Start from scratch.")
+
+    if mode == "single":
+        cond_params = cond_params1
+    elif mode == "multi":
+        cond_params = (cond_params1, cond_params2)
+    else:
+        raise ValueError("mode should be either single or multi")
     
     _, forward_fn = make_classifier_loss(cond_transformer, classifier)
 
@@ -109,9 +130,17 @@ if __name__  == "__main__":
 
     ################### Conditional Generation ############################
     forward = jax.vmap(forward_fn, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))
-    cond_logp_fn = make_cond_logp(logp_fn, forward, 
-                                  target=jnp.array(-3),
-                                  alpha=10)
+
+    if mode == "single":
+        cond_logp_fn = make_cond_logp(logp_fn, forward, 
+                                      target=jnp.array(target[0]),
+                                      alpha=alpha[0])
+    else:
+        cond_logp_fn = make_multi_cond_logp(logp_fn,
+                                            forward_fns=(forward, forward),
+                                            targets=jnp.array(target),
+                                            alphas=alpha
+                                            )
 
     print("\n========== Load sampled data ==========")
     spg = 225
