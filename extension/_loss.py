@@ -84,8 +84,9 @@ def make_multi_cond_logp(logp_fn, forward_fns, targets, alphas):
         alpha1, alpha2 = alphas
         cond_params1, cond_params2 = cond_params
 
-        y1 = forward_fn1(cond_params1, state, key, G, L, XYZ, A, W, is_training) # f1(x)
-        y2 = forward_fn2(cond_params2, state, key, G, L, XYZ, A, W, is_training) # f2(x)
+        key, subkey1, subkey2 = jax.random.split(key, 3)
+        y1 = forward_fn1(cond_params1, state, subkey1, G, L, XYZ, A, W, is_training) # f1(x)
+        y2 = forward_fn2(cond_params2, state, subkey2, G, L, XYZ, A, W, is_training) # f2(x)
 
         logp_cond1 = jnp.abs(target1 - y1) # |y1 - f1(x)|
         logp_cond2 = jnp.abs(target2 - y2)

@@ -196,6 +196,9 @@ if __name__  == "__main__":
     G, L, XYZ, A, W = x
 
     key, subkey = jax.random.split(key)
+    logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(base_params, subkey, G, L, XYZ, A, W, False)
+    logp = logp_w + logp_xyz + logp_a + logp_l
+    key, subkey = jax.random.split(key)
     logp_new = jax.jit(cond_logp_fn, static_argnums=9)(base_params, cond_params, state, subkey, G, L, XYZ, A, W, False)
 
     print("====== after mcmc =====")
@@ -219,7 +222,8 @@ if __name__  == "__main__":
     data['A'] = np.array(A).tolist()
     data['W'] = np.array(W).tolist()
     data['M'] = np.array(M).tolist()
-    data['logp'] = np.array(logp_new).tolist()
+    data['logp'] = np.array(logp).tolist()
+    data['logp_new'] = np.array(logp_new).tolist()
 
     filename = f'./cond_output_{spg}.csv'
     header = False if os.path.exists(filename) else True
