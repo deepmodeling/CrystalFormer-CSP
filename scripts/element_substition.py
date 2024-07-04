@@ -48,7 +48,7 @@ def main(args):
             print(f"there is {len(sub_structs)} sub structures")
             for _sub_struct in sub_structs:
 
-                if _sub_struct['probability'] < args.prob_threshold:
+                if _sub_struct['probability'] < float(args.prob_threshold):
                     continue
                 
                 sub_struct = _sub_struct['structure']
