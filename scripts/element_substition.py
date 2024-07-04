@@ -77,7 +77,7 @@ def main(args):
     print(len(last_struct))
 
     output_data = pd.DataFrame()
-    output_data['cif'] = [struct.as_dict() for struct in sub_scale_structs]
+    output_data['cif'] = [struct.as_dict() for struct in last_struct]
     output_data.to_csv(args.output_path, index=False)
 
 
