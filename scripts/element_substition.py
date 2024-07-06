@@ -41,6 +41,7 @@ def main(args):
     print(len(oxi_structs))
 
     sub_scale_structs = []
+    prob_list = []
     for idx, struct in enumerate(oxi_structs):
         print(idx)
         try:
@@ -57,6 +58,7 @@ def main(args):
                 
                 scale_struct = volume_predictor.get_predicted_structure(sub_struct)
                 sub_scale_structs.append(scale_struct)
+                prob_list.append(_sub_struct['probability'])
         except Exception as e:
             print(e)
             # print(struct)
@@ -66,18 +68,25 @@ def main(args):
 
     # remove duplicate structures in the list
     last_struct = []
-    for idx, struct in enumerate(sub_scale_structs):
+    last_prob = []
+    for idx, (struct, prob)  in enumerate(zip(sub_scale_structs, prob_list)):
         if idx == 0:
             last_struct.append(struct)
+            last_prob.append(prob)
             continue
 
         if struct in last_struct:
             continue
         last_struct.append(struct)
+        last_prob.append(prob)
     print(len(last_struct))
 
     output_data = pd.DataFrame()
     output_data['cif'] = [struct.as_dict() for struct in last_struct]
+    output_data['probability'] = last_prob
+    output_data = output_data.sort_values(by='probability', ascending=False)
+    # only select top num structures
+    output_data = output_data.head(int(args.top_num))
     output_data.to_csv(args.output_path, index=False)
 
 
@@ -87,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--spacegroup', default=216, help='spacegroup number')
     parser.add_argument('--anonymized_formula', default='AB', help='anonymized formula')
     parser.add_argument('--prob_threshold', default=0.05, help='probability threshold')
+    parser.add_argument('--top_num', default=100, help='top number of the output')
     parser.add_argument('--output_path', default='./test.csv', help='filepath of the output file')
     args = parser.parse_args()
     main(args)
