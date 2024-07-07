@@ -81,6 +81,9 @@ def main(args):
         last_prob.append(prob)
     print(len(last_struct))
 
+    # convert to conventional cell
+    last_struct = [s.to_conventional() for s in last_struct]
+
     output_data = pd.DataFrame()
     output_data['cif'] = [struct.as_dict() for struct in last_struct]
     output_data['probability'] = last_prob
