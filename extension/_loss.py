@@ -67,8 +67,18 @@ def make_cond_logp(logp_fn, forward_fn, target, alpha):
 
 def make_multi_cond_logp(logp_fn, forward_fns, targets, alphas):
     '''
-    NOTE This Multi-conditional is now only available for TWO conditional models
+    logp_fn: function to calculate log p(x)
+    forward_fns: functions to calculate p(y|x)
+    targets: target labels
+    alphas: hyperparameters to control the trade-off between log p(x) and log p(y|x)
+
+    NOTE that the logp_fn and forward_fns should be vmapped before passing to this function
     '''
+
+    num_conditions = len(forward_fns)
+    assert len(forward_fns) == len(targets) == len(alphas), "The number of forward functions, targets, and alphas should be the same"
+    print (num_conditions)
+
     def cond_logp_fn(base_params, cond_params, state, key, G, L, XYZ, A, W, is_training):
         '''
         base_params: base model parameters
@@ -79,20 +89,14 @@ def make_multi_cond_logp(logp_fn, forward_fns, targets, alphas):
         logp_base = logp_xyz + logp_w + logp_a + logp_l
 
         # calculate multiple p(y|x) 
-        forward_fn1, forward_fn2 = forward_fns
-        target1, target2 = targets
-        alpha1, alpha2 = alphas
-        cond_params1, cond_params2 = cond_params
-
-        key, subkey1, subkey2 = jax.random.split(key, 3)
-        y1 = forward_fn1(cond_params1, state, subkey1, G, L, XYZ, A, W, is_training) # f1(x)
-        y2 = forward_fn2(cond_params2, state, subkey2, G, L, XYZ, A, W, is_training) # f2(x)
-
-        logp_cond1 = jnp.abs(target1 - y1) # |y1 - f1(x)|
-        logp_cond2 = jnp.abs(target2 - y2)
+        key, *subkeys = jax.random.split(key, num_conditions+1)
+        logp_cond = 0
+        for i in range(num_conditions):
+            y = forward_fns[i](cond_params[i], state, subkeys[i], G, L, XYZ, A, W, is_training)
+            logp_cond += jnp.abs(targets[i] - y).squeeze() * alphas[i]
 
         # trade-off between log p(x) and p(y|x)
-        logp = logp_base - alpha1 * logp_cond1.squeeze() - alpha2 * logp_cond2.squeeze()
+        logp = logp_base - logp_cond
 
         return logp
     
