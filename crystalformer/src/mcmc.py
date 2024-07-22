@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from wyckoff import fc_mask_table
-from von_mises import sample_von_mises
+from crystalformer.src.wyckoff import fc_mask_table
+from crystalformer.src.von_mises import sample_von_mises
 
 
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
