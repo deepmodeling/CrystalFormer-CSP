@@ -2,10 +2,9 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-# from config import *
-from wyckoff import fc_mask_table
-from von_mises import sample_von_mises
-from lattice import symmetrize_lattice
+from crystalformer.src.wyckoff import fc_mask_table
+from crystalformer.src.von_mises import sample_von_mises
+from crystalformer.src.lattice import symmetrize_lattice
 
 
 get_fc_mask = lambda g, w: jnp.logical_and((w>0)[:, None], fc_mask_table[g-1, w])
@@ -166,9 +165,9 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
 
 
 if __name__  == "__main__":
-    from utils import GLXYZAW_from_file
-    from loss import make_loss_fn
-    from transformer import make_transformer
+    from crystalformer.src.utils import GLXYZAW_from_file
+    from crystalformer.src.loss import make_loss_fn
+    from crystalformer.src.transformer import make_transformer
     atom_types = 119
     n_max = 21
     wyck_types = 28

@@ -3,7 +3,7 @@ import jax
 import optax
 import math
 
-import checkpoint
+import crystalformer.src.checkpoint as checkpoint
 
 
 def train(key, optimizer, opt_state, loss_fn, params, state, epoch_finished, epochs, batchsize, train_data, valid_data, path):

@@ -1,9 +1,8 @@
 import jax
 import jax.numpy as jnp
 from functools import partial
-
-# from config import *   
-from wyckoff import mult_table
+ 
+from crystalformer.src.wyckoff import mult_table
 
 
 def make_classifier_loss(transformer, classifier):
@@ -104,10 +103,10 @@ def make_multi_cond_logp(logp_fn, forward_fns, targets, alphas):
 
 
 if __name__ == "__main__":
-    from utils import GLXYZAW_from_file
+    from crystalformer.src.utils import GLXYZAW_from_file
 
-    from _model import make_classifier
-    from _transformer import make_transformer
+    from model import make_classifier
+    from transformer import make_transformer
 
     atom_types = 119
     n_max = 21
