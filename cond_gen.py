@@ -5,16 +5,15 @@ import pandas as pd
 import numpy as np
 from ast import literal_eval
 
-from config import *
-from _loss import make_classifier_loss, make_cond_logp, make_multi_cond_logp
-from _model import make_classifier
-from _transformer import make_transformer as make_transformer_with_state
-from _mcmc import make_mcmc_step
+from crystalformer.extension.loss import make_classifier_loss, make_cond_logp, make_multi_cond_logp
+from crystalformer.extension.model import make_classifier
+from crystalformer.extension.transformer import make_transformer as make_transformer_with_state
+from crystalformer.extension.mcmc import make_mcmc_step
 
-import checkpoint
-from wyckoff import mult_table
-from loss import make_loss_fn
-from transformer import make_transformer
+import crystalformer.src.checkpoint as checkpoint
+from crystalformer.src.wyckoff import mult_table
+from crystalformer.src.loss import make_loss_fn
+from crystalformer.src.transformer import make_transformer
 
 
 if __name__  == "__main__":
