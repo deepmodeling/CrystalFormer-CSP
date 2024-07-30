@@ -4,8 +4,7 @@ import pandas as pd
 import os
 import optax
 
-from config import *
-import checkpoint
+import crystalformer.src.checkpoint as checkpoint
 
 
 def get_labels(csv_file, label_col):
