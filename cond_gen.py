@@ -1,3 +1,4 @@
+import os
 import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
@@ -17,65 +18,97 @@ from crystalformer.src.transformer import make_transformer
 
 
 if __name__  == "__main__":
+
+    import argparse
+    parser = argparse.ArgumentParser(description='')
+
+    group = parser.add_argument_group('physics parameters')
+    group.add_argument('--n_max', type=int, default=21, help='The maximum number of atoms in the cell')
+    group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
+    group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
+
+
+    num_io_process = 40
+
+    group = parser.add_argument_group('base transformer parameters')
+    group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
+    group.add_argument('--Kx', type=int, default=16, help='number of modes in x')
+    group.add_argument('--Kl', type=int, default=4, help='number of modes in lattice')
+    group.add_argument('--h0_size', type=int, default=256, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
+    group.add_argument('--transformer_layers', type=int, default=16, help='The number of layers in transformer')
+    group.add_argument('--num_heads', type=int, default=16, help='The number of heads')
+    group.add_argument('--key_size', type=int, default=64, help='The key size')
+    group.add_argument('--model_size', type=int, default=64, help='The model size')
+    group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
+    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate')
+    group.add_argument('--restore_path', default='./', help='The path to restore the base model')
+
+    group = parser.add_argument_group('cond transformer parameters')
+    group.add_argument('--cond_transformer_layers', type=int, default=4, help='The number of layers in transformer')
+    group.add_argument('--cond_num_heads', type=int, default=8, help='The number of heads')
+    group.add_argument('--cond_key_size', type=int, default=32, help='The key size')
+    group.add_argument('--cond_dropout_rate', type=float, default=0.3, help='The dropout rate')
+
+    group = parser.add_argument_group('classifier parameters')
+    group.add_argument('--sequence_length', type=int, default=105, help='The sequence length')
+    group.add_argument('--outputs_size', type=int, default=64, help='The outputs size')
+    group.add_argument('--hidden_sizes', type=str, default='128,128,64' , help='The hidden sizes')
+    group.add_argument('--num_classes', type=int, default=1, help='The number of classes')
+
+    # restore_path = ("/data/zdcao/crystal_gpt/classifier/", 
+    #                 "/data/zdcao/crystal_gpt/classifier/bandgap_mae/"
+    # )
+    group.add_argument('--cond_restore_path', help='The path to restore the conditional model')
+
+    group = parser.add_argument_group('conditional generation parameters')
+    group.add_argument('--spacegroup', type=int, help='The space group')
+    group.add_argument('--input_path', default='./', help='The path to load the input data')
+    group.add_argument('--mode', type=str, default="multi", help='single or multi')
+    group.add_argument('--target', type=str, default="-3, 2", help='target value for formation energy and bandgap')
+    group.add_argument('--alpha', type=str, default="10, 3", help='guidance strength')
+    group.add_argument('--output_path', default='./', help='The path to output the generated data')
+
+    group = parser.add_argument_group('MCMC parameters')
+    group.add_argument('--mc_steps', type=int, default=1000, help='The number of MCMC steps')
+    group.add_argument('--mc_width', type=float, default=0.1, help='The width of MCMC proposal')
+    group.add_argument('--init_temp', type=float, default=10.0, help='The initial temperature')
+    group.add_argument('--end_temp', type=float, default=1.0, help='The final temperature')
+    group.add_argument('--decay_step', type=int, default=10, help='The number of decay steps')
+
+
+    args = parser.parse_args()
     key = jax.random.PRNGKey(42)
 
-    atom_types = 119
-    wyck_types = 28
-    n_max = 21
-    num_io_process = 40
-    Nf = 5
-    Kx = 16
-    Kl = 4
-    h0_size = 256
-    transformer_layers = 4
-    num_heads = 8
-    key_size = 32
-    model_size = 64
-    embed_size = 32
-    dropout_rate = 0.3
-
-    sequence_length = 105
-    outputs_size = 64
-    hidden_sizes = [128, 128, 64]
-    num_classes = 1
-    restore_path = ("/data/zdcao/crystal_gpt/classifier/", 
-                    "/data/zdcao/crystal_gpt/classifier/bandgap_mae/"
-    )
-    lr = 1e-4
-    epochs = 1000
-    batchsize = 256
-
-    mode = "multi" # "single" or "multi"
-    target = (-3, 2) # target value for formation energy and bandgap
-    alpha = (10, 3) 
+    target = [float(x) for x in args.target.split(',')]
+    alpha = [float(x) for x in args.alpha.split(',')]
 
     ################### Load Classifier Model #############################
-    transformer_params, state, cond_transformer = make_transformer_with_state(key, Nf, Kx, Kl, n_max, 
-                                                                              h0_size, 
-                                                                              transformer_layers, num_heads, 
-                                                                              key_size, model_size, embed_size, 
-                                                                              atom_types, wyck_types,
-                                                                              dropout_rate)
+    transformer_params, state, cond_transformer = make_transformer_with_state(key, args.Nf, args.Kx, args.Kl, args.n_max, 
+                                                                              args.h0_size, 
+                                                                              args.cond_transformer_layers,
+                                                                              args.cond_num_heads, 
+                                                                              args.cond_key_size,
+                                                                              args.model_size, args.embed_size, 
+                                                                              args.atom_types, args.wyck_types,
+                                                                              args.cond_dropout_rate)
+
     print ("# of transformer params", ravel_pytree(transformer_params)[0].size) 
     
     key, subkey = jax.random.split(key)
     classifier_params, classifier = make_classifier(subkey,
-                                                    n_max=n_max,
-                                                    embed_size=embed_size,
-                                                    sequence_length=sequence_length,
-                                                    outputs_size=outputs_size,
-                                                    hidden_sizes=hidden_sizes,
-                                                    num_classes=num_classes)
+                                                    n_max=args.n_max,
+                                                    embed_size=args.embed_size,
+                                                    sequence_length=args.sequence_length,
+                                                    outputs_size=args.outputs_size,
+                                                    hidden_sizes=[int(x) for x in args.hidden_sizes.split(',')],
+                                                    num_classes=args.num_classes)
 
     print ("# of classifier params", ravel_pytree(classifier_params)[0].size) 
 
     cond_params = (transformer_params, classifier_params)
 
-    # print("\n========== Prepare logs ==========")
-    # output_path = os.path.dirname(restore_path)
-    # print("Will output samples to: %s" % output_path)
-
     print("\n========== Load checkpoint==========")
+    restore_path = args.cond_restore_path.split(',')
     ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path[0]) 
     if ckpt_filename is not None:
         print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
@@ -92,9 +125,9 @@ if __name__  == "__main__":
     else:
         print("No checkpoint file found. Start from scratch.")
 
-    if mode == "single":
+    if args.mode == "single":
         cond_params = cond_params1
-    elif mode == "multi":
+    elif args.mode == "multi":
         cond_params = (cond_params1, cond_params2)
     else:
         raise ValueError("mode should be either single or multi")
@@ -102,24 +135,18 @@ if __name__  == "__main__":
     _, forward_fn = make_classifier_loss(cond_transformer, classifier)
 
     ################### Load BASE Model #############################
-    transformer_layers = 16
-    num_heads = 16
-    key_size = 64
-    dropout_rate = 0.5
-    restore_path = "/home/zdcao/pipeline_crystalgpt/crystal_gpt/experimental/"
-
-    base_params, base_transformer = make_transformer(key, Nf, Kx, Kl, n_max, 
-                                                     h0_size, 
-                                                     transformer_layers, num_heads, 
-                                                     key_size, model_size, embed_size, 
-                                                     atom_types, wyck_types,
-                                                     dropout_rate)
+    base_params, base_transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
+                                        args.h0_size, 
+                                        args.transformer_layers, args.num_heads, 
+                                        args.key_size, args.model_size, args.embed_size, 
+                                        args.atom_types, args.wyck_types,
+                                        args.dropout_rate)
     print ("# of transformer params", ravel_pytree(base_params)[0].size) 
 
-    _, logp_fn = make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, base_transformer)
+    _, logp_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, base_transformer)
 
     print("\n========== Load checkpoint==========")
-    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(restore_path) 
+    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path) 
     if ckpt_filename is not None:
         print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
         ckpt = checkpoint.load_data(ckpt_filename)
@@ -130,7 +157,7 @@ if __name__  == "__main__":
     ################### Conditional Generation ############################
     forward = jax.vmap(forward_fn, in_axes=(None, None, None, 0, 0, 0, 0, 0, None))
 
-    if mode == "single":
+    if args.mode == "single":
         cond_logp_fn = make_cond_logp(logp_fn, forward, 
                                       target=jnp.array(target[0]),
                                       alpha=alpha[0])
@@ -142,8 +169,7 @@ if __name__  == "__main__":
                                             )
 
     print("\n========== Load sampled data ==========")
-    spg = 225
-    csv_file = f"/home/zdcao/pipeline_crystalgpt/crystal_gpt/experimental/output_{spg}.csv"
+    csv_file = f"{args.input_path}/output_{args.spacegroup}.csv"
     origin_data = pd.read_csv(csv_file)
     L, XYZ, A, W = origin_data['L'], origin_data['X'], origin_data['A'], origin_data['W']
     L = L.apply(lambda x: literal_eval(x))
@@ -152,7 +178,7 @@ if __name__  == "__main__":
     W = W.apply(lambda x: literal_eval(x))
 
     # convert array of list to numpy ndarray
-    G = jnp.array([spg]*len(L))
+    G = jnp.array([args.spacegroup]*len(L))
     L = jnp.array(L.tolist())
     XYZ = jnp.array(XYZ.tolist())
     A = jnp.array(A.tolist())
@@ -168,13 +194,7 @@ if __name__  == "__main__":
     print(G.shape, L.shape, XYZ.shape, A.shape, W.shape)
 
     print("\n========== Start MCMC ==========")
-    mcmc = make_mcmc_step(base_params, cond_params, state, n_max=n_max, atom_types=atom_types)
-
-    mc_steps = 23000
-    mc_width = 0.1
-    init_temp = 10.0
-    end_temp = 1.0
-    decay_step = 10
+    mcmc = make_mcmc_step(base_params, cond_params, state, n_max=args.n_max, atom_types=args.atom_types)
     x = (G, L, XYZ, A, W)
 
     print("====== before mcmc =====")
@@ -183,13 +203,15 @@ if __name__  == "__main__":
     print ("W:\n", W)  # Wyckoff positions
     print ("L:\n", L)  # lattice
 
-    temp = init_temp
-    for i in range(decay_step):
-        alpha = i/(decay_step-1)
-        temp = 1/(alpha/end_temp + (1-alpha)/init_temp)
+    temp = args.init_temp
+    for i in range(args.decay_step):
+        alpha = i/(args.decay_step-1)
+        temp = 1/(alpha/args.end_temp + (1-alpha)/args.init_temp)
         # temp = init_temp - (init_temp - end_temp) * i / (decay_step-1)
         key, subkey = jax.random.split(key)
-        x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey, mc_steps=mc_steps//decay_step, mc_width=mc_width, temp=temp)
+        x, acc = mcmc(cond_logp_fn, x_init=x, key=subkey,
+                      mc_steps=args.mc_steps//args.decay_step,
+                      mc_width=args.mc_width, temp=temp)
         print("i, temp, acc", i, temp, acc)
 
     G, L, XYZ, A, W = x
@@ -224,7 +246,7 @@ if __name__  == "__main__":
     data['logp'] = np.array(logp).tolist()
     data['logp_new'] = np.array(logp_new).tolist()
 
-    filename = f'./cond_output_{spg}.csv'
+    filename = f'{args.output_path}/cond_output_{args.spacegroup}.csv'
     header = False if os.path.exists(filename) else True
     data.to_csv(filename, mode='a', index=False, header=header)
 
