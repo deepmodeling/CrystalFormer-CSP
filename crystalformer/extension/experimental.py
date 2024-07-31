@@ -2,21 +2,28 @@ import jax
 import jax.numpy as jnp
 
 
-def make_cond_logp(logp_fn, process_fn, forward_fn, target, alpha):
+def make_cond_logp(logp_fn, forward_fn, target, alpha):
     '''
     logp_fn: function to calculate log p(x)
-    forward_fn: function to calculate y = f(x)
-    process_fn: function to process G, L, XYZ, A, W to forward_fn input
+    forward_fn: function to calculate log p(y|x)
     target: target label
     alpha: hyperparameter to control the trade-off between log p(x) and log p(y|x)
     NOTE that the logp_fn and forward_fn should be vmapped before passing to this function
     '''
+    
+    def process_fn(G, L, XYZ, A, W):
+        # TODO: recover C = (A, XYZ, L) from G, L, XYZ, A, W
 
-    def forward(G, L, XYZ, A, W):
-        # TODO: need to be wrapped using callback
-        x = process_fn(G, L, XYZ, A, W)
-        y = forward_fn(x)
+        return A, XYZ, L
+
+    def forward(G, L, XYZ, A, W, target):
+        A, XYZ, L = process_fn(G, L, XYZ, A, W)
+        y = forward_fn(A, XYZ, L, target)
         return y
+
+    def callback_forward(G, L, XYZ, A, W, target):
+        shape = jax.eval_shape(forward, G, L, XYZ, A, W, target)
+        return jax.experimental.io_callback(forward, shape, G, L, XYZ, A, W, target)
 
     def cond_logp_fn(params, key, G, L, XYZ, A, W, is_training):
         '''
@@ -28,11 +35,11 @@ def make_cond_logp(logp_fn, process_fn, forward_fn, target, alpha):
         logp_base = logp_xyz + logp_w + logp_a + logp_l
 
         # calculate p(y|x)
-        y = forward(G, L, XYZ, A, W) # f(x)
-        logp_cond = jnp.abs(target - y) # |y - f(x)|
+        logp_cond = callback_forward(G, L, XYZ, A, W, target)
 
         # trade-off between log p(x) and p(y|x)
         logp = logp_base - alpha * logp_cond.squeeze()
         return logp
     
     return cond_logp_fn
+
