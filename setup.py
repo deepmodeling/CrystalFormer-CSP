@@ -11,6 +11,9 @@ setup(
     author_email = 'zdcao@iphy.ac.cn, wanglei@iphy.ac.cn',
     packages = find_packages(),
     include_package_data = True,
+    package_data={
+        'crystalformer': ['data/*.csv'],
+    },
     platforms = 'any',
     install_requires = [],
 )
