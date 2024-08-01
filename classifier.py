@@ -33,6 +33,9 @@ if __name__  == "__main__":
     group.add_argument('--property', default='band_gap', help='The property to predict')
     group.add_argument('--num_io_process', type=int, default=40, help='number of io processes')
 
+    group = parser.add_argument_group('predict dataset')
+    group.add_argument('--output_path', type=str, default='./predict.npy', help='The path to save the prediction result')
+
     group = parser.add_argument_group('physics parameters')
     group.add_argument('--n_max', type=int, default=21, help='The maximum number of atoms in the cell')
     group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
@@ -61,22 +64,29 @@ if __name__  == "__main__":
     group.add_argument('--lr', type=float, default=1e-4, help='The learning rate')
     group.add_argument('--epochs', type=int, default=1000, help='The number of epochs')
     group.add_argument('--batchsize', type=int, default=256, help='The batch size')
-
+    group.add_argument('--optimizer', type=str, default='adam', choices=["none", "adam"], help='The optimizer')
 
     args = parser.parse_args()
     key = jax.random.PRNGKey(42)
 
-    train_data = GLXYZAW_from_file(args.train_path, args.atom_types,
-                                   args.wyck_types, args.n_max, args.num_io_process)
-    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types,
-                                   args.wyck_types, args.n_max, args.num_io_process)
-    # test_data = GLXYZAW_from_file(test_path, atom_types, wyck_types, n_max, num_io_process)
+    if args.optimizer != "none":
+        train_data = GLXYZAW_from_file(args.train_path, args.atom_types,
+                                    args.wyck_types, args.n_max, args.num_io_process)
+        valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types,
+                                    args.wyck_types, args.n_max, args.num_io_process)
 
-    train_labels = get_labels(args.train_path, args.property)
-    valid_labels = get_labels(args.valid_path, args.property)
+        train_labels = get_labels(args.train_path, args.property)
+        valid_labels = get_labels(args.valid_path, args.property)
 
-    train_data = (*train_data, train_labels)
-    valid_data = (*valid_data, valid_labels)
+        train_data = (*train_data, train_labels)
+        valid_data = (*valid_data, valid_labels)
+    
+    else:
+        test_data = GLXYZAW_from_file(args.test_path, args.atom_types,
+                                      args.wyck_types, args.n_max, args.num_io_process)
+        test_labels = get_labels(args.test_path, args.property)
+
+        test_data = (*test_data, test_labels)
 
     ################### Model #############################
     transformer_params, state, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
@@ -121,14 +131,27 @@ if __name__  == "__main__":
         params = (_params, params[1])  # only restore transformer params
         print("only restore transformer params")
     
-    loss_fn, _ = make_classifier_loss(transformer, classifier)
+    loss_fn, forward_fn = make_classifier_loss(transformer, classifier)
 
-    param_labels = ('transformer', 'classifier')
-    optimizer = optax.multi_transform({'transformer': optax.adam(args.lr*0.1), 
-                                       'classifier': optax.adam(args.lr)},
-                                      param_labels)
-    opt_state = optimizer.init(params)
+    if args.optimizer == 'adam':
+    
+        param_labels = ('transformer', 'classifier')
+        optimizer = optax.multi_transform({'transformer': optax.adam(args.lr*0.1), 
+                                        'classifier': optax.adam(args.lr)},
+                                        param_labels)
+        opt_state = optimizer.init(params)
 
-    print("\n========== Start training ==========")
-    key, subkey = jax.random.split(key)
-    params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, state, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
+        print("\n========== Start training ==========")
+        key, subkey = jax.random.split(key)
+        params, opt_state = train(subkey, optimizer, opt_state, loss_fn, params, state, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
+
+    elif args.optimizer == 'none':
+        G, L, XYZ, A, W, labels = test_data
+        y = jax.vmap(forward_fn,
+             in_axes=(None, None, None, 0, 0, 0, 0, 0, None)
+             )(params, state, key, G, L, XYZ, A, W, False)
+
+        jnp.save(args.output_path, y)
+
+    else:
+        raise NotImplementedError(f"Optimizer {args.optimizer} not implemented")
