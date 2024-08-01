@@ -5,20 +5,14 @@ import jax.numpy as jnp
 def make_cond_logp(logp_fn, forward_fn, target, alpha):
     '''
     logp_fn: function to calculate log p(x)
-    forward_fn: function to calculate log p(y|x)
+    forward_fn: function to calculate log p(y|x), x is G, L, XYZ, A, W
     target: target label
     alpha: hyperparameter to control the trade-off between log p(x) and log p(y|x)
     NOTE that the logp_fn and forward_fn should be vmapped before passing to this function
     '''
-    
-    def process_fn(G, L, XYZ, A, W):
-        # TODO: recover C = (A, XYZ, L) from G, L, XYZ, A, W
-
-        return A, XYZ, L
 
     def forward(G, L, XYZ, A, W, target):
-        A, XYZ, L = process_fn(G, L, XYZ, A, W)
-        y = forward_fn(A, XYZ, L, target)
+        y = forward_fn(G, L, XYZ, A, W, target)
         return y
 
     def callback_forward(G, L, XYZ, A, W, target):
