@@ -27,9 +27,6 @@ if __name__  == "__main__":
     group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
-
-    num_io_process = 40
-
     group = parser.add_argument_group('base transformer parameters')
     group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
     group.add_argument('--Kx', type=int, default=16, help='number of modes in x')
