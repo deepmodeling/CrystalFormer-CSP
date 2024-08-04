@@ -16,6 +16,7 @@ def make_classifier(key,
     def network(g, l, w, h, is_training):
         """
         sequence_length = n_max * 5
+        g : (embed_size, )
         l : (6, )
         w : (n_max,)
         h : (sequence_length, ouputs_size)

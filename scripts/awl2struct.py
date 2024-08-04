@@ -1,5 +1,5 @@
 import sys
-sys.path.append('./src/')
+sys.path.append('./crystalformer/src/')
 
 import pandas as pd
 import numpy as np
