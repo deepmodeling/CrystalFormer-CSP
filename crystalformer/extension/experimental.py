@@ -28,7 +28,7 @@ def make_cond_logp(logp_fn, forward_fn, target, alpha):
 
     def cond_logp_fn(params, key, G, L, XYZ, A, W, is_training):
         '''
-        base_params: base model parameters
+        params: base model parameters
         '''
         # calculate log p(x)
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, G, L, XYZ, A, W, is_training)
@@ -75,6 +75,7 @@ def make_mcmc_step(base_params, n_max, atom_types, atom_mask=None, constraints=N
             key: initial PRNG key.
             mc_steps: total number of Monte Carlo steps.
             mc_width: size of the Monte Carlo proposal.
+            temp: temperature in the smiulated annealing.
 
         OUTPUT:
             x: resulting batch samples, with the same shape as `x_init`.

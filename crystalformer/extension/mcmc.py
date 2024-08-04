@@ -40,6 +40,7 @@ def make_mcmc_step(base_params, cond_params, model_state, n_max, atom_types, ato
             key: initial PRNG key.
             mc_steps: total number of Monte Carlo steps.
             mc_width: size of the Monte Carlo proposal.
+            temp: temperature in the smiulated annealing.
 
         OUTPUT:
             x: resulting batch samples, with the same shape as `x_init`.
