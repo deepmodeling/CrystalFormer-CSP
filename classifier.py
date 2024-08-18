@@ -21,32 +21,32 @@ def get_labels(csv_file, label_col):
     return labels
 
 def GLXYZAW_from_sample(spg, test_path):
-        ### read from generated data
-        from ast import literal_eval
-        from crystalformer.src.wyckoff import mult_table
+    ### read from generated data
+    from ast import literal_eval
+    from crystalformer.src.wyckoff import mult_table
 
-        test_data = pd.read_csv(test_path)
-        L, XYZ, A, W = test_data['L'], test_data['X'], test_data['A'], test_data['W']
-        L = L.apply(lambda x: literal_eval(x))
-        XYZ = XYZ.apply(lambda x: literal_eval(x))
-        A = A.apply(lambda x: literal_eval(x))
-        W = W.apply(lambda x: literal_eval(x))
+    test_data = pd.read_csv(test_path)
+    L, XYZ, A, W = test_data['L'], test_data['X'], test_data['A'], test_data['W']
+    L = L.apply(lambda x: literal_eval(x))
+    XYZ = XYZ.apply(lambda x: literal_eval(x))
+    A = A.apply(lambda x: literal_eval(x))
+    W = W.apply(lambda x: literal_eval(x))
 
-        # convert array of list to numpy ndarray
-        G = jnp.array([spg]*len(L))
-        L = jnp.array(L.tolist())
-        XYZ = jnp.array(XYZ.tolist())
-        A = jnp.array(A.tolist())
-        W = jnp.array(W.tolist())
+    # convert array of list to numpy ndarray
+    G = jnp.array([spg]*len(L))
+    L = jnp.array(L.tolist())
+    XYZ = jnp.array(XYZ.tolist())
+    A = jnp.array(A.tolist())
+    W = jnp.array(W.tolist())
 
-        M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
-        num_atoms = jnp.sum(M, axis=1)
-        length, angle = jnp.split(L, 2, axis=-1)
-        length = length/num_atoms[:, None]**(1/3)
-        angle = angle * (jnp.pi / 180) # to rad
-        L = jnp.concatenate([length, angle], axis=-1)
+    M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
+    num_atoms = jnp.sum(M, axis=1)
+    length, angle = jnp.split(L, 2, axis=-1)
+    length = length/num_atoms[:, None]**(1/3)
+    angle = angle * (jnp.pi / 180) # to rad
+    L = jnp.concatenate([length, angle], axis=-1)
 
-        return G, L, XYZ, A, W
+    return G, L, XYZ, A, W
 
 
 if __name__  == "__main__":
