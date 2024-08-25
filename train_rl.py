@@ -15,37 +15,43 @@ from crystalformer.src.sample import sample_crystal
 import crystalformer.src.checkpoint as checkpoint
 
 from crystalformer.reinforce.train import train
-from crystalformer.reinforce.loss import make_reward_fn, make_reinforce_loss
-
-################## Read config file ###################
-
-optimizer = "adam"
-restore_path = "./data/"
-epochs = 10
+from crystalformer.reinforce.loss import make_reinforce_loss
+from crystalformer.reinforce.reward import make_force_reward_fn
 
 class config:
     def __init__(self, d=None):
-      for key, value in d.items():
-          setattr(self, key, value)
+        for key, value in d.items():
+            setattr(self, key, value)
 
+    def __print__(self):
+        for key, value in self.__dict__.items():
+            print(f"{key} : {value}")
 
+################## Read config file ###################
 # load config file
 with open("./model/config.yaml") as stream:
     args = yaml.safe_load(stream)
 args = config(args)
-args.restore_path = restore_path
-args.epochs = epochs
+
+args.restore_path = "./data/"
+args.epochs = 10
+args.optimizer = "adam"
+args.transformer_layers = 4
+args.num_heads = 8
+args.key_size = 32
+args.dropout_rate = 0.3
+
+print("\n========== Config ==========")
+args.__print__()
 
 ################### Model #############################
 key = jax.random.PRNGKey(42)
 params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
                                       args.h0_size, 
-                                      4, 8, 
-                                      32, args.model_size, args.embed_size, 
+                                      args.transformer_layers, args.num_heads, 
+                                      args.key_size, args.model_size, args.embed_size, 
                                       args.atom_types, args.wyck_types,
-                                      0.3)
-
-
+                                      args.dropout_rate)
 
 transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_e_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.embed_size, args.dropout_rate)
 
@@ -79,7 +85,7 @@ if ckpt_filename is not None:
 else:
     print("No checkpoint file found. Start from scratch.")
 
-if optimizer != "none":
+if args.optimizer != "none":
 
     schedule = lambda t: args.lr/(1+args.lr_decay*t)
 
@@ -105,7 +111,7 @@ if optimizer != "none":
                    dispersion=False,
                    default_dtype="float32",
                    device='cuda')
-    reward_fn, batch_reward_fn = make_reward_fn(calc)
+    reward_fn, batch_reward_fn = make_force_reward_fn(calc)
     rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
 
     print("\n========== Load partial sample function ==========")
