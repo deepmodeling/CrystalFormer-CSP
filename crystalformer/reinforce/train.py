@@ -32,7 +32,7 @@ def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_fini
  
     for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
-        params, opt_state, value = update(params, subkey, opt_state, spacegroup=225) # TODO: only for P1 for now
+        params, opt_state, value = update(params, subkey, opt_state, spacegroup=1) # TODO: only for P1 for now
         _, (f_mean, f_err) = value
 
         if epoch % 1 == 0:

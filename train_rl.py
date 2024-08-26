@@ -108,10 +108,12 @@ if args.optimizer != "none":
         pass 
 
     print("\n========== Load calculator and rl loss ==========")
-    calc = mace_mp(model="./data/2023-12-03-mace-128-L1_epoch-199.model",
-                   dispersion=False,
-                   default_dtype="float32",
-                   device='cuda')
+    # calc = mace_mp(model="./data/2023-12-03-mace-128-L1_epoch-199.model",
+    #                dispersion=False,
+    #                default_dtype="float32",
+    #                device='cuda')
+    from ase.calculators.lj import LennardJones
+    calc = LennardJones()
     reward_fn, batch_reward_fn = make_force_reward_fn(calc)
     rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
 

@@ -33,8 +33,10 @@ def make_force_reward_fn(calculator):
         G, L, XYZ, A, W = x
         atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
         atoms.calc = calculator
-        forces = jnp.array(atoms.get_forces())
+        try: forces = jnp.array(atoms.get_forces())
+        except: forces = jnp.ones((len(atoms), 3))*jnp.inf # avoid nan
         forces = jnp.linalg.norm(forces, axis=-1)
+        forces = jnp.clip(forces, 0, 1e2)  # avoid too large forces
         fmax = jnp.max(forces) # same definition as fmax in ase
 
         return fmax
