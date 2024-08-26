@@ -11,13 +11,18 @@ import crystalformer.src.checkpoint as checkpoint
 def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_finished, epochs, batchsize, path):
            
     def update(params, key, opt_state, spacegroup):
+        @jax.jit
+        def apply_update(grad, params, opt_state):
+            updates, opt_state = optimizer.update(grad, opt_state, params)
+            params = optax.apply_updates(params, updates)
+            return params, opt_state
+
         key, sample_key, loss_key = jax.random.split(key, 3)
         XYZ, A, W, M, L = sample_crystal(sample_key, params=params, g=spacegroup, batchsize=batchsize)  #TODO: partial function
         G = spacegroup * jnp.ones((batchsize), dtype=int)
         x = (G, L, XYZ, A, W)
         value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, loss_key, x, True)
-        updates, opt_state = optimizer.update(grad, opt_state, params)
-        params = optax.apply_updates(params, updates)
+        params, opt_state = apply_update(grad, params, opt_state)
         return params, opt_state, value
 
     log_filename = os.path.join(path, "data.txt")

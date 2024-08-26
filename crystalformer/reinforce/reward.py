@@ -33,19 +33,15 @@ def make_force_reward_fn(calculator):
         G, L, XYZ, A, W = x
         atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
         atoms.calc = calculator
-        forces = atoms.get_forces()
-        fmax = np.max(np.abs(forces)) # same definition as fmax in ase
+        forces = jnp.array(atoms.get_forces())
+        forces = jnp.linalg.norm(forces, axis=-1)
+        fmax = jnp.max(forces) # same definition as fmax in ase
 
-        return jnp.array(fmax)
+        return fmax
 
     def batch_reward_fn(x):
-        batch_reward = jnp.zeros(x[0].shape[0])
-        for i in range(x[0].shape[0]):
-            _x = jax.tree_map(lambda x: x[i], x)
-            reward = reward_fn(_x)
-            batch_reward = batch_reward.at[i].set(reward)
-    
-        return batch_reward
+        output = map(reward_fn, zip(*x))
+        return jnp.array(list(output))
 
     return reward_fn, batch_reward_fn
 
@@ -61,12 +57,7 @@ def make_distance_reward_fn():
         return jnp.array(1/min_dis)
 
     def batch_reward_fn(x):
-        batch_reward = jnp.zeros(x[0].shape[0])
-        for i in range(x[0].shape[0]):
-            _x = jax.tree_map(lambda x: x[i], x)
-            reward = reward_fn(_x)
-            batch_reward = batch_reward.at[i].set(reward)
-    
-        return batch_reward
+        output = map(reward_fn, zip(*x))
+        return jnp.array(list(output))
 
     return reward_fn, batch_reward_fn

@@ -34,6 +34,7 @@ with open("./model/config.yaml") as stream:
 args = config(args)
 
 args.restore_path = "./data/"
+args.folder = "./experimental/"
 args.epochs = 10
 args.optimizer = "adam"
 args.transformer_layers = 4
