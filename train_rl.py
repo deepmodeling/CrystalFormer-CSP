@@ -35,12 +35,13 @@ args = config(args)
 
 args.restore_path = "./data/"
 args.folder = "./experimental/"
-args.epochs = 10
+args.epochs = 100
 args.optimizer = "adam"
 args.transformer_layers = 4
 args.num_heads = 8
 args.key_size = 32
 args.dropout_rate = 0.3
+args.lr = 1e-5
 
 print("\n========== Config ==========")
 args.__print__()

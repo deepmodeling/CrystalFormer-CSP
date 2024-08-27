@@ -35,7 +35,7 @@ def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_fini
         params, opt_state, value = update(params, subkey, opt_state, spacegroup=1) # TODO: only for P1 for now
         _, (f_mean, f_err) = value
 
-        if epoch % 1 == 0:
+        if epoch % 5 == 0:
 
             f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, f_mean, f_err))
 

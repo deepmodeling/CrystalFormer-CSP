@@ -36,10 +36,10 @@ def make_force_reward_fn(calculator):
         try: forces = jnp.array(atoms.get_forces())
         except: forces = jnp.ones((len(atoms), 3))*jnp.inf # avoid nan
         forces = jnp.linalg.norm(forces, axis=-1)
-        forces = jnp.clip(forces, 0, 1e2)  # avoid too large forces
+        forces = jnp.clip(forces, 1e-2, 1e2)  # avoid too large or too small forces
         fmax = jnp.max(forces) # same definition as fmax in ase
 
-        return fmax
+        return jnp.log(fmax)
 
     def batch_reward_fn(x):
         output = map(reward_fn, zip(*x))
