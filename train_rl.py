@@ -1,4 +1,5 @@
 import jax
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 import numpy as np
@@ -42,6 +43,7 @@ args.num_heads = 8
 args.key_size = 32
 args.dropout_rate = 0.3
 args.lr = 1e-5
+args.batchsize = 200
 
 print("\n========== Config ==========")
 args.__print__()
