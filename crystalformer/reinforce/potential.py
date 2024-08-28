@@ -50,7 +50,7 @@ class ExponentialPotential(Calculator):
         Calculator.__init__(self, **kwargs)
 
         if self.parameters.rc is None:
-            self.parameters.rc = 5.0  # Choose an appropriate rc for your system
+            self.parameters.rc = 10.0  # Choose an appropriate rc for your system
 
         if self.parameters.ro is None:
             self.parameters.ro = 0.66 * self.parameters.rc
@@ -100,7 +100,7 @@ class ExponentialPotential(Calculator):
             distance_vectors = positions[neighbors] + cells - positions[ii]
 
             r = np.sqrt((distance_vectors ** 2).sum(1))
-            r[r > rc] = 0.0  # Exclude pairs beyond cutoff
+            r[r > rc] = np.inf  # Exclude pairs beyond cutoff
 
             if smooth:
                 cutoff_fn = cutoff_function(r ** 2, rc ** 2, ro ** 2)
