@@ -8,7 +8,7 @@ import os
 import optax
 from functools import partial
 
-from mace.calculators import mace_mp
+# from mace.calculators import mace_mp
 
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
@@ -43,7 +43,7 @@ args.num_heads = 8
 args.key_size = 32
 args.dropout_rate = 0.3
 args.lr = 1e-5
-args.batchsize = 200
+args.batchsize = 1024
 
 print("\n========== Config ==========")
 args.__print__()
@@ -115,8 +115,12 @@ if args.optimizer != "none":
     #                dispersion=False,
     #                default_dtype="float32",
     #                device='cuda')
-    from ase.calculators.lj import LennardJones
-    calc = LennardJones()
+    # from ase.calculators.lj import LennardJones
+    # calc = LennardJones()
+
+    from crystalformer.reinforce.potential import ExponentialPotential
+    calc = ExponentialPotential()
+
     reward_fn, batch_reward_fn = make_force_reward_fn(calc)
     rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
 

@@ -1,26 +1,65 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import itertools
 from pymatgen.core import Structure, Lattice
 
-from crystalformer.src.wyckoff import symmetrize_atoms
+from crystalformer.src.wyckoff import wmax_table, mult_table, symops
+
+symops = np.array(symops)
+mult_table = np.array(mult_table)
+wmax_table = np.array(wmax_table)
+
+
+def symmetrize_atoms(g, w, x):
+    '''
+    symmetrize atoms via, apply all sg symmetry op, finding the generator, and lastly apply symops 
+    we need to do that because the sampled atom might not be at the first WP
+    Args:
+       g: int 
+       w: int
+       x: (3,)
+    Returns:
+       xs: (m, 3) symmetrize atom positions
+    '''
+
+    # (1) apply all space group symmetry op to the x 
+    w_max = wmax_table[g-1].item()
+    m_max = mult_table[g-1, w_max].item()
+    ops = symops[g-1, w_max, :m_max] # (m_max, 3, 4)
+    affine_point = np.array([*x, 1]) # (4, )
+    coords = ops@affine_point # (m_max, 3) 
+    coords -= np.floor(coords)
+
+    # (2) search for the generator which satisfies op0(x) = x , i.e. the first Wyckoff position 
+    # here we solve it in a jit friendly way by looking for the minimal distance solution for the lhs and rhs  
+    #https://github.com/qzhu2017/PyXtal/blob/82e7d0eac1965c2713179eeda26a60cace06afc8/pyxtal/wyckoff_site.py#L115
+    def dist_to_op0x(coord):
+        diff = np.dot(symops[g-1, w, 0], np.array([*coord, 1])) - coord
+        diff -= np.rint(diff)
+        return np.sum(diff**2) 
+   #  loc = np.argmin(jax.vmap(dist_to_op0x)(coords))
+    loc = np.argmin([dist_to_op0x(coord) for coord in coords])
+    x = coords[loc].reshape(3,)
+
+    # (3) lastly, apply the given symmetry op to x
+    m = mult_table[g-1, w] 
+    ops = symops[g-1, w, :m]   # (m, 3, 4)
+    affine_point = np.array([*x, 1]) # (4, )
+    xs = ops@affine_point # (m, 3)
+    xs -= np.floor(xs) # wrap back to 0-1 
+    return xs
 
 
 def get_atoms_from_GLXYZAW(G, L, XYZ, A, W):
-    A = np.array(A)
-    X = np.array(XYZ)
-    W = np.array(W)
 
     A = A[np.nonzero(A)]
-    X = X[np.nonzero(A)]
+    X = XYZ[np.nonzero(A)]
     W = W[np.nonzero(A)]
 
     lattice = Lattice.from_parameters(*L)
     xs_list = [symmetrize_atoms(G, w, x) for w, x in zip(W, X)]
-    as_list = [[A[idx] for _ in range(len(xs))] for idx, xs in enumerate(xs_list)]
-    A_list = list(itertools.chain.from_iterable(as_list))
-    X_list = list(itertools.chain.from_iterable(xs_list))
+    A_list = np.repeat(A, [len(xs) for xs in xs_list])
+    X_list = np.concatenate(xs_list)
     struct = Structure(lattice, A_list, X_list).to_ase_atoms()
     return struct
 
@@ -33,15 +72,23 @@ def make_force_reward_fn(calculator):
         G, L, XYZ, A, W = x
         atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
         atoms.calc = calculator
-        try: forces = jnp.array(atoms.get_forces())
-        except: forces = jnp.ones((len(atoms), 3))*jnp.inf # avoid nan
-        forces = jnp.linalg.norm(forces, axis=-1)
-        forces = jnp.clip(forces, 1e-2, 1e2)  # avoid too large or too small forces
-        fmax = jnp.max(forces) # same definition as fmax in ase
+        try: forces = np.array(atoms.get_forces())
+        except: forces = np.ones((len(atoms), 3))*np.inf # avoid nan
+        forces = np.linalg.norm(forces, axis=-1)
+        forces = np.clip(forces, 1e-2, 1e2)  # avoid too large or too small forces
+        fmax = np.max(forces) # same definition as fmax in ase
 
-        return jnp.log(fmax)
+        return np.log(fmax)
 
     def batch_reward_fn(x):
+        G, L, XYZ, A, W = x
+        G = np.array(G)
+        L = np.array(L)
+        XYZ = np.array(XYZ)
+        A = np.array(A)
+        W = np.array(W)
+        x = (G, L, XYZ, A, W)
+
         output = map(reward_fn, zip(*x))
         return jnp.array(list(output))
 
