@@ -81,16 +81,15 @@ def make_force_reward_fn(calculator):
         return np.log(fmax)
 
     def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
         G, L, XYZ, A, W = x
-        G = np.array(G)
-        L = np.array(L)
-        XYZ = np.array(XYZ)
-        A = np.array(A)
-        W = np.array(W)
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
         x = (G, L, XYZ, A, W)
-
         output = map(reward_fn, zip(*x))
-        return jnp.array(list(output))
+        output = np.array(list(output))
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
 
     return reward_fn, batch_reward_fn
 
