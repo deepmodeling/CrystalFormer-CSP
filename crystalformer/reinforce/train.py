@@ -13,6 +13,7 @@ def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_fini
     def update(params, key, opt_state, spacegroup):
         @jax.jit
         def apply_update(grad, params, opt_state):
+            grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
             updates, opt_state = optimizer.update(grad, opt_state, params)
             params = optax.apply_updates(params, updates)
             return params, opt_state

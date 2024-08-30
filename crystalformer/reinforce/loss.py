@@ -17,6 +17,6 @@ def make_reinforce_loss(batch_logp, batch_reward_fn):
 
         f_std = jnp.std(f)/jnp.sqrt(f.shape[0])
 
-        return jnp.mean((f - f_mean) * entropy), (f_mean, f_std)
+        return -jnp.mean((f - f_mean) * entropy), (-f_mean, f_std)
 
     return loss
