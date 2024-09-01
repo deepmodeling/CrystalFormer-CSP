@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from crystalformer.src.wyckoff import mult_table
+from crystalformer.src.lattice import norm_lattice
 
 
 def make_reinforce_loss(batch_logp, batch_reward_fn):
@@ -13,12 +13,7 @@ def make_reinforce_loss(batch_logp, batch_reward_fn):
         f_std = jnp.std(f)/jnp.sqrt(f.shape[0])
 
         G, L, XYZ, A, W = x
-        M = jax.vmap(lambda g, w: mult_table[g-1, w], in_axes=(0, 0))(G, W) # (batchsize, n_max)
-        num_atoms = jnp.sum(M, axis=1)
-        length, angle = jnp.split(L, 2, axis=-1)
-        length = length/num_atoms[:, None]**(1/3)
-        angle = angle * (jnp.pi / 180) # to rad
-        L = jnp.concatenate([length, angle], axis=-1)
+        L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
         
         # TODO: now only support for crystalformer logp
