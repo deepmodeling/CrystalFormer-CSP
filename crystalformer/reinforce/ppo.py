@@ -65,7 +65,7 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, loss_key, *x, True)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, loss_key, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
         
         for _ in range(ppo_epoch):
