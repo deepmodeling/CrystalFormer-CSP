@@ -13,7 +13,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01):
 
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
-        entropy = - jnp.mean(jnp.exp(logp) * logp)
+        entropy = - jnp.mean(logp)
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
