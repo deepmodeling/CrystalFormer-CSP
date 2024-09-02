@@ -70,10 +70,12 @@ def make_force_reward_fn(calculator):
     """
     def reward_fn(x):
         G, L, XYZ, A, W = x
-        atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
-        atoms.calc = calculator
-        try: forces = np.array(atoms.get_forces())
-        except: forces = np.ones((len(atoms), 3))*np.inf # avoid nan
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            atoms.calc = calculator
+            forces = np.array(atoms.get_forces())
+        except: 
+            forces = np.ones((1, 3))*np.inf # avoid nan
         forces = np.linalg.norm(forces, axis=-1)
         forces = np.clip(forces, 1e-2, 1e2)  # avoid too large or too small forces
         fmax = np.mean(forces) # same definition as fmax in ase
