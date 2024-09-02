@@ -11,7 +11,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip):
 
     def ppo_loss_fn(params, key, x, old_logp, advantages):
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, True)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
 
         # Finding the ratio (pi_theta / pi_theta__old)
@@ -30,7 +30,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip):
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, batchsize, path):
+def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     @jax.jit
     def step(params, key, opt_state, x, old_logp, advantages):
@@ -46,7 +46,6 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         f.write("epoch f_mean f_err\n")
  
     spacegroup = 1
-    ppo_epoch = 10
 
     for epoch in range(epoch_finished+1, epochs):
 
@@ -68,7 +67,7 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, loss_key, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
         
-        for _ in range(ppo_epoch):
+        for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, advantages)
             print("epoch %d, loss %.6f" % (epoch, value))

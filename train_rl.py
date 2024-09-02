@@ -15,8 +15,9 @@ from crystalformer.src.transformer import make_transformer
 from crystalformer.src.sample import sample_crystal
 import crystalformer.src.checkpoint as checkpoint
 
-from crystalformer.reinforce.train import train
-from crystalformer.reinforce.loss import make_reinforce_loss
+# from crystalformer.reinforce.train import train
+# from crystalformer.reinforce.loss import make_reinforce_loss
+from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
 from crystalformer.reinforce.reward import make_force_reward_fn
 
 class config:
@@ -122,7 +123,7 @@ if args.optimizer != "none":
     calc = ExponentialPotential()
 
     reward_fn, batch_reward_fn = make_force_reward_fn(calc)
-    rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
+    # rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
 
     print("\n========== Load partial sample function ==========")
     w_mask = None
@@ -138,8 +139,13 @@ if args.optimizer != "none":
                                      T1=args.temperature, constraints=constraints)
 
     print("\n========== Start RL training ==========")
-    params, opt_state = train(key, optimizer, opt_state, rl_loss_fn, partial_sample_crystal,
-                              params, epoch_finished, args.epochs, args.batchsize, output_path)
+    eps_clip = 0.2
+    ppo_epochs = 10
+    ppo_loss_fn = make_ppo_loss_fn(logp_fn, eps_clip)
+
+    # PPO training
+    params, opt_state = train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
+                              params, epoch_finished, args.epochs, ppo_epochs, args.batchsize, output_path)
 
 else:
     raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")
