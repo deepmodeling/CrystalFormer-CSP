@@ -7,13 +7,21 @@ import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.lattice import norm_lattice
 
 
-def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01):
+def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
 
-    def ppo_loss_fn(params, key, x, old_logp, advantages):
+    """
+    PPO clipped objective function with entropy and KL divergence regularization
+    PPO_loss = PPO-clip + beta * entropy - gamma * KL(P || P_pretrain)
+    """
+
+    def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
 
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
         entropy = - jnp.mean(logp)
+
+        kl_loss = logp - pretrain_logp
+        advantages = advantages - gamma * kl_loss
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
@@ -34,8 +42,8 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01):
 def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     @jax.jit
-    def step(params, key, opt_state, x, old_logp, advantages):
-        value, grad = jax.value_and_grad(ppo_loss_fn)(params, key, x, old_logp, advantages)
+    def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
+        value, grad = jax.value_and_grad(ppo_loss_fn)(params, key, x, old_logp, pretrain_logp, advantages)
         grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
@@ -45,13 +53,14 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
         f.write("epoch f_mean f_err\n")
- 
+    pretrain_params = params
+
     spacegroup = 1
 
     for epoch in range(epoch_finished+1, epochs):
 
-        key, sample_key, loss_key = jax.random.split(key, 3)
-        XYZ, A, W, M, L = sample_crystal(sample_key, params=params, g=spacegroup, batchsize=batchsize) 
+        key, subkey1, subkey2, subkey3 = jax.random.split(key, 4)
+        XYZ, A, W, _, L = sample_crystal(subkey1, params=params, g=spacegroup, batchsize=batchsize) 
         G = spacegroup * jnp.ones((batchsize), dtype=int)
 
         x = (G, L, XYZ, A, W)
@@ -65,12 +74,16 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, loss_key, *x, False)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params,subkey2, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
-        
+
+        key, subkey = jax.random.split(key)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(pretrain_params, subkey3, *x, False)
+        pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
+
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
-            params, opt_state, value = step(params, subkey, opt_state, x, old_logp, advantages)
+            params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             print("epoch %d, loss %.6f" % (epoch, value))
         
         if epoch % 5 == 0:
