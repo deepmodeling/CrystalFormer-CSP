@@ -77,7 +77,6 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params,subkey2, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
 
-        key, subkey = jax.random.split(key)
         logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(pretrain_params, subkey3, *x, False)
         pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
 
