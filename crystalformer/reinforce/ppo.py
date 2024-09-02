@@ -7,12 +7,13 @@ import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.lattice import norm_lattice
 
 
-def make_ppo_loss_fn(logp_fn, eps_clip):
+def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01):
 
     def ppo_loss_fn(params, key, x, old_logp, advantages):
 
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
+        entropy = - jnp.mean(jnp.exp(logp) * logp)
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
@@ -23,7 +24,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip):
         surr2 = jax.lax.clamp(1-eps_clip, ratios, 1+eps_clip) * advantages
 
         # Final loss of clipped objective PPO
-        ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
+        ppo_loss = jnp.mean(jnp.minimum(surr1, surr2)) + beta * entropy
 
         return ppo_loss
     
