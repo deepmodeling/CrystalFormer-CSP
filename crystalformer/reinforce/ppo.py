@@ -34,7 +34,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
         # Final loss of clipped objective PPO
         ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
 
-        return ppo_loss
+        return ppo_loss, (jnp.mean(kl_loss), jnp.mean(entropy))
     
     return ppo_loss_fn
 
@@ -43,7 +43,7 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
 
     @jax.jit
     def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
-        value, grad = jax.value_and_grad(ppo_loss_fn)(params, key, x, old_logp, pretrain_logp, advantages)
+        value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, x, old_logp, pretrain_logp, advantages)
         grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
@@ -83,7 +83,8 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
-            print("epoch %d, loss %.6f" % (epoch, value))
+            ppo_loss, (kl_loss, entropy) = value
+            print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f} {entropy:.6f}")
         
         if epoch % 5 == 0:
             ckpt = {"params": params,
