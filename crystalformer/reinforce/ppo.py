@@ -18,10 +18,10 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
 
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
-        entropy = - jnp.mean(logp)
+        entropy = - logp
 
         kl_loss = logp - pretrain_logp
-        advantages = advantages - gamma * kl_loss
+        advantages = advantages - gamma * kl_loss + beta * entropy
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
@@ -32,7 +32,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
         surr2 = jax.lax.clamp(1-eps_clip, ratios, 1+eps_clip) * advantages
 
         # Final loss of clipped objective PPO
-        ppo_loss = jnp.mean(jnp.minimum(surr1, surr2)) + beta * entropy
+        ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
 
         return ppo_loss
     
