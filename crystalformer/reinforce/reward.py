@@ -64,7 +64,7 @@ def get_atoms_from_GLXYZAW(G, L, XYZ, A, W):
     return struct
 
 
-def make_force_reward_fn(calculator):
+def make_force_reward_fn(calculator, weight=1.0):
     """
     ase calculator object
     """
@@ -73,14 +73,18 @@ def make_force_reward_fn(calculator):
         try: 
             atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
             atoms.calc = calculator
-            forces = np.array(atoms.get_forces())
+            forces = atoms.get_forces()
+            stress = atoms.get_stress()
         except: 
             forces = np.ones((1, 3))*np.inf # avoid nan
+            stress = np.ones((6,))*np.inf
         forces = np.linalg.norm(forces, axis=-1)
         forces = np.clip(forces, 1e-2, 1e2)  # avoid too large or too small forces
-        fmax = np.mean(forces) # same definition as fmax in ase
-
-        return np.log(fmax)
+        forces = np.mean(forces)
+        stress = np.clip(stress, 1e-2, 1e2)
+        stress = np.mean(stress)
+        
+        return np.log(forces + weight*stress)
 
     def batch_reward_fn(x):
         x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
