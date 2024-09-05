@@ -69,7 +69,7 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
 
         # running average baseline
         if epoch == epoch_finished+1:
-            baseline = 0.95 * 0 + 0.05 * f_mean
+            baseline = f_mean
         else:
             baseline = 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
