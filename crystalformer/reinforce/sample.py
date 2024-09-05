@@ -135,7 +135,6 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl):
 
 
 if __name__ == "__main__":
-    from crystalformer.src.utils import GLXYZAW_from_file
     from crystalformer.src.transformer import make_transformer
     atom_types = 119
     n_max = 21
@@ -145,18 +144,12 @@ if __name__ == "__main__":
     Kl  = 4
     dropout_rate = 0.1 
 
-    csv_file = '../../data/mini.csv'
-    G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
-
-    M = mult_table[G[0]-1, W]
-    print(G.shape, M.shape, W.shape)
-
     key = jax.random.PRNGKey(42)
-
     params, transformer = make_transformer(key, Nf, Kx, Kl, n_max, 128, 4, 4, 8, 16, 16, atom_types, wyck_types, dropout_rate) 
     sample_crystal = make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl)
     atom_mask = jnp.zeros((n_max, atom_types))
-    G = jnp.array([225, 225, 225, 225, 225])
+
+    G = jnp.array([2, 12, 62, 139, 166, 194, 225])
     XYZ, A, W, M, L = sample_crystal(key, params, G, atom_mask, 1.0, 1.0)
     print(XYZ.shape, A.shape, W.shape, M.shape, L.shape)
     print ("G:\n", G)  # space group
