@@ -7,21 +7,20 @@ import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.lattice import norm_lattice
 
 
-def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
+def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
     """
-    PPO clipped objective function with entropy and KL divergence regularization
-    PPO_loss = PPO-clip + beta * entropy - gamma * KL(P || P_pretrain)
+    PPO clipped objective function with KL divergence regularization
+    PPO_loss = PPO-clip + beta  * KL(P || P_pretrain)
     """
 
     def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
 
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_w + logp_xyz + logp_a + logp_l
-        entropy = - logp
 
         kl_loss = logp - pretrain_logp
-        advantages = advantages - gamma * kl_loss + beta * entropy
+        advantages = advantages - beta * kl_loss
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
@@ -34,7 +33,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.01, gamma=0.1):
         # Final loss of clipped objective PPO
         ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
 
-        return ppo_loss, (jnp.mean(kl_loss), jnp.mean(entropy))
+        return ppo_loss, (jnp.mean(kl_loss))
     
     return ppo_loss_fn
 
@@ -67,7 +66,13 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         rewards = - batch_reward_fn(x)  # inverse reward
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
-        advantages = rewards - f_mean
+
+        # running average baseline
+        if epoch == epoch_finished+1:
+            baseline = 0.95 * 0 + 0.05 * f_mean
+        else:
+            baseline = 0.95 * baseline + 0.05 * f_mean
+        advantages = rewards - baseline
 
         f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, f_mean, f_err))
 
@@ -83,8 +88,8 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
-            ppo_loss, (kl_loss, entropy) = value
-            print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f} {entropy:.6f}")
+            ppo_loss, (kl_loss) = value
+            print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f}")
         
         if epoch % 5 == 0:
             ckpt = {"params": params,

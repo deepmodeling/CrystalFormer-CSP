@@ -5,8 +5,9 @@ from jax.flatten_util import ravel_pytree
 import os
 import optax
 from functools import partial
-
 from mace.calculators import mace_mp
+import warnings
+warnings.filterwarnings("ignore")
 
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
@@ -54,10 +55,9 @@ if __name__ == "__main__":
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
     group = parser.add_argument_group('reinforcement learning parameters')
-    group.add_argument('--beta', type=float, default=0.0, help='weight for entropy regularization')
-    group.add_argument('--gamma', type=float, default=0.1, help='weight for KL divergence')
+    group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
-    group.add_argument('--ppo_epochs', type=int, default=10, help='number of PPO epochs')
+    group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
     group.add_argument('--mlff_path', type=str, default='./data/2023-12-03-mace-128-L1_epoch-199.model', help='path to the MLFF model')
         
 
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "ppo_%d_gamma_%g_" % (args.ppo_epochs, args.gamma) \
+        output_path = args.folder + "ppo_%d_beta_%g_" % (args.ppo_epochs, args.beta) \
                     + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                     + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -153,7 +153,7 @@ if __name__ == "__main__":
                                          T1=args.temperature, constraints=constraints)
 
         print("\n========== Start RL training ==========")
-        ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, gamma=args.gamma)
+        ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
         # PPO training
         params, opt_state = train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
