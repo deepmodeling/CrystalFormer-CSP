@@ -11,11 +11,12 @@ warnings.filterwarnings("ignore")
 
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
-from crystalformer.src.sample import sample_crystal
+# from crystalformer.src.sample import sample_crystal
 import crystalformer.src.checkpoint as checkpoint
 
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
 from crystalformer.reinforce.reward import make_force_reward_fn
+from crystalformer.reinforce.sample import make_sample_crystal
 
 if __name__ == "__main__":
     import argparse
@@ -55,6 +56,7 @@ if __name__ == "__main__":
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
     group = parser.add_argument_group('reinforcement learning parameters')
+    group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
@@ -68,6 +70,15 @@ if __name__ == "__main__":
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
+    if args.spacegroup is not None:
+        spg_mask = jnp.zeros((230), dtype=int)
+        for g in args.spacegroup:
+            spg_mask = spg_mask.at[int(g)-1].set(1)
+    else:
+        spg_mask = jnp.ones((230), dtype=int)
+    print("spacegroup mask", spg_mask)
+
+    print("\n========== Prepare transformer ==========")
     ################### Model #############################
     key = jax.random.PRNGKey(42)
     params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_max, 
@@ -145,18 +156,13 @@ if __name__ == "__main__":
         atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
         constraints = jnp.arange(0, args.n_max, 1)
 
-        partial_sample_crystal = partial(sample_crystal, transformer=transformer,
-                                         n_max=args.n_max, atom_types=args.atom_types,
-                                         wyck_types=args.wyck_types, Kx=args.Kx, Kl=args.Kl,
-                                         w_mask=None, atom_mask=atom_mask,
-                                         top_p=args.top_p, temperature=args.temperature,
-                                         T1=args.temperature, constraints=constraints)
+        sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
 
         print("\n========== Start RL training ==========")
         ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
         # PPO training
-        params, opt_state = train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
+        params, opt_state = train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
                                   params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
 
     else:

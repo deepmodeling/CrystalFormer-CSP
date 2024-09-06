@@ -38,7 +38,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
+def train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     @jax.jit
     def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
@@ -54,13 +54,16 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         f.write("epoch f_mean f_err\n")
     pretrain_params = params
 
-    spacegroup = 1
-
+    atom_mask = jnp.zeros((21, 119))  # we will do nothing to a_logit in sampling
+    
     for epoch in range(epoch_finished+1, epochs):
 
-        key, subkey1, subkey2, subkey3 = jax.random.split(key, 4)
-        XYZ, A, W, _, L = sample_crystal(subkey1, params=params, g=spacegroup, batchsize=batchsize) 
-        G = spacegroup * jnp.ones((batchsize), dtype=int)
+        key, subkey1, subkey2 = jax.random.split(key, 3)
+        G = jax.random.choice(subkey1,
+                              a=jnp.arange(1, 231, 1),
+                              p=spg_mask,
+                              shape=(batchsize, ))
+        XYZ, A, W, _, L = sample_crystal(subkey2, params, G, atom_mask, 1.0, 1.0)
 
         x = (G, L, XYZ, A, W)
         rewards = - batch_reward_fn(x)  # inverse reward
@@ -79,10 +82,12 @@ def train(key, optimizer, opt_state, logp_fn, batch_reward_fn, ppo_loss_fn, samp
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params,subkey2, *x, False)
+
+        key, subkey1, subkey2 = jax.random.split(key, 3)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params,subkey1, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
 
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(pretrain_params, subkey3, *x, False)
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(pretrain_params, subkey2, *x, False)
         pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
 
         for _ in range(ppo_epochs):
