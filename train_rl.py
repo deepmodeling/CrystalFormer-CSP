@@ -9,6 +9,7 @@ from mace.calculators import mace_mp
 import warnings
 warnings.filterwarnings("ignore")
 
+from crystalformer.src.utils import GLXYZAW_from_file
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
 # from crystalformer.src.sample import sample_crystal
@@ -17,6 +18,7 @@ import crystalformer.src.checkpoint as checkpoint
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
 from crystalformer.reinforce.reward import make_force_reward_fn
 from crystalformer.reinforce.sample import make_sample_crystal
+
 
 if __name__ == "__main__":
     import argparse
@@ -33,6 +35,10 @@ if __name__ == "__main__":
 
     group.add_argument("--folder", default="./data/", help="the folder to save data")
     group.add_argument("--restore_path", default=None, help="checkpoint path or file")
+
+    group = parser.add_argument_group('dataset')
+    group.add_argument('--valid_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
     group = parser.add_argument_group('transformer parameters')
     group.add_argument('--Nf', type=int, default=5, help='number of frequencies for fc')
@@ -64,6 +70,9 @@ if __name__ == "__main__":
         
 
     args = parser.parse_args()
+
+    print("\n========== Load dataset ==========")
+    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
 
     print("================ parameters ================")
     # print all the parameters
@@ -162,8 +171,8 @@ if __name__ == "__main__":
         ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
         # PPO training
-        params, opt_state = train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                                  params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
+        params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
+                                  params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
 
     else:
         raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")

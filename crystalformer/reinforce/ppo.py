@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import os
 import optax
+import math
 
 import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.lattice import norm_lattice
@@ -38,7 +39,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
+def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, valid_data, path):
 
     @jax.jit
     def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
@@ -51,7 +52,7 @@ def train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_los
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err\n")
+        f.write("epoch f_mean f_err v_loss\n")
     pretrain_params = params
 
     atom_mask = jnp.zeros((21, 119))  # we will do nothing to a_logit in sampling
@@ -77,7 +78,7 @@ def train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_los
             baseline = 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
 
-        f.write( ("%6d" + 2*"  %.6f" + "\n") % (epoch, f_mean, f_err))
+        f.write( ("%6d" + 2*"  %.6f") % (epoch, f_mean, f_err))
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
@@ -95,7 +96,35 @@ def train(key, optimizer, opt_state, spg_mask, logp_fn, batch_reward_fn, ppo_los
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss) = value
             print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f}")
-        
+
+        valid_G, valid_L, valid_X, valid_A, valid_W = valid_data 
+        valid_loss = 0.0 
+        valid_aux = 0.0, 0.0, 0.0, 0.0
+        num_samples = len(valid_L)
+        num_batches = math.ceil(num_samples / batchsize)
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * batchsize
+            end_idx = min(start_idx + batchsize, num_samples)
+            G, L, X, A, W = valid_G[start_idx:end_idx], \
+                            valid_L[start_idx:end_idx], \
+                            valid_X[start_idx:end_idx], \
+                            valid_A[start_idx:end_idx], \
+                            valid_W[start_idx:end_idx]
+
+            key, subkey = jax.random.split(key)
+            loss, aux = jax.jit(loss_fn, static_argnums=7)(params, subkey, G, L, X, A, W, False)
+            valid_loss, valid_aux = jax.tree_map(
+                    lambda acc, i: acc + i,
+                    (valid_loss, valid_aux), 
+                    (loss, aux)
+                    )
+
+        valid_loss, valid_aux = jax.tree_map(
+                    lambda x: x/num_batches, 
+                    (valid_loss, valid_aux)
+                    ) 
+        f.write(("  %.6f" + "\n") % (valid_loss))
+    
         if epoch % 5 == 0:
             ckpt = {"params": params,
                     "opt_state" : opt_state
