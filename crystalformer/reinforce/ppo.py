@@ -54,6 +54,8 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     if os.path.getsize(log_filename) == 0:
         f.write("epoch f_mean f_err v_loss\n")
     pretrain_params = params
+    logp_fn = jax.jit(logp_fn, static_argnums=7)
+    loss_fn = jax.jit(loss_fn, static_argnums=7)
 
     atom_mask = jnp.zeros((21, 119))  # we will do nothing to a_logit in sampling
     
@@ -72,10 +74,7 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
 
         # running average baseline
-        if epoch == epoch_finished+1:
-            baseline = f_mean
-        else:
-            baseline = 0.95 * baseline + 0.05 * f_mean
+        baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
 
         f.write( ("%6d" + 2*"  %.6f") % (epoch, f_mean, f_err))
@@ -85,10 +84,10 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         x = (G, L, XYZ, A, W)
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params,subkey1, *x, False)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
         old_logp = logp_w + logp_xyz + logp_a + logp_l
 
-        logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(pretrain_params, subkey2, *x, False)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
         pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
 
         for _ in range(ppo_epochs):
@@ -97,22 +96,17 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
             ppo_loss, (kl_loss) = value
             print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f}")
 
-        valid_G, valid_L, valid_X, valid_A, valid_W = valid_data 
         valid_loss = 0.0 
         valid_aux = 0.0, 0.0, 0.0, 0.0
-        num_samples = len(valid_L)
+        num_samples = len(valid_data[0])
         num_batches = math.ceil(num_samples / batchsize)
         for batch_idx in range(num_batches):
             start_idx = batch_idx * batchsize
             end_idx = min(start_idx + batchsize, num_samples)
-            G, L, X, A, W = valid_G[start_idx:end_idx], \
-                            valid_L[start_idx:end_idx], \
-                            valid_X[start_idx:end_idx], \
-                            valid_A[start_idx:end_idx], \
-                            valid_W[start_idx:end_idx]
+            batch_data = jax.tree_util.tree_map(lambda x: x[start_idx:end_idx], valid_data)
 
             key, subkey = jax.random.split(key)
-            loss, aux = jax.jit(loss_fn, static_argnums=7)(params, subkey, G, L, X, A, W, False)
+            loss, aux = loss_fn(params, subkey, *batch_data, False)
             valid_loss, valid_aux = jax.tree_map(
                     lambda acc, i: acc + i,
                     (valid_loss, valid_aux), 
