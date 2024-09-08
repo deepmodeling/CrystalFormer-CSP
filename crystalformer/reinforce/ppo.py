@@ -52,7 +52,7 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err v_loss\n")
+        f.write("epoch f_mean f_err v_loss v_loss_w v_loss_a v_loss_xyz v_loss_l\n")
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
     loss_fn = jax.jit(loss_fn, static_argnums=7)
@@ -117,8 +117,13 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
                     lambda x: x/num_batches, 
                     (valid_loss, valid_aux)
                     ) 
-        f.write(("  %.6f" + "\n") % (valid_loss))
-    
+        valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
+        f.write( (5*"  %.6f" + "\n") % (valid_loss,
+                                        valid_loss_w, 
+                                        valid_loss_a, 
+                                        valid_loss_xyz, 
+                                        valid_loss_l))
+
         if epoch % 5 == 0:
             ckpt = {"params": params,
                     "opt_state" : opt_state
