@@ -17,8 +17,8 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
     def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
-        logp = logp_w + logp_xyz + logp_a + logp_l
+        _, logp_xyz, _, logp_l = logp_fn(params, key, *x, False)
+        logp = logp_xyz + logp_l
 
         kl_loss = logp - pretrain_logp
         advantages = advantages - beta * kl_loss
@@ -84,11 +84,11 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         x = (G, L, XYZ, A, W)
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
-        old_logp = logp_w + logp_xyz + logp_a + logp_l
+        _, logp_xyz, _, logp_l = logp_fn(params, subkey1, *x, False)
+        old_logp = logp_xyz + logp_l
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
-        pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
+        _, logp_xyz, _, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
+        pretrain_logp = logp_xyz + logp_l
 
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
