@@ -23,8 +23,7 @@ def get_data_from_file(filename):
         fh.close()
 
     print(len(data["entries"]))
-    entries = [entry for entry in data["entries"]  if entry['data']['e_above_hull'] <= 0.1]   # E_above_hull <= 0.1 eV
-
+    entries = data["entries"]
     # save this key information to a dataframe
     df = pd.DataFrame([{'e_above_hull': entry['data']['e_above_hull'],
                         'e_form': entry['data']['e_form'],
@@ -36,6 +35,9 @@ def get_data_from_file(filename):
                         'band_gap_ind': entry['data']['band_gap_ind'],
                         'nsites': entry['data']['nsites'],
                         'structure': entry['structure']} for entry in entries])
+    # screening the data
+    df = df[(df['e_above_hull'] <= 0.1) & (df['nsites'] <= 20)]
+
     return df
 
 
