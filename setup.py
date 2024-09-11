@@ -14,11 +14,13 @@ setup(
     package_data={
         'crystalformer': ['data/*.csv'],
     },
-    platforms = 'any',
+    platforms = 'linux',
     install_requires = [],
     entry_points = {
         'console_scripts': [
-            "train_rl=crystalformer.cli.train_rl:main"
+            "train_rl=crystalformer.cli.train_rl:main",
+            "classifier=crystalformer.cli.classifier:main",
+            "cond_gen=crystalformer.cli.cond_gen:main"
         ]
     }
 )

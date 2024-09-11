@@ -49,7 +49,7 @@ def GLXYZAW_from_sample(spg, test_path):
     return G, L, XYZ, A, W
 
 
-if __name__  == "__main__":
+def main():
 
     import argparse
     parser = argparse.ArgumentParser(description='')
@@ -186,3 +186,7 @@ if __name__  == "__main__":
 
     else:
         raise NotImplementedError(f"Optimizer {args.optimizer} not implemented")
+
+
+if __name__ == "__main__":
+    main()
