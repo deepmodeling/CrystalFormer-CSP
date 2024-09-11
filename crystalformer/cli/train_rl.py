@@ -4,7 +4,6 @@ import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 import os
 import optax
-from functools import partial
 from mace.calculators import mace_mp
 import warnings
 warnings.filterwarnings("ignore")
@@ -12,7 +11,6 @@ warnings.filterwarnings("ignore")
 from crystalformer.src.utils import GLXYZAW_from_file
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
-# from crystalformer.src.sample import sample_crystal
 import crystalformer.src.checkpoint as checkpoint
 
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
@@ -20,7 +18,7 @@ from crystalformer.reinforce.reward import make_force_reward_fn
 from crystalformer.reinforce.sample import make_sample_crystal
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     parser = argparse.ArgumentParser(description='')
 
@@ -176,3 +174,7 @@ if __name__ == "__main__":
 
     else:
         raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")
+
+
+if __name__ == "__main__":
+    main()

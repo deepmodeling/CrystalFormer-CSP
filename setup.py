@@ -16,4 +16,9 @@ setup(
     },
     platforms = 'any',
     install_requires = [],
+    entry_points = {
+        'console_scripts': [
+            "train_rl=crystalformer.cli.train_rl:main"
+        ]
+    }
 )
