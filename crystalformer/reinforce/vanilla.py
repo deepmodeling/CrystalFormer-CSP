@@ -1,11 +1,32 @@
 import jax
 import jax.numpy as jnp
-from functools import partial
 import os
 import optax
-import math
 
 import crystalformer.src.checkpoint as checkpoint
+from crystalformer.src.lattice import norm_lattice
+
+
+def make_reinforce_loss(batch_logp, batch_reward_fn):
+
+    def loss(params, key, x, is_train):
+        f = batch_reward_fn(x)
+        f = jax.lax.stop_gradient(f)
+
+        f_mean = jnp.mean(f)
+        f_std = jnp.std(f)/jnp.sqrt(f.shape[0])
+
+        G, L, XYZ, A, W = x
+        L = norm_lattice(G, W, L)
+        x = (G, L, XYZ, A, W)
+        
+        # TODO: now only support for crystalformer logp
+        logp_w, logp_xyz, logp_a, logp_l = jax.jit(batch_logp, static_argnums=7)(params, key, *x, is_train)
+        entropy = logp_w + logp_xyz + logp_a + logp_l
+
+        return -jnp.mean((f - f_mean) * entropy), (-f_mean, f_std)
+
+    return loss
 
 
 def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_finished, epochs, batchsize, path):
@@ -19,7 +40,7 @@ def train(key, optimizer, opt_state, loss_fn, sample_crystal, params, epoch_fini
             return params, opt_state
 
         key, sample_key, loss_key = jax.random.split(key, 3)
-        XYZ, A, W, M, L = sample_crystal(sample_key, params=params, g=spacegroup, batchsize=batchsize)  #TODO: partial function
+        XYZ, A, W, M, L = sample_crystal(sample_key, params=params, g=spacegroup, batchsize=batchsize) 
         G = spacegroup * jnp.ones((batchsize), dtype=int)
         x = (G, L, XYZ, A, W)
         value, grad = jax.value_and_grad(loss_fn, has_aux=True)(params, loss_key, x, True)
