@@ -35,14 +35,20 @@ def csv_to_lmdb(csv_file, lmdb_file, num_workers=40):
     print(f"Successfully converted {csv_file} to {lmdb_file}")
 
 
-if __name__ == "__main__":
-    import sys
-    path = sys.argv[1]
-    num_workers = int(sys.argv[2])
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path", type=str, required=True)
+    parser.add_argument("--num_workers", type=int, default=40)
+    args = parser.parse_args()
 
     for i in ["test", "val", "train"]:
         csv_to_lmdb(
-            os.path.join(path, f"{i}.csv"), 
-            os.path.join(path, f"{i}.lmdb"),
-            num_workers=num_workers
+            os.path.join(args.path, f"{i}.csv"), 
+            os.path.join(args.path, f"{i}.lmdb"),
+            num_workers=args.num_workers
         )
+
+
+if __name__ == "__main__":
+    main()
