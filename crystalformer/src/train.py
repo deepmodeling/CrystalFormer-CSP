@@ -55,7 +55,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
     if os.path.getsize(log_filename) == 0:
         f.write("epoch t_loss v_loss t_loss_w v_loss_w t_loss_a v_loss_a t_loss_xyz v_loss_xyz t_loss_l v_loss_l\n")
  
-    for epoch in range(epoch_finished+1, epochs):
+    for epoch in range(epoch_finished+1, epochs+1):
         key, subkey = jax.random.split(key)
         train_data = shuffle(subkey, train_data)
 
