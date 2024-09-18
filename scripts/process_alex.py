@@ -47,6 +47,11 @@ def main(args):
     with mp.Pool(args.num_io_process) as pool:
         df_list = pool.map_async(get_data_from_file, filename_list).get()
     df_total = pd.concat(df_list, axis=0)
+
+    print("total data: ", df_total.shape)
+    if args.ratio < 1.0:
+        df_total = df_total.sample(frac=args.ratio, random_state=42)
+        print("random sampled data: ", df_total.shape)
     
     ########### split the data into train, val, test ###########
     train_data, val_test_data = train_test_split(df_total, test_size=0.2, random_state=42)
@@ -66,6 +71,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process ALEX data")
     parser.add_argument("--input_path", type=str, default="/data/zdcao/crystal_gpt/dataset/alex/origin/", help="path to the input data")
     parser.add_argument("--output_path", type=str, default="/data/zdcao/crystal_gpt/dataset/alex/alex20_811/", help="path to the output data")
+    parser.add_argument("--ratio", type=float, default=1.0, help="ratio of the data to be used")
     parser.add_argument('--num_io_process', type=int, default=20, help='number of process used in multiprocessing io')
 
     args = parser.parse_args()
