@@ -13,6 +13,8 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
     """
     PPO clipped objective function with KL divergence regularization
     PPO_loss = PPO-clip + beta  * KL(P || P_pretrain)
+
+    Note that we only consider the logp_xyz and logp_l in the logp_fn
     """
 
     def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
@@ -25,7 +27,6 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
-        # jax.debug.print("ratios mean {x}", x=jnp.mean(ratios))
 
         # Finding Surrogate Loss  
         surr1 = ratios * advantages

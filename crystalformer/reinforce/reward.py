@@ -66,7 +66,13 @@ def get_atoms_from_GLXYZAW(G, L, XYZ, A, W):
 
 def make_force_reward_fn(calculator, weight=1.0):
     """
-    ase calculator object
+    Args:
+        calculator: ase calculator object
+        weight: weight for stress, total reward = log(forces + weight*stress)
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
     """
     def reward_fn(x):
         G, L, XYZ, A, W = x

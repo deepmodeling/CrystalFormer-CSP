@@ -154,14 +154,12 @@ def main():
                        default_dtype="float64",
                        device='cuda')
 
-        reward_fn, batch_reward_fn = make_force_reward_fn(calc)
+        _, batch_reward_fn = make_force_reward_fn(calc)
         # rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
 
         print("\n========== Load partial sample function ==========")
-        w_mask = None
         atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
         atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-        constraints = jnp.arange(0, args.n_max, 1)
 
         sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
 

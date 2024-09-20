@@ -19,6 +19,9 @@ def inference(model, params, G, W, A, X, Y, Z):
 
 
 def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl):
+    """
+    sample fucntion for different space group
+    """
 
     @partial(jax.jit, static_argnums=(4, 5))
     def sample_crystal(key,  params,  G, atom_mask, top_p, temperature):
