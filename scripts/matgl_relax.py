@@ -38,6 +38,7 @@ def relax_structures(pot, structures, relaxations):
         initial_energies = [relax_results["trajectory"].energies[0] for relax_results in relax_results_list]
         final_energies = [relax_results["trajectory"].energies[-1] for relax_results in relax_results_list]
         relaxed_cif_strings = [relax_results["final_structure"].to(fmt="cif") for relax_results in relax_results_list]
+        formula_list = [relax_results["final_structure"].composition.formula for relax_results in relax_results_list]
     else:
         print("No relaxation was performed. Returning initial energies as final energies.")
         ase_adaptor = AseAtomsAdaptor()
@@ -52,8 +53,9 @@ def relax_structures(pot, structures, relaxations):
             initial_energies.append(atoms.get_potential_energy())
         final_energies = initial_energies    # if no relaxation, final energy is the same as initial energy
         relaxed_cif_strings = [struct.to(fmt="cif") for struct in structures]
+        formula_list = [struct.composition.formula for struct in structures]
 
-    return initial_energies, final_energies, relaxed_cif_strings
+    return initial_energies, final_energies, relaxed_cif_strings, formula_list
 
 
 def main(args):
@@ -67,7 +69,7 @@ def main(args):
     pot = matgl.load_model(args.model_path)
     print("Relaxing structures...")
     start_time = time()
-    initial_energies, final_energies, relaxed_cif_strings  = relax_structures(pot, structures, args.relaxation)
+    initial_energies, final_energies, relaxed_cif_strings, formula_list  = relax_structures(pot, structures, args.relaxation)
     end_time = time()
     print(f"Relaxation took {end_time - start_time:.2f} seconds")
 
@@ -75,6 +77,7 @@ def main(args):
     output_data['initial_energy'] = initial_energies
     output_data['final_energy'] = final_energies
     output_data['relaxed_cif'] = relaxed_cif_strings
+    output_data['formula'] = formula_list
     if args.label:
         output_data.to_csv(os.path.join(args.restore_path, f"relaxed_structures_{args.label}.csv"),
                            index=False)
