@@ -113,9 +113,9 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
                              ], axis=1) # (n, 5, model_size)
         h = h.reshape(5*n, -1)                                         # (5*n, model_size)
 
-        positional_embeddings = hk.get_parameter(
-                        'positional_embeddings', [5*n_max, model_size], init=initializer)
-        h = h + positional_embeddings[:5*n, :]
+        # positional_embeddings = hk.get_parameter(
+        #                 'positional_embeddings', [5*n_max, model_size], init=initializer)
+        # h = h + positional_embeddings[:5*n, :]
 
         del hW
         del hA
