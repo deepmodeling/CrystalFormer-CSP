@@ -25,6 +25,7 @@ import numpy as np
 import haiku as hk
 
 from crystalformer.src.rope import PositionalEmbedding, apply_rotary_embeddings
+# from crystalformer.src.rope import RelativePosition
 
 
 class MultiHeadAttention(hk.Module):
@@ -126,9 +127,15 @@ class MultiHeadAttention(hk.Module):
     sin_freqs, cos_freqs = positional_embeddings.get_freqs()
     query_heads, key_heads = apply_rotary_embeddings(query_heads, key_heads, sin_freqs, cos_freqs)
 
+    # relative_position = RelativePosition(max_relative_position=sequence_length)
+
     # Compute attention weights.
     attn_logits = jnp.einsum("...thd,...Thd->...htT", query_heads, key_heads)
     attn_logits = attn_logits / np.sqrt(self.key_size).astype(key.dtype)
+    
+    # # Add relative position embeddings
+    # attn_logits += relative_position(sequence_length, sequence_length)
+
     if mask is not None:
       if mask.ndim != attn_logits.ndim:
         raise ValueError(
