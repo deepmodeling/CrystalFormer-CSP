@@ -1,57 +1,62 @@
-# https://github.com/VachanVY/Rotary-Embeddings/blob/main/rope.py
 import jax
-from jax import (
-    Array, 
-    numpy as jnp
-)
+import jax.numpy as jnp
 import haiku as hk
 
 
-class PositionalEmbedding:
-    """```
-    Sinusoidal Fixed Positional Embeddings
-    Args:
-        maxlen:int
-        dim:int
-    sinusoidal_embeddings: 
-        pos_emb: (maxlen, dim)
-    get_freqs:
-        get_freqs: sin_freqs(maxlen, 1, dim), cos_freqs(maxlen, 1, dim)
-    ```"""
-    def __init__(self, maxlen:int, dim:int):
-        p, i = jnp.meshgrid(jnp.arange(float(maxlen)), jnp.arange(dim/2)*2)
-        theta = (p/1e4**(i/dim)).T
+def sine_table(features, length, min_timescale=1.0, max_timescale=10000.0):
+    fraction = jnp.arange(0, features, 2, dtype=jnp.float32) / features
+    timescale = min_timescale * (max_timescale / min_timescale) ** fraction
+    rotational_frequency = 1.0 / timescale
+    # Must use high precision einsum here, bfloat16 rounding is catastrophic.
+    sinusoid_inp = jnp.einsum(
+        'i,j->ij',
+        jnp.arange(length),
+        rotational_frequency,
+        precision=jax.lax.Precision.HIGHEST,
+    )
+    sinusoid_inp = jnp.concatenate([sinusoid_inp, sinusoid_inp], axis=-1)
+    return jnp.sin(sinusoid_inp), jnp.cos(sinusoid_inp)
 
-        self.pos_emb = jnp.stack([jnp.sin(theta), jnp.cos(theta)], axis=-1)
-        self.pos_emb = self.pos_emb.reshape((maxlen, dim)) # (maxlen, dim)
 
-    def sinusoidal_embeddings(self):
-        return self.pos_emb # (maxlen, dim)
-    
-    def get_freqs(self):
-        sin_freqs = jnp.repeat(self.pos_emb[..., None, ::2], repeats=2, axis=-1)
-        cos_freqs = jnp.repeat(self.pos_emb[..., None, 1::2], repeats=2, axis=-1)
-        return sin_freqs, cos_freqs # (maxlen, 1, dim), (maxlen, 1, dim)
-    
+def rotate_half(x):
+    x1, x2 = jnp.split(x, 2, axis=-1)
+    x = jnp.concatenate([-x2, x1], axis=-1)
+    return x
 
-def apply_rotary_embeddings(q:Array, k:Array, sin_freqs:Array, cos_freqs:Array):
+
+# https://github.com/google/flax/blob/nnx/flax/experimental/nnx/examples/07_transformer.py#L131-L157
+def apply_rotary_embedding(q, k, cos, sin, index=None):
     """
-    q.shape=[seq_len, num_heads, hidden_size]
-    k.shape=[seq_len, num_heads, hidden_size]
-
-    Glossary of shapes:
-    - T: Sequence length.
-    - D: Vector (embedding) size.
-    - H: Number of attention heads.
-
+    Helper function to apply Rotary Embeddings.
+    
+    The implementation is different from the original Rotary position embeddings,
+    more details can be found in F.2. section of https://arxiv.org/abs/2202.07765 
     """
-    T = q.shape[0]
-
-    minus_swap_alternate = lambda x: jnp.stack([-x[..., 1::2], x[..., ::2]], axis=-1).reshape(x.shape)
-
-    q = q*cos_freqs[:T, :, :] + minus_swap_alternate(q)*sin_freqs[:T, :, :] # (T, H, D)*(T, 1, D) + (T, H, D)*(T, 1, D)
-    k = k*cos_freqs[:T, :, :] + minus_swap_alternate(k)*sin_freqs[:T, :, :] # (T, H, D)*(T, 1, D) + (T, H, D)*(T, 1, D)
-    return q, k # (T, H, D), (T, H, D)
+    qlen, qheads, d = q.shape
+    klen, kheads, kd = k.shape
+    if index is not None:
+        qcos = jax.lax.broadcast_in_dim(
+        cos[index, :], (qlen, qheads, d), (2,)
+        )
+        qsin = jax.lax.broadcast_in_dim(
+        sin[index, :], (qlen, qheads, d), (2,)
+        )
+    else:
+        qcos = jax.lax.broadcast_in_dim(
+        cos[:qlen, :], (qlen, qheads, d), (0, 2)
+        )
+        qsin = jax.lax.broadcast_in_dim(
+        sin[:qlen, :], (qlen, qheads, d), (0, 2)
+        )
+    kcos = jax.lax.broadcast_in_dim(
+        cos[:klen, :], (klen, kheads, d), (0, 2)
+    )
+    ksin = jax.lax.broadcast_in_dim(
+        sin[:klen, :], (klen, kheads, d), (0, 2)
+    )
+    out_q = (q * qcos) + (rotate_half(q) * qsin)
+    out_k = (k * kcos) + (rotate_half(k) * ksin)
+    return out_q, out_k
 
 
 class RelativePosition(hk.Module):

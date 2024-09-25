@@ -24,7 +24,7 @@ import numpy as np
 
 import haiku as hk
 
-from crystalformer.src.rope import PositionalEmbedding, apply_rotary_embeddings
+from crystalformer.src.rope import sine_table, apply_rotary_embedding
 # from crystalformer.src.rope import RelativePosition
 
 
@@ -123,9 +123,8 @@ class MultiHeadAttention(hk.Module):
     value_heads = projection(value, self.value_size, "value")  # [T, H, V]
 
     # Rotary Positional Embeddings
-    positional_embeddings = PositionalEmbedding(maxlen=sequence_length, dim=self.key_size)
-    sin_freqs, cos_freqs = positional_embeddings.get_freqs()
-    query_heads, key_heads = apply_rotary_embeddings(query_heads, key_heads, sin_freqs, cos_freqs)
+    sin, cos = sine_table(features=self.key_size, length=sequence_length)
+    query_heads, key_heads = apply_rotary_embedding(query_heads, key_heads, cos, sin)
 
     # relative_position = RelativePosition(max_relative_position=sequence_length)
 
