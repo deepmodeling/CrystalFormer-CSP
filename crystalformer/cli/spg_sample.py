@@ -34,7 +34,8 @@ def main():
     group.add_argument('--key_size', type=int, default=64, help='The key size')
     group.add_argument('--model_size', type=int, default=64, help='The model size')
     group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
-    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate')
+    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate for MLP')
+    group.add_argument('--attn_dropout', type=float, default=0.1, help='The dropout rate for attention')
 
     group = parser.add_argument_group('loss parameters')
     group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part relative to fc")
@@ -109,7 +110,7 @@ def main():
                                            args.transformer_layers, args.num_heads, 
                                            args.key_size, args.model_size, args.embed_size, 
                                            args.atom_types, args.wyck_types,
-                                           args.dropout_rate)
+                                           args.dropout_rate, args.attn_dropout)
     print ("# of transformer params", ravel_pytree(params)[0].size) 
 
     ################### Train #############################

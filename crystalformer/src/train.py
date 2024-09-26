@@ -27,7 +27,7 @@ def scatter(x: jnp.ndarray, retain_axis=False) -> jnp.ndarray:
     return shard(x)
 
 
-def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path):
+def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, batchsize, train_data, valid_data, path, val_interval):
            
     num_devices = jax.local_device_count()
     batch_per_device = batchsize // num_devices
@@ -87,7 +87,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                         (train_loss, train_aux)
                         ) 
 
-        if epoch % 100 == 0:
+        if epoch % val_interval == 0:
             _, valid_L, _, _, _ = valid_data 
             valid_loss = 0.0 
             valid_aux = 0.0, 0.0, 0.0, 0.0

@@ -28,6 +28,7 @@ group.add_argument('--lr_decay', type=float, default=0.0, help='lr decay')
 group.add_argument('--weight_decay', type=float, default=0.0, help='weight decay')
 group.add_argument('--clip_grad', type=float, default=1.0, help='clip gradient')
 group.add_argument("--optimizer", type=str, default="adam", choices=["none", "adam", "adamw"], help="optimizer type")
+group.add_argument("--val_interval", type=int, default=100, help="validation interval")
 
 group.add_argument("--folder", default="../data/", help="the folder to save data")
 group.add_argument("--restore_path", default=None, help="checkpoint path or file")
@@ -169,7 +170,7 @@ params, transformer = make_transformer(key, args.Nf, args.Kx, args.Kl, args.n_ma
                                       args.key_size, args.model_size, args.embed_size, 
                                       args.atom_types, args.wyck_types,
                                       args.dropout_rate, args.attn_dropout)
-transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_e_%d_drop_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.embed_size, args.dropout_rate)
+transformer_name = 'Nf_%d_Kx_%d_Kl_%d_h0_%d_l_%d_H_%d_k_%d_m_%d_e_%d_drop_%g_%g'%(args.Nf, args.Kx, args.Kl, args.h0_size, args.transformer_layers, args.num_heads, args.key_size, args.model_size, args.embed_size, args.dropout_rate, args.attn_dropout)
 
 print ("# of transformer params", ravel_pytree(params)[0].size) 
 
@@ -223,7 +224,7 @@ if args.optimizer != "none":
         pass 
  
     print("\n========== Start training ==========")
-    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path, args.val_interval)
 
 else:
     pass
