@@ -9,7 +9,7 @@ import numpy as np
 from crystalformer.src.attention import MultiHeadAttention
 from crystalformer.src.wyckoff import wmax_table, dof0_table
 
-def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, embed_size, atom_types, wyck_types, dropout_rate, widening_factor=4, sigmamin=1e-3):
+def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key_size, model_size, embed_size, atom_types, wyck_types, dropout_rate, attn_dropout=0.1, widening_factor=4, sigmamin=1e-3):
     
     coord_types = 3*Kx
     lattice_types = Kl+2*6*Kl
@@ -128,7 +128,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
                                                key_size=key_size,
                                                model_size=model_size,
                                                w_init =initializer, 
-                                               dropout_rate =dropout_rate
+                                               dropout_rate = attn_dropout
                                               )
             h_norm = _layer_norm(h)
             h_attn = attn_block(h_norm, h_norm, h_norm, 
