@@ -70,12 +70,17 @@ def main():
         args.num_io_process = num_cpu
 
     ################### Data #############################
-    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
-    G = test_data[0]
-    # spg_mask = jnp.zeros((230), dtype=int)
-    # convert space group to probability table
-    spg_mask = jnp.bincount(G, minlength=231)
-    spg_mask = spg_mask[1:] # remove 0
+    try:
+        print("\n========== Load dataset and get space group distribution =========")
+        test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+        G = test_data[0]
+        # convert space group to probability table
+        spg_mask = jnp.bincount(G, minlength=231)
+        spg_mask = spg_mask[1:] # remove 0
+    except:
+        print("\n====== failed to load dataset, back to uniform distribution ======")
+        spg_mask = jnp.ones((230), dtype=int)
+
     spg_mask = spg_mask / jnp.sum(spg_mask)
     print(spg_mask)
 
