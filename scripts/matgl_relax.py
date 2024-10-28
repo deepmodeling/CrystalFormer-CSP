@@ -68,7 +68,7 @@ def relax_structures(pot, structures, relaxations):
             atoms.set_calculator(calc)
             initial_energies.append(atoms.get_potential_energy())
         final_energies = initial_energies    # if no relaxation, final energy is the same as initial energy
-        relaxed_cif_strings = [struct.to(fmt="cif") for struct in structures]
+        relaxed_cif_strings = [struct.as_dict() for struct in structures]
         formula_list = [struct.composition.formula for struct in structures]
 
     return initial_energies, final_energies, relaxed_cif_strings, formula_list
