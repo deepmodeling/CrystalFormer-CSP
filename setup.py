@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'crystalformer',
-    version = '0.4',
+    version = '0.4.1',
     keywords='Crystal Generation',
     description = 'CrystalFormer is a transformer-based autoregressive model specifically designed for space group-controlled generation of crystalline materials.',
     license = 'Apache License',

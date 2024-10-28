@@ -15,6 +15,7 @@ import pandas as pd
 import os
 from time import time
 from ast import literal_eval
+from tqdm import tqdm
 
 
 def relax_structures(pot, structures, relaxations):
@@ -34,11 +35,26 @@ def relax_structures(pot, structures, relaxations):
     if relaxations:
         print("Relaxing structures with M3GNet...")
         relaxer = Relaxer(potential=pot)
-        relax_results_list = [relaxer.relax(struct, fmax=0.01) for struct in structures]
-        initial_energies = [relax_results["trajectory"].energies[0] for relax_results in relax_results_list]
-        final_energies = [relax_results["trajectory"].energies[-1] for relax_results in relax_results_list]
-        relaxed_cif_strings = [relax_results["final_structure"].to(fmt="cif") for relax_results in relax_results_list]
-        formula_list = [relax_results["final_structure"].composition.formula for relax_results in relax_results_list]
+        initial_energies = []
+        final_energies = []
+        relaxed_cif_strings = []
+        formula_list = []
+        for i in tqdm(range(len(structures))):
+            struct = structures[i]
+            try:
+                # relax the structure
+                relax_results = relaxer.relax(struct, fmax=0.01)   
+            except Exception as e:
+                print(f"Error in relaxation of structure {i}")
+                print(e)
+                print("Skipping this structure...")
+                continue
+
+            initial_energies.append(relax_results["trajectory"].energies[0])
+            final_energies.append(relax_results["trajectory"].energies[-1])
+            relaxed_cif_strings.append(relax_results["final_structure"].to(fmt="cif"))
+            formula_list.append(relax_results["final_structure"].composition.formula)
+            
     else:
         print("No relaxation was performed. Returning initial energies as final energies.")
         ase_adaptor = AseAtomsAdaptor()
@@ -66,6 +82,11 @@ def main(args):
 
     try: structures = [Structure.from_dict(literal_eval(cif)) for cif in cif_strings]
     except: structures = [Structure.from_str(cif, fmt="cif") for cif in cif_strings]
+
+    if args.primitive:
+        print("Converting structures to primitive form...")
+        structures = [struct.to_primitive() for struct in structures]
+    
     pot = matgl.load_model(args.model_path)
     print("Relaxing structures...")
     start_time = time()
@@ -92,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("--restore_path", type=str, default="/data/zdcao/crystal_gpt/data/b38199e3/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.5/unconditional/sorted")
     parser.add_argument('--filename', default='output_225_struct.csv')
     parser.add_argument('--relaxation', action='store_true')
+    parser.add_argument('--primitive', action='store_true')
     parser.add_argument('--model_path', default='/data/zdcao/website/matgl/pretrained_models/M3GNet-MP-2021.2.8-PES')
     parser.add_argument('--label', default='')
     args = parser.parse_args()
