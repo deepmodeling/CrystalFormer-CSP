@@ -52,7 +52,7 @@ def relax_structures(pot, structures, relaxations):
 
             initial_energies.append(relax_results["trajectory"].energies[0])
             final_energies.append(relax_results["trajectory"].energies[-1])
-            relaxed_cif_strings.append(relax_results["final_structure"].to(fmt="cif"))
+            relaxed_cif_strings.append(relax_results["final_structure"].as_dict())
             formula_list.append(relax_results["final_structure"].composition.formula)
             
     else:
