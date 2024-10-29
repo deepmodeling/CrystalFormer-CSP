@@ -17,6 +17,7 @@ crystal space, which is crucial for data and compute efficient generative modeli
 
 - [Contents](#contents)
 - [Model card](#model-card)
+- [Status](#status)
 - [Get Started](#get-started)
 - [Installation](#installation)
   - [CPU installation](#cpu-installation)
@@ -43,6 +44,16 @@ The model is an autoregressive transformer for the space group conditioned cryst
 - `P(L| ...)`  is the mixture of Gaussian distribution.
 
 We only consider symmetry inequivalent atoms. The remaining atoms are restored based on the space group and Wyckoff letter information. Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where discrete Wyckoff letters can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling.
+
+## Status
+
+Major milestones are summarized below.
+
+- v0.4.1 : Replace the absolute positional embedding with the Rotary Positional Embedding (RoPE).
+- v0.4 : Add reinforcement learning.
+- v0.3 : Add conditional generation in the plug-and-play manner.
+- v0.2 : Add Markov chain Monte Carlo (MCMC) sampling for template-based structure generation.
+- v0.1 : Initial implementations of crystalline material generation conditioned on the space group.
 
 ## Get Started
 
