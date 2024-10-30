@@ -218,7 +218,7 @@ if args.optimizer != "none":
 
     opt_state = optimizer.init(params)
     try:
-        opt_state.update(ckpt["opt_state"])
+        opt_state = ckpt["opt_state"]
     except: 
         print ("failed to update opt_state from checkpoint")
         pass 
