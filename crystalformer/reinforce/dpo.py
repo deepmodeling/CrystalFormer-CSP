@@ -45,7 +45,6 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
     @jax.jit
     def step(params, key, opt_state, x_w, x_l, ref_chosen_logps, ref_rejected_logps):
         value, grad = jax.value_and_grad(dpo_loss_fn)(params, key, x_w, x_l, ref_chosen_logps, ref_rejected_logps)
-        grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
