@@ -56,12 +56,29 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
     ref_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
 
-    key, subkey1, subkey2 = jax.random.split(key, 3)
-    logp_w, logp_xyz, logp_a, logp_l = logp_fn(ref_params, subkey1, *chosen_data, False)
-    ref_chosen_logps = logp_w + logp_xyz + logp_a + logp_l
-    
-    logp_w, logp_xyz, logp_a, logp_l = logp_fn(ref_params, subkey2, *rejected_data, False)
-    ref_rejected_logps = logp_w + logp_xyz + logp_a + logp_l
+    ref_chosen_logps = jnp.array([])
+    ref_rejected_logps = jnp.array([])
+    _, chosen_L, _, _, _ = chosen_data
+    num_samples = len(chosen_L)
+    num_batches = math.ceil(num_samples / batchsize)
+    for batch_idx in range(num_batches):
+        start_idx = batch_idx * batchsize
+        end_idx = min(start_idx + batchsize, num_samples)
+        key, subkey1, subkey2 = jax.random.split(key, 3)
+
+        data = jax.tree_map(lambda x: x[start_idx:end_idx], chosen_data)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(ref_params, subkey1, *data, False)
+        logp = logp_w + logp_xyz + logp_a + logp_l
+        ref_chosen_logps = jnp.append(ref_chosen_logps, logp, axis=0)
+
+        data = jax.tree_map(lambda x: x[start_idx:end_idx], rejected_data)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(ref_params, subkey2, *data, False)
+        logp = logp_w + logp_xyz + logp_a + logp_l
+        ref_rejected_logps = jnp.append(ref_rejected_logps, logp, axis=0)
+
+    print(ref_chosen_logps.shape, ref_rejected_logps.shape)
+
+    print("Finished calculating reference logp")
     
     for epoch in range(epoch_finished+1, epochs):
         key, subkey = jax.random.split(key)
