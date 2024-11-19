@@ -80,9 +80,13 @@ def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
 
         if relaxation:
             if fixsymmetry:
-                # Fix the space group symmetry of the structure
-                c = FixSymmetry(atoms) 
-                atoms.set_constraint(c)
+                try:
+                    # Fix the space group symmetry of the structure
+                    c = FixSymmetry(atoms) 
+                    atoms.set_constraint(c)
+                except Exception as e:
+                    # sometimes the FixSymmetry constraint may not work if atoms are too close
+                    print(f"Error fixing symmetry: {e}")
 
             # The following code is adapted from matgl repo
             # https://github.com/materialsvirtuallab/matgl/blob/824c1c4cefa9129c0af7066523d1665515f42899/src/matgl/ext/ase.py#L218-L304
