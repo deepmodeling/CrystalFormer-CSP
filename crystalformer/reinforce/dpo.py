@@ -8,7 +8,7 @@ from crystalformer.src.utils import shuffle
 import crystalformer.src.checkpoint as checkpoint
 
 
-def make_dpo_loss(logp_fn, beta):
+def make_dpo_loss(logp_fn, beta, label_smoothing=0.0, gamma=0.0):
     
     def dpo_logp_fn(policy_chosen_logps,
                     policy_rejected_logps,
@@ -20,22 +20,26 @@ def make_dpo_loss(logp_fn, beta):
 
         logits = pi_logratios - ref_logratios
 
-        losses = -jax.nn.log_sigmoid(beta * logits)
-        # chosen_rewards = beta * (policy_chosen_logps - ref_chosen_logps)
-        # rejected_rewards = beta * (policy_rejected_logps - ref_rejected_logps)
+        # label_smoothing=0 gives original DPO 
+        losses = -jax.nn.log_sigmoid(beta * logits) * (1 - label_smoothing) - jax.nn.log_sigmoid(-beta * logits) * label_smoothing
         return jnp.mean(losses)
     
     def loss_fn(params, key, x_w, x_l, ref_chosen_logps, ref_rejected_logps):
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x_w, False)
+        key, subkey = jax.random.split(key)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey, *x_w, False)
         policy_chosen_logps = logp_w + logp_xyz + logp_a + logp_l
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x_l, False)
+        key, subkey = jax.random.split(key)
+        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey, *x_l, False)
         policy_rejected_logps = logp_w + logp_xyz + logp_a + logp_l
 
-        return dpo_logp_fn(policy_chosen_logps,
-                           policy_rejected_logps,
-                           ref_chosen_logps,
-                           ref_rejected_logps)
+        dpo_loss = dpo_logp_fn(policy_chosen_logps,
+                               policy_rejected_logps,
+                               ref_chosen_logps,
+                               ref_rejected_logps)
+        loss = dpo_loss - gamma * jnp.mean(policy_chosen_logps)
+
+        return loss, (dpo_loss, jnp.mean(policy_chosen_logps))
 
     return loss_fn
 
@@ -44,7 +48,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
 
     @jax.jit
     def step(params, key, opt_state, x_w, x_l, ref_chosen_logps, ref_rejected_logps):
-        value, grad = jax.value_and_grad(dpo_loss_fn)(params, key, x_w, x_l, ref_chosen_logps, ref_rejected_logps)
+        value, grad = jax.value_and_grad(dpo_loss_fn, has_aux=True)(params, key, x_w, x_l, ref_chosen_logps, ref_rejected_logps)
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
         return params, opt_state, value
@@ -52,7 +56,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err v_loss v_loss_w v_loss_a v_loss_xyz v_loss_l\n")
+        f.write("epoch loss dpo_loss chosen_logp\n")
     ref_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
 
@@ -77,10 +81,9 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
         ref_rejected_logps = jnp.append(ref_rejected_logps, logp, axis=0)
 
     print(ref_chosen_logps.shape, ref_rejected_logps.shape)
-
     print("Finished calculating reference logp")
     
-    for epoch in range(epoch_finished+1, epochs):
+    for epoch in range(epoch_finished+1, epochs+1):
         key, subkey = jax.random.split(key)
         chosen_data = shuffle(subkey, chosen_data)
         rejected_data = shuffle(subkey, rejected_data)  
@@ -90,7 +93,6 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
         ref_rejected_logps = ref_rejected_logps[idx]
 
         _, chosen_L, _, _, _ = chosen_data
-        train_loss = 0.0 
         num_samples = chosen_L.shape[0]
         if num_samples % batchsize == 0:
             num_batches = math.ceil(num_samples / batchsize)
@@ -102,23 +104,22 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
             end_idx = min(start_idx + batchsize, num_samples)
             x_w = jax.tree_map(lambda x: x[start_idx:end_idx], chosen_data)
             x_l = jax.tree_map(lambda x: x[start_idx:end_idx], rejected_data)
-            ref_chosen_logps_batch = jax.tree_map(lambda x: x[start_idx:end_idx], ref_chosen_logps)
-            ref_rejected_logps_batch = jax.tree_map(lambda x: x[start_idx:end_idx], ref_rejected_logps)
+            ref_chosen_logps_batch = ref_chosen_logps[start_idx:end_idx]
+            ref_rejected_logps_batch = ref_rejected_logps[start_idx:end_idx]
 
             key, subkey = jax.random.split(key)
-            params, opt_state, loss = step(params, key, opt_state, x_w, x_l, ref_chosen_logps_batch, ref_rejected_logps_batch)
-            train_loss += loss
+            params, opt_state, value = step(params, subkey, opt_state, x_w, x_l, ref_chosen_logps_batch, ref_rejected_logps_batch)
+            loss, (dpo_loss, policy_chosen_logps) = value
         
-        train_loss = train_loss / num_batches
-        f.write( ("%6d" + "  %.6f" + "\n") % (epoch, train_loss))
+            f.write( ("%6d" + 3*"  %.6f" + "\n") % (epoch, loss, dpo_loss, policy_chosen_logps))
 
-        if epoch % 5 == 0:
-            ckpt = {"params": params,
-                    "opt_state" : opt_state
-                   }
-            ckpt_filename = os.path.join(path, "epoch_%06d.pkl" %(epoch))
-            checkpoint.save_data(ckpt, ckpt_filename)
-            print("Save checkpoint file: %s" % ckpt_filename)
+            if batch_idx % 10 == 0:
+                ckpt = {"params": params,
+                        "opt_state" : opt_state
+                    }
+                ckpt_filename = os.path.join(path, "epoch_%06d.pkl" %((epoch-1)*num_batches+batch_idx))
+                checkpoint.save_data(ckpt, ckpt_filename)
+                print("Save checkpoint file: %s" % ckpt_filename)
 
     f.close()
 

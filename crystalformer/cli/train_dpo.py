@@ -53,6 +53,11 @@ def main():
     group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
+    group = parser.add_argument_group('reinforcement learning parameters')
+    parser.add_argument('--beta', type=float, default=0.1, help='beta for DPO loss')
+    parser.add_argument('--label_smoothing', type=float, default=0.0, help='label smoothing for DPO loss')
+    parser.add_argument('--gamma', type=float, default=0.0, help='logp regularization coefficient for DPO loss')
+
     args = parser.parse_args()
 
     print("\n========== Load dataset ==========")
@@ -85,6 +90,7 @@ def main():
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
         output_path = args.folder \
+                    + "beta_%g_label_%g_gamma_%g_"%(args.beta, args.label_smoothing, args.gamma) \
                     + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                     + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -128,7 +134,7 @@ def main():
             pass 
 
         print("\n========== Start RL training ==========")
-        dpo_loss_fn = make_dpo_loss(logp_fn, beta=0.1)
+        dpo_loss_fn = make_dpo_loss(logp_fn, beta=args.beta, label_smoothing=args.label_smoothing, gamma=args.gamma)
 
         # PPO training
         params, opt_state = train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finished, 
