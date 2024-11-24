@@ -8,8 +8,9 @@ from crystalformer.src.utils import shuffle
 import crystalformer.src.checkpoint as checkpoint
 
 
-def make_dpo_loss(logp_fn, beta, label_smoothing=0.0, gamma=0.0):
+def make_dpo_loss(logp_fn, beta, label_smoothing=0.0, gamma=0.0, ipo=False):
     
+    # https://github.com/eric-mitchell/direct-preference-optimization/blob/f8b8c0f49dc92a430bae41585f9d467d3618fe2f/trainers.py#L45-L87
     def dpo_logp_fn(policy_chosen_logps,
                     policy_rejected_logps,
                     ref_chosen_logps,
@@ -20,8 +21,11 @@ def make_dpo_loss(logp_fn, beta, label_smoothing=0.0, gamma=0.0):
 
         logits = pi_logratios - ref_logratios
 
-        # label_smoothing=0 gives original DPO 
-        losses = -jax.nn.log_sigmoid(beta * logits) * (1 - label_smoothing) - jax.nn.log_sigmoid(-beta * logits) * label_smoothing
+        if ipo:
+            losses = (logits - 1/(2 * beta)) ** 2  # Eq. 17 of https://arxiv.org/pdf/2310.12036v2.pdf
+        else:
+            # label_smoothing=0 gives original DPO 
+            losses = -jax.nn.log_sigmoid(beta * logits) * (1 - label_smoothing) - jax.nn.log_sigmoid(-beta * logits) * label_smoothing
         return jnp.mean(losses)
     
     def loss_fn(params, key, x_w, x_l, ref_chosen_logps, ref_rejected_logps):
@@ -113,7 +117,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
         
             f.write( ("%6d" + 3*"  %.6f" + "\n") % (epoch, loss, dpo_loss, policy_chosen_logps))
 
-            if batch_idx % 10 == 0:
+            if batch_idx == num_batches - 1 :
                 ckpt = {"params": params,
                         "opt_state" : opt_state
                     }

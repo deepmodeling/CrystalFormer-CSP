@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--beta', type=float, default=0.1, help='beta for DPO loss')
     parser.add_argument('--label_smoothing', type=float, default=0.0, help='label smoothing for DPO loss')
     parser.add_argument('--gamma', type=float, default=0.0, help='logp regularization coefficient for DPO loss')
+    parser.add_argument('--ipo', action='store_true', help='use IPO loss instead of DPO loss')
 
     args = parser.parse_args()
 
@@ -134,7 +135,11 @@ def main():
             pass 
 
         print("\n========== Start RL training ==========")
-        dpo_loss_fn = make_dpo_loss(logp_fn, beta=args.beta, label_smoothing=args.label_smoothing, gamma=args.gamma)
+        dpo_loss_fn = make_dpo_loss(logp_fn,
+                                    beta=args.beta,
+                                    label_smoothing=args.label_smoothing,
+                                    gamma=args.gamma,
+                                    ipo=args.ipo)
 
         # PPO training
         params, opt_state = train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finished, 
