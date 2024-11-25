@@ -43,7 +43,7 @@ def make_dpo_loss(logp_fn, beta, label_smoothing=0.0, gamma=0.0, ipo=False):
                                ref_rejected_logps)
         loss = dpo_loss - gamma * jnp.mean(policy_chosen_logps)
 
-        return loss, (dpo_loss, jnp.mean(policy_chosen_logps))
+        return loss, (dpo_loss, jnp.mean(policy_chosen_logps), jnp.mean(policy_rejected_logps))
 
     return loss_fn
 
@@ -60,7 +60,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch loss dpo_loss chosen_logp v_loss v_dpo_loss v_chosen_logp\n")
+        f.write("epoch loss dpo_loss chosen_logp rejected_logp v_loss v_dpo_loss v_chosen_logp v_rejected_logp\n")
     ref_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
 
@@ -122,6 +122,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
         train_loss = 0.0
         train_dpo_loss = 0.0
         train_policy_chosen_logps = 0.0
+        train_policy_rejected_logps = 0.0
         _, chosen_L, _, _, _ = train_chosen_data
         num_samples = chosen_L.shape[0]
         num_batches = math.ceil(num_samples / batchsize)
@@ -135,20 +136,23 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
 
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x_w, x_l, ref_chosen_logps_batch, ref_rejected_logps_batch)
-            loss, (dpo_loss, policy_chosen_logps) = value
+            loss, (dpo_loss, policy_chosen_logps, policy_rejected_logps) = value
             train_loss += loss
             train_dpo_loss += dpo_loss
             train_policy_chosen_logps += policy_chosen_logps
+            train_policy_rejected_logps += policy_rejected_logps
         
         train_loss /= num_batches
         train_dpo_loss /= num_batches
         train_policy_chosen_logps /= num_batches
-        f.write( ("%6d" + 3*"  %.6f") % (epoch, train_loss, train_dpo_loss, train_policy_chosen_logps))
+        train_policy_rejected_logps /= num_batches
+        f.write( ("%6d" + 4*"  %.6f") % (epoch, train_loss, train_dpo_loss, train_policy_chosen_logps, train_policy_rejected_logps))
 
         # Validation
         val_loss = 0.0
         val_dpo_loss = 0.0
         val_policy_chosen_logps = 0.0
+        val_policy_rejected_logps = 0.0
         num_val_samples = len(val_ref_chosen_logps)
         num_batches = math.ceil(num_val_samples / batchsize)
         for batch_idx in range(num_batches):
@@ -160,15 +164,17 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
             ref_rejected_logps_batch = val_ref_rejected_logps[start_idx:end_idx]
 
             key, subkey = jax.random.split(key)
-            loss, (dpo_loss, policy_chosen_logps) = jax.jit(dpo_loss_fn)(params, subkey, x_w, x_l, ref_chosen_logps_batch, ref_rejected_logps_batch)
+            loss, (dpo_loss, policy_chosen_logps, policy_rejected_logps) = jax.jit(dpo_loss_fn)(params, subkey, x_w, x_l, ref_chosen_logps_batch, ref_rejected_logps_batch)
             val_loss += loss
             val_dpo_loss += dpo_loss
             val_policy_chosen_logps += policy_chosen_logps
+            val_policy_rejected_logps += policy_rejected_logps
 
         val_loss /= num_batches
         val_dpo_loss /= num_batches
         val_policy_chosen_logps /= num_batches
-        f.write( (3*"  %.6f" + "\n") % (val_loss, val_dpo_loss, val_policy_chosen_logps))
+        val_policy_rejected_logps /= num_batches
+        f.write( (4*"  %.6f" + "\n") % (val_loss, val_dpo_loss, val_policy_chosen_logps, val_policy_rejected_logps))
 
 
         if epoch % 1 == 0:
