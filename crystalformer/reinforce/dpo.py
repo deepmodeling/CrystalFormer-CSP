@@ -98,6 +98,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
     # Split the data into training and validation
     num_val_samples = int(num_samples * val_ratio)
     num_train_samples = num_samples - num_val_samples
+    print("num_train_samples: %d, num_val_samples: %d" % (num_train_samples, num_val_samples))
 
     train_chosen_data = jax.tree_map(lambda x: x[:num_train_samples], chosen_data)
     train_rejected_data = jax.tree_map(lambda x: x[:num_train_samples], rejected_data)

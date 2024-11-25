@@ -33,6 +33,7 @@ def main():
     group = parser.add_argument_group('dataset')
     group.add_argument('--chosen_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
     group.add_argument('--rejected_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument("--val_ratio", type=float, default=0.2, help="validation ratio")
     group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
     group = parser.add_argument_group('transformer parameters')
@@ -143,7 +144,7 @@ def main():
 
         # PPO training
         params, opt_state = train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finished, 
-                                  args.epochs, args.batchsize, chosen_data, rejected_data, output_path)
+                                  args.epochs, args.batchsize, chosen_data, rejected_data, output_path, args.val_ratio)
 
     else:
         raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")
