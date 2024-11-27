@@ -85,6 +85,7 @@ def train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finishe
         ref_rejected_logps = jnp.append(ref_rejected_logps, logp, axis=0)
 
     print(ref_chosen_logps.shape, ref_rejected_logps.shape)
+    print(f"ref_chosen_logps: {jnp.mean(ref_chosen_logps)}, ref_rejected_logps: {jnp.mean(ref_rejected_logps)}")
     print("Finished calculating reference logp")
 
     # Shuffle the data
