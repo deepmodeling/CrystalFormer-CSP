@@ -135,9 +135,9 @@ def make_ehull_reward_fn(calculator, ref_data):
         # clip energy to avoid nan
         energy = np.clip(energy, -10, 10)
         structure = ase_adaptor.get_structure(atoms)
-        ehull = ehull.forward_fn(structure, energy, ref_data)
+        e_above_hull = ehull.forward_fn(structure, energy, ref_data)
 
-        return ehull
+        return e_above_hull
 
     def batch_reward_fn(x):
         x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
@@ -145,7 +145,7 @@ def make_ehull_reward_fn(calculator, ref_data):
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
         x = (G, L, XYZ, A, W)
         output = map(reward_fn, zip(*x))
-        output = np.array(list(output))
+        output = jnp.array(list(output))
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
 
         return output

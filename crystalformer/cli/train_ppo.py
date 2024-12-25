@@ -14,7 +14,6 @@ from crystalformer.src.transformer import make_transformer
 import crystalformer.src.checkpoint as checkpoint
 
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
-from crystalformer.reinforce.reward import make_force_reward_fn
 from crystalformer.reinforce.sample import make_sample_crystal
 
 
@@ -62,6 +61,8 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
+    group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull'], help='reward function to use')
+    group.add_argument('--convex_path', type=str, default='/data/zdcao/crystal_gpt/dataset/alex/PBE/convex_hull_pbe_2023.12.29.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
@@ -155,8 +156,19 @@ def main():
                        default_dtype="float64",
                        device='cuda')
 
-        _, batch_reward_fn = make_force_reward_fn(calc)
-        # rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
+        if args.reward == "force":
+            from crystalformer.reinforce.reward import make_force_reward_fn
+            _, batch_reward_fn = make_force_reward_fn(calc)
+
+        elif args.reward == "ehull":
+            import json, bz2
+            from crystalformer.reinforce.reward import make_ehull_reward_fn
+            with bz2.open(args.convex_path) as fh:
+                ref_data = json.loads(fh.read().decode('utf-8'))
+            _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
+            
+        else:
+            raise NotImplementedError
 
         print("\n========== Load partial sample function ==========")
         atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
