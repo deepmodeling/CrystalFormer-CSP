@@ -129,13 +129,14 @@ def make_ehull_reward_fn(calculator, ref_data):
             atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
             atoms.calc = calculator
             energy = atoms.get_potential_energy()
-        except: 
-            energy = np.inf
+            structure = ase_adaptor.get_structure(atoms)
+            e_above_hull = ehull.forward_fn(structure, energy, ref_data)
 
-        # clip energy to avoid nan
-        energy = np.clip(energy, -10, 10)
-        structure = ase_adaptor.get_structure(atoms)
-        e_above_hull = ehull.forward_fn(structure, energy, ref_data)
+        except:
+            e_above_hull = np.inf
+
+        # clip e above hull to avoid too large or too small values
+        e_above_hull = np.clip(e_above_hull, -10, 10)
 
         return e_above_hull
 
