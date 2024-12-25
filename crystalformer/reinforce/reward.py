@@ -3,7 +3,9 @@ import jax.numpy as jnp
 import numpy as np
 from pymatgen.core import Structure, Lattice
 
+import crystalformer.reinforce.ehull as ehull
 from crystalformer.src.wyckoff import wmax_table, mult_table, symops
+
 
 symops = np.array(symops)
 mult_table = np.array(mult_table)
@@ -106,18 +108,46 @@ def make_force_reward_fn(calculator, weight=1.0):
     return reward_fn, batch_reward_fn
 
 
-def make_distance_reward_fn():
+def make_ehull_reward_fn(calculator, ref_data):
+    """
+    Args:
+        calculator: ase calculator object
+        ref_data: reference data for ehull calculation
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+
+    ase_adaptor = AseAtomsAdaptor()
 
     def reward_fn(x):
         G, L, XYZ, A, W = x
-        atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
-        dis_matrix = jnp.array(atoms.get_all_distances(mic=True, vector=False))
-        min_dis = jnp.min(jnp.where(dis_matrix == 0, jnp.inf, dis_matrix))  # avoid 0 distance
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            atoms.calc = calculator
+            energy = atoms.get_potential_energy()
+        except: 
+            energy = np.inf
 
-        return jnp.array(1/min_dis)
+        # clip energy to avoid nan
+        energy = np.clip(energy, -10, 10)
+        structure = ase_adaptor.get_structure(atoms)
+        ehull = ehull.forward_fn(structure, energy, ref_data)
+
+        return ehull
 
     def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
         output = map(reward_fn, zip(*x))
-        return jnp.array(list(output))
+        output = np.array(list(output))
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
 
     return reward_fn, batch_reward_fn
