@@ -4,7 +4,6 @@ import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 import os
 import optax
-from mace.calculators import mace_mp
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -66,7 +65,8 @@ def main():
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
-    group.add_argument('--mlff_path', type=str, default='./data/2023-12-03-mace-128-L1_epoch-199.model', help='path to the MLFF model')
+    group.add_argument('--mlff_model', type=str, default='orb', choices=['mace', 'orb'], help='the model to use for MLFF')
+    group.add_argument('--mlff_path', type=str, default='./data/orb-v2-20241011.ckpt', help='path to the MLFF model')
         
 
     args = parser.parse_args()
@@ -151,10 +151,24 @@ def main():
             pass 
 
         print("\n========== Load calculator and rl loss ==========")
-        calc = mace_mp(model=args.mlff_path,
-                       dispersion=False,
-                       default_dtype="float64",
-                       device='cuda')
+        print(f"Using {args.mlff_model} model at {args.mlff_path}")
+        if args.mlff_model == "mace":
+            from mace.calculators import mace_mp
+            calc = mace_mp(model=args.mlff_path,
+                           dispersion=False,
+                           default_dtype="float64",
+                           device='cuda')
+            
+        elif args.mlff_model == "orb":
+            from orb_models.forcefield import pretrained
+            from orb_models.forcefield.calculator import ORBCalculator
+
+            # Load the ORB forcefield model
+            orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
+            calc = ORBCalculator(orbff, device='cuda')
+        
+        else:
+            raise NotImplementedError
 
         if args.reward == "force":
             from crystalformer.reinforce.reward import make_force_reward_fn
