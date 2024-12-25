@@ -49,13 +49,9 @@ def generate_CSE(structure, m3gnet_energy):
 def calculate_hull(structure, energy, entries):
     entries = [ComputedStructureEntry.from_dict(i) for i in entries]
     pd = PhaseDiagram(entries)
-
-    try:
-        entry = generate_CSE(structure, energy)
-        ehull = pd.get_e_above_hull(entry, allow_negative=True)
-    except Exception as e:
-        print(f"Error: {e}")
-        ehull = None
+    
+    entry = generate_CSE(structure, energy)
+    ehull = pd.get_e_above_hull(entry, allow_negative=True)
     
     return ehull
 
