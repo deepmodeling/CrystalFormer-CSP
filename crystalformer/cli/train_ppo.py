@@ -34,6 +34,7 @@ def main():
 
     group = parser.add_argument_group('dataset')
     group.add_argument('--valid_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument('--test_path', default=None, help='dataset to get the space group distribution')
     group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
     group = parser.add_argument_group('transformer parameters')
@@ -79,12 +80,26 @@ def main():
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
-    if args.spacegroup is not None:
-        spg_mask = jnp.zeros((230), dtype=int)
-        for g in args.spacegroup:
-            spg_mask = spg_mask.at[int(g)-1].set(1)
-    else:
-        spg_mask = jnp.ones((230), dtype=int)
+    ################### Data #############################
+    try:
+        print("\n========== Load dataset and get space group distribution =========")
+        test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+        G = test_data[0]
+        # convert space group to probability table
+        spg_mask = jnp.bincount(G, minlength=231)
+        spg_mask = spg_mask[1:] # remove 0
+    except:
+        print("\n====== failed to load dataset ======")
+        if args.spacegroup is not None:
+            print("Spacegroup specified, will sample from the specified spacegroups")
+            spg_mask = jnp.zeros((230), dtype=int)
+            for g in args.spacegroup:
+                spg_mask = spg_mask.at[int(g)-1].set(1)
+            
+        else:
+            print("No spacegroup specified, will sample from all spacegroups")
+            spg_mask = jnp.ones((230), dtype=int)
+
     print("spacegroup mask", spg_mask)
 
     print("\n========== Prepare transformer ==========")
@@ -185,9 +200,6 @@ def main():
             raise NotImplementedError
 
         print("\n========== Load partial sample function ==========")
-        atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
-        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-
         sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
 
         print("\n========== Start RL training ==========")
