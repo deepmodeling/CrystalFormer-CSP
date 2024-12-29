@@ -53,13 +53,17 @@ def main(args):
     print(f"Number of stable structures: {len(structures)}")
 
     # remove duplicates (Uniqueness)
+    idx_list = []
     unique_structures = []
-    for s in structures:
+    for idx, s in enumerate(structures):
         if not any([compare_structures(s, us) for us in unique_structures]):
             unique_structures.append(s)
+            idx_list.append(idx)
 
+    data = data.iloc[idx_list]
     print(f"Number of stable and unique structures: {len(unique_structures)}")
 
+    # remove structures that are already in the reference data (Novelty)
     comp_list = []
     for idx, formula in enumerate(ref_data['formula']):
         try:
@@ -79,9 +83,11 @@ def main(args):
     search_duplicate = make_search_duplicate(ref_data, sm)
     duplicate_list = list(map(lambda s: search_duplicate(s), unique_structures))
 
-    # count the number of False in duplicate_list
-    num_unique = len([x for x in duplicate_list if not x])
-    print(f"Number of stable unique and novelty structures: {num_unique}")
+    # pick the idx of False in duplicate_list
+    idx_list = [idx for idx, duplicate in enumerate(duplicate_list) if not duplicate]
+    data = data.iloc[idx_list]
+    print(f"Number of stable, unique and novel structures: {data.shape[0]}")
+    data.to_csv(os.path.join(args.restore_path, "stable_unique_novel_structures.csv"), index=False)
 
 
 if __name__ == "__main__":
