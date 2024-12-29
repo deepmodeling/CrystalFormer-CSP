@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import os
 import optax
 import math
+from functools import partial
 
 import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.lattice import norm_lattice
@@ -42,9 +43,18 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
 def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, valid_data, path):
 
-    @jax.jit
+    num_devices = jax.local_device_count()
+    batch_per_device = batchsize // num_devices
+    shape_prefix = (num_devices, batch_per_device)
+    print("num_devices: ", num_devices)
+    print("batch_per_device: ", batch_per_device)
+    print("shape_prefix: ", shape_prefix)
+
+    @partial(jax.pmap, axis_name="p", in_axes=(None, None, None, 0, 0, 0, 0), out_axes=(None, None, 0),)
     def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
         value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, x, old_logp, pretrain_logp, advantages)
+        grad = jax.lax.pmean(grad, axis_name="p")
+        value = jax.lax.pmean(value, axis_name="p")
         grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
         updates, opt_state = optimizer.update(grad, opt_state, params)
         params = optax.apply_updates(params, updates)
@@ -91,11 +101,16 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
         pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
 
+        x = jax.tree_map(lambda _x: _x.reshape(shape_prefix + _x.shape[1:]), x)
+        old_logp = old_logp.reshape(shape_prefix + old_logp.shape[1:])
+        pretrain_logp = pretrain_logp.reshape(shape_prefix + pretrain_logp.shape[1:])
+        advantages = advantages.reshape(shape_prefix + advantages.shape[1:])
+
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss) = value
-            print(f"epoch {epoch}, loss {ppo_loss:.6f} {kl_loss:.6f}")
+            print(f"epoch {epoch}, loss {jnp.mean(ppo_loss):.6f} {jnp.mean(kl_loss):.6f}")
 
         valid_loss = 0.0 
         valid_aux = 0.0, 0.0, 0.0, 0.0
