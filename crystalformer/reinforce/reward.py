@@ -152,3 +152,47 @@ def make_ehull_reward_fn(calculator, ref_data):
         return output
 
     return reward_fn, batch_reward_fn
+
+
+def make_prop_reward_fn(model, dummy_value=5):
+
+    """
+    Args:
+        model: property prediction model, takes pymatgen structure as input, returns property value
+        dummy_value: dummy value to return if model fails to predict
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+
+    ase_adaptor = AseAtomsAdaptor()
+
+    def reward_fn(x):
+        G, L, XYZ, A, W = x
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            struct = ase_adaptor.get_structure(atoms)
+            quantity = model(struct)
+            # if quantity is nan, return a dummy value
+            quantity = quantity if not np.isnan(quantity) else np.array(dummy_value)
+        except:
+            quantity = np.array(dummy_value)  #TODO: check if this is a good idea
+        
+        return quantity
+
+    def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
+        output = map(reward_fn, zip(*x))
+        output = jnp.array(list(output))
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
+
+    return reward_fn, batch_reward_fn
