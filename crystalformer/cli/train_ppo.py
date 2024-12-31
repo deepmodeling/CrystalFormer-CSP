@@ -61,14 +61,17 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
-    group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull'], help='reward function to use')
+    group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop'], help='reward function to use')
     group.add_argument('--convex_path', type=str, default='/data/zdcao/crystal_gpt/dataset/alex/PBE/convex_hull_pbe_2023.12.29.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
-    group.add_argument('--mlff_model', type=str, default='orb', choices=['mace', 'orb'], help='the model to use for MLFF')
+    group.add_argument('--mlff_model', type=str, default='orb', choices=['mace', 'orb', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='./data/orb-v2-20241011.ckpt', help='path to the MLFF model')
-        
+
+    group = parser.add_argument_group('property reward parameters')
+    group.add_argument('--target', type=float, default=-3, help='target property value to optimize')
+    group.add_argument('--dummy_value', type=float, default=5, help='dummy value for the property')
 
     args = parser.parse_args()
 
@@ -182,6 +185,12 @@ def main():
             orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
             calc = ORBCalculator(orbff, device='cuda')
         
+        elif args.mlff_model == "matgl":
+            # only available for property reward
+            import matgl
+            model = matgl.load_model(args.mlff_path)
+            model = model.predict_structure
+
         else:
             raise NotImplementedError
 
@@ -195,7 +204,11 @@ def main():
             with bz2.open(args.convex_path) as fh:
                 ref_data = json.loads(fh.read().decode('utf-8'))
             _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
-            
+        
+        elif args.reward == "prop":
+            from crystalformer.reinforce.reward import make_prop_reward_fn
+            _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value)
+
         else:
             raise NotImplementedError
 

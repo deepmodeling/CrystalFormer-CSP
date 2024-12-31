@@ -154,11 +154,12 @@ def make_ehull_reward_fn(calculator, ref_data):
     return reward_fn, batch_reward_fn
 
 
-def make_prop_reward_fn(model, dummy_value=5):
+def make_prop_reward_fn(model, target, dummy_value=5):
 
     """
     Args:
         model: property prediction model, takes pymatgen structure as input, returns property value
+        target: target property value
         dummy_value: dummy value to return if model fails to predict
 
     Returns:
@@ -190,7 +191,8 @@ def make_prop_reward_fn(model, dummy_value=5):
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
         x = (G, L, XYZ, A, W)
         output = map(reward_fn, zip(*x))
-        output = jnp.array(list(output))
+        output = jnp.array(list(output)) - target
+        output = jnp.abs(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
 
         return output
