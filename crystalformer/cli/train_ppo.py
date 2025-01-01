@@ -72,6 +72,7 @@ def main():
     group = parser.add_argument_group('property reward parameters')
     group.add_argument('--target', type=float, default=-3, help='target property value to optimize')
     group.add_argument('--dummy_value', type=float, default=5, help='dummy value for the property')
+    group.add_argument('--loss_type', type=str, default='mse', choices=['mse', 'mae'], help='loss type for the property reward')
 
     args = parser.parse_args()
 
@@ -207,7 +208,7 @@ def main():
         
         elif args.reward == "prop":
             from crystalformer.reinforce.reward import make_prop_reward_fn
-            _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value)
+            _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value, args.loss_type)
 
         else:
             raise NotImplementedError

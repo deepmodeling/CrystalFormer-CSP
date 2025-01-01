@@ -154,13 +154,14 @@ def make_ehull_reward_fn(calculator, ref_data):
     return reward_fn, batch_reward_fn
 
 
-def make_prop_reward_fn(model, target, dummy_value=5):
+def make_prop_reward_fn(model, target, dummy_value=5, loss_type='mse'):
 
     """
     Args:
         model: property prediction model, takes pymatgen structure as input, returns property value
         target: target property value
         dummy_value: dummy value to return if model fails to predict
+        loss_type: loss function type, 'mse' or 'mae'
 
     Returns:
         reward_fn: single reward function
@@ -192,7 +193,14 @@ def make_prop_reward_fn(model, target, dummy_value=5):
         x = (G, L, XYZ, A, W)
         output = map(reward_fn, zip(*x))
         output = jnp.array(list(output)) - target
-        output = jnp.abs(output)
+        
+        if loss_type == 'mae':
+            output = jnp.abs(output)
+        elif loss_type == 'mse':
+            output = output**2  # MSE loss
+        else:
+            raise ValueError('Invalid loss type')
+        
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
 
         return output
