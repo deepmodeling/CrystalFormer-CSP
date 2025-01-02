@@ -1,6 +1,6 @@
 import tempfile
 from pymatgen.core import Structure
-from pymatgen.entries.computed_entries import ComputedStructureEntry
+from pymatgen.entries.computed_entries import ComputedStructureEntry, ComputedEntry
 from pymatgen.analysis.phase_diagram import PhaseDiagram
 from pymatgen.entries.compatibility import MaterialsProject2020Compatibility
 from pymatgen.io.vasp.sets import MPRelaxSet
@@ -47,7 +47,7 @@ def generate_CSE(structure, m3gnet_energy):
 
 
 def calculate_hull(structure, energy, entries):
-    entries = [ComputedStructureEntry.from_dict(i) for i in entries]
+    entries = [ComputedEntry.from_dict(i) for i in entries]
     pd = PhaseDiagram(entries)
     
     entry = generate_CSE(structure, energy)

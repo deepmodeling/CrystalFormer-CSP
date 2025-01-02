@@ -204,6 +204,10 @@ def main():
             from crystalformer.reinforce.reward import make_ehull_reward_fn
             with bz2.open(args.convex_path) as fh:
                 ref_data = json.loads(fh.read().decode('utf-8'))
+                # remove 'structure' key in the 'entries' dictionary to reduce the size of the ref_data
+                for entry in ref_data['entries']:
+                    entry.pop('structure')
+                    
             _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
         
         elif args.reward == "prop":

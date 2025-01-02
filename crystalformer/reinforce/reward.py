@@ -1,9 +1,10 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import joblib
 from pymatgen.core import Structure, Lattice
 
-import crystalformer.reinforce.ehull as ehull
+from crystalformer.reinforce import ehull
 from crystalformer.src.wyckoff import wmax_table, mult_table, symops
 
 
@@ -108,7 +109,7 @@ def make_force_reward_fn(calculator, weight=1.0):
     return reward_fn, batch_reward_fn
 
 
-def make_ehull_reward_fn(calculator, ref_data):
+def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
     """
     Args:
         calculator: ase calculator object
@@ -123,30 +124,56 @@ def make_ehull_reward_fn(calculator, ref_data):
 
     ase_adaptor = AseAtomsAdaptor()
 
-    def reward_fn(x):
+    def energy_fn(x):
         G, L, XYZ, A, W = x
         try: 
             atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
             atoms.calc = calculator
             energy = atoms.get_potential_energy()
             structure = ase_adaptor.get_structure(atoms)
-            e_above_hull = ehull.forward_fn(structure, energy, ref_data)
-
         except:
+            energy = np.inf
+            structure = None
+        
+        return structure, energy
+
+    def reward_fn(structure, energy):
+        if structure == None:
             e_above_hull = np.inf
+        else:    
+            try: 
+                e_above_hull = ehull.forward_fn(structure, energy, ref_data)
+            except:
+                e_above_hull = np.inf
 
         # clip e above hull to avoid too large or too small values
         e_above_hull = np.clip(e_above_hull, -10, 10)
 
         return e_above_hull
+    
+    def map_reward_fn(structures, energies):
+        output = map(reward_fn, structures, energies)
+
+        return list(output)
+    
+    def parallel_reward_fn(structures, energies):
+        xs = [(structures[i:i+batch], energies[i:i+batch]) for i in range(0, len(structures), batch)]
+        output = joblib.Parallel(
+                        n_jobs=n_jobs
+                    )(joblib.delayed(map_reward_fn)(*x) for x in xs)
+        # concatenate the output
+        output = np.concatenate(output)
+
+        return output
 
     def batch_reward_fn(x):
         x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
         G, L, XYZ, A, W = x
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
         x = (G, L, XYZ, A, W)
-        output = map(reward_fn, zip(*x))
-        output = jnp.array(list(output))
+        structures, energies = zip(*map(energy_fn, zip(*x)))
+        output = parallel_reward_fn(structures, energies)
+        output = jnp.array(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
 
         return output
