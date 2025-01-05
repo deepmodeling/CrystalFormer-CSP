@@ -44,6 +44,12 @@ def main(args):
     data = pd.read_csv(os.path.join(args.restore_path, args.filename))
     ref_data = pd.read_csv(args.ref_path)
 
+    if args.spg is not None:
+        ref_data = ref_data[ref_data['spg'] == args.spg]  # filter by space group
+        print(f"Number of structures in the reference data with space group {args.spg}: {ref_data.shape[0]}")
+    else:
+        print(f"Number of structures in the reference data: {ref_data.shape[0]}")
+
     sm = StructureMatcher()
     compare_structures = make_compare_structures(sm)
 
@@ -81,18 +87,23 @@ def main(args):
     ref_data['composition'] = comp_list
 
     search_duplicate = make_search_duplicate(ref_data, sm)
-    duplicate_list = list(map(lambda s: search_duplicate(s), unique_structures))
+    duplicate_list = list(map(search_duplicate, unique_structures))
 
     # pick the idx of False in duplicate_list
     idx_list = [idx for idx, duplicate in enumerate(duplicate_list) if not duplicate]
     data = data.iloc[idx_list]
     print(f"Number of stable, unique and novel structures: {data.shape[0]}")
-    data.to_csv(os.path.join(args.restore_path, "stable_unique_novel_structures.csv"), index=False)
+
+    if args.spg is not None:
+        data.to_csv(os.path.join(args.restore_path, f"sun_structures_{args.spg}.csv"), index=False)
+    else:
+        data.to_csv(os.path.join(args.restore_path, "sun_structures.csv"), index=False)
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser("Check the stable, Unique and Novelty structures")
+    parser.add_argument("--spg", type=int, default=None, help="Space group number")
     parser.add_argument("--restore_path", type=str, default=None, help="Path to the restored data")
     parser.add_argument("--filename", type=str, default="relaxed_structures_ehull.csv", help="Filename of the restored data")
     parser.add_argument("--ref_path", type=str, default="/data/zdcao/crystal_gpt/dataset/alex/PBE/alex20/alex20.csv", help="Path to the reference data")
