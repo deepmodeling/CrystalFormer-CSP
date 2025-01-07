@@ -36,6 +36,7 @@ def make_matgl_calc(model_path, device="cuda"):
 
     return calc
 
+
 def make_mace_calc(model_path, device="cuda", default_dtype="float64"):
     from mace.calculators import mace_mp
 
@@ -43,6 +44,13 @@ def make_mace_calc(model_path, device="cuda", default_dtype="float64"):
                    dispersion=False,
                    default_dtype=default_dtype,
                    device=device)
+    return calc
+
+
+def make_dp_calc(model_path):
+    from deepmd.calculator import DP
+
+    calc = DP(model_path)
     return calc
 
 
@@ -136,8 +144,10 @@ def main(args):
         calc = make_matgl_calc(args.model_path, args.device)
     elif args.model == "mace":
         calc = make_mace_calc(args.model_path, args.device)
+    elif args.model == "dp":
+        calc = make_dp_calc(args.model_path)
     else:
-        raise ValueError("Invalid model type. Please choose from 'orb', 'matgl', or 'mace'.")
+        raise ValueError("Invalid model type. Please choose from 'orb', 'matgl', 'mace' or 'dp'.")
 
     print("Calculating energies...")
     start_time = time()
