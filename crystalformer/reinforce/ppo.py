@@ -67,8 +67,6 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
     loss_fn = jax.jit(loss_fn, static_argnums=7)
-
-    atom_mask = jnp.zeros((21, 119))  # we will do nothing to a_logit in sampling
     
     for epoch in range(epoch_finished+1, epochs+1):
 
@@ -77,7 +75,7 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
                               a=jnp.arange(1, 231, 1),
                               p=spg_mask,
                               shape=(batchsize, ))
-        XYZ, A, W, _, L = sample_crystal(subkey2, params, G, atom_mask, 1.0, 1.0)
+        XYZ, A, W, _, L = sample_crystal(subkey2, params, G)
 
         x = (G, L, XYZ, A, W)
         rewards = - batch_reward_fn(x)  # inverse reward

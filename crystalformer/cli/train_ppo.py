@@ -2,6 +2,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
+from functools import partial
 import os
 import optax
 import warnings
@@ -56,6 +57,7 @@ def main():
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
     group = parser.add_argument_group('sampling parameters')
+    group.add_argument('--remove_radioactive', action='store_true', help='remove radioactive elements and noble gas')
     group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
@@ -105,6 +107,21 @@ def main():
             spg_mask = jnp.ones((230), dtype=int)
 
     print("spacegroup mask", spg_mask)
+
+    if args.remove_radioactive:
+        from crystalformer.src.elements import radioactive_elements_dict, noble_gas_dict
+        # remove radioactive elements and noble gas
+        atom_mask = [1] + [1 if i not in radioactive_elements_dict.values() and i not in noble_gas_dict.values() else 0 for i in range(1, args.atom_types)]
+        atom_mask = jnp.array(atom_mask)
+        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+        print('sampling structure formed by non-radioactive elements and non-noble gas')
+            
+    else:
+        atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
+        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+        print('sampling structure formed by all elements')
+
+    print("atom_mask", atom_mask)
 
     print("\n========== Prepare transformer ==========")
     ################### Model #############################
@@ -219,12 +236,13 @@ def main():
 
         print("\n========== Load partial sample function ==========")
         sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
+        partial_sample_crystal = partial(sample_crystal, atom_mask=atom_mask, top_p=args.top_p, temperature=args.temperature)
 
         print("\n========== Start RL training ==========")
         ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
         # PPO training
-        params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
+        params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
                                   params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
 
     else:
