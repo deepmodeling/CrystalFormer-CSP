@@ -131,7 +131,7 @@ def main():
         print("No checkpoint file found. Start from scratch.")
 
     print("\n========== Start sampling ==========")
-    # jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 
+    jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 
     #FYI, the error was [Compiling module extracted] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
 
     if args.seed is not None:
