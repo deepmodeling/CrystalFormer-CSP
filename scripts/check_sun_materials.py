@@ -3,6 +3,7 @@ import pandas as pd
 
 from pymatgen.core import Structure, Composition
 from pymatgen.analysis.structure_matcher import StructureMatcher
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
 def make_compare_structures(StructureMatcher):
@@ -19,8 +20,23 @@ def make_compare_structures(StructureMatcher):
 def make_search_duplicate(ref_data, StructureMatcher):
 
     def search_duplicate(s):
+        try:
+            spg_analyzer = SpacegroupAnalyzer(s)
+            spg = spg_analyzer.get_space_group_number()
+
+        except Exception as e:
+            spg = None
+            print(e)
+            print(f"Error with structure {s}")
+            pass
+
+        if spg is not None:
+            sub_data = ref_data[ref_data['spg'] == spg]
+        else: 
+            sub_data = ref_data
+    
         # pick all structures with the same composition
-        sub_data = ref_data[ref_data['composition'] == s.composition.reduced_composition]
+        sub_data = sub_data[sub_data['composition'] == s.composition.reduced_composition]
 
         duplicate = False
         # compare the structure with all structures with the same composition
@@ -43,6 +59,9 @@ def main(args):
 
     data = pd.read_csv(os.path.join(args.restore_path, args.filename))
     ref_data = pd.read_csv(args.ref_path)
+
+    # only keep the necessary columns
+    ref_data = ref_data[['formula', 'elements', 'structure', 'spg']]
 
     if args.spg is not None:
         ref_data = ref_data[ref_data['spg'] == args.spg]  # filter by space group
