@@ -7,8 +7,24 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
 def make_compare_structures(StructureMatcher):
+    """
+    Args:
+        StructureMatcher: pymatgen.analysis.structure_matcher.StructureMatcher
+    
+    Returns:
+        compare_structures: function, compare two structures
+    """
     
     def compare_structures(s1, s2):
+        """
+        Args:
+            s1: pymatgen Structure
+            s2: pymatgen Structure
+        
+        Returns:
+            bool, True if the two structures are the same
+        """
+    
         if s1.composition.reduced_composition != s2.composition.reduced_composition:
             return False
         else:
@@ -17,22 +33,46 @@ def make_compare_structures(StructureMatcher):
     return compare_structures
 
 
-def make_search_duplicate(ref_data, StructureMatcher):
+def make_search_duplicate(ref_data, StructureMatcher, spg_search=False):
+    """
+    Args:
+        ref_data: pd.DataFrame, reference data
+        StructureMatcher: pymatgen.analysis.structure_matcher.StructureMatcher
+        spg_search: bool, whether to filter the reference data by space group number
+
+    Returns:
+        search_duplicate: function, search for duplicates in the reference data
+    """
 
     def search_duplicate(s):
-        try:
-            spg_analyzer = SpacegroupAnalyzer(s)
-            spg = spg_analyzer.get_space_group_number()
+        """
+        Args:
+            s: pymatgen Structure
 
-        except Exception as e:
-            spg = None
-            print(e)
-            print(f"Error with structure {s}")
-            pass
+        Returns:
+            duplicate: bool, True if the structure is a duplicate
 
-        if spg is not None:
-            sub_data = ref_data[ref_data['spg'] == spg]
-        else: 
+        sometimes the matching of the space group number is not accurate
+        so we will not use it to filter the reference data
+        """
+
+        if spg_search:
+            try:
+                spg_analyzer = SpacegroupAnalyzer(s)
+                spg = spg_analyzer.get_space_group_number()
+
+            except Exception as e:
+                spg = None
+                print(e)
+                print(f"Error with structure {s}")
+                pass
+
+            if spg is not None:
+                sub_data = ref_data[ref_data['spg'] == spg]
+            else: 
+                sub_data = ref_data
+
+        else:
             sub_data = ref_data
     
         # pick all structures with the same composition
@@ -63,7 +103,7 @@ def main(args):
     # only keep the necessary columns
     ref_data = ref_data[['formula', 'elements', 'structure', 'spg']]
 
-    if args.spg is not None:
+    if args.spg_search and args.spg is not None:
         ref_data = ref_data[ref_data['spg'] == args.spg]  # filter by space group
         print(f"Number of structures in the reference data with space group {args.spg}: {ref_data.shape[0]}")
     else:
@@ -105,7 +145,7 @@ def main(args):
     comp_list = [comp.reduced_composition for comp in comp_list]
     ref_data['composition'] = comp_list
 
-    search_duplicate = make_search_duplicate(ref_data, sm)
+    search_duplicate = make_search_duplicate(ref_data, sm, args.spg_search)
     duplicate_list = list(map(search_duplicate, unique_structures))
 
     # pick the idx of False in duplicate_list
@@ -123,6 +163,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser("Check the stable, Unique and Novelty structures")
     parser.add_argument("--spg", type=int, default=None, help="Space group number")
+    parser.add_argument("--spg_search", action="store_true", help="Whether to filter the reference data by space group number")
     parser.add_argument("--restore_path", type=str, default=None, help="Path to the restored data")
     parser.add_argument("--filename", type=str, default="relaxed_structures_ehull.csv", help="Filename of the restored data")
     parser.add_argument("--ref_path", type=str, default="/data/zdcao/crystal_gpt/dataset/alex/PBE/alex20/alex20.csv", help="Path to the reference data")
