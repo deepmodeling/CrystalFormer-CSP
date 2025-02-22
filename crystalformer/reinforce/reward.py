@@ -233,3 +233,62 @@ def make_prop_reward_fn(model, target, dummy_value=5, loss_type='mse'):
         return output
 
     return reward_fn, batch_reward_fn
+
+
+def make_dielectric_reward_fn(models, dummy_value=0):
+    """
+    Reward function for dielectric reward. models contains two models, one for dielectric constant and one for band gap.
+    the reward is the product of the two quantities.
+
+    Args:
+        models: list of property prediction models, each takes pymatgen structure as input, returns property value
+        dummy_value: dummy value to return if model fails to predict
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+    from ase.stress import voigt_6_to_full_3x3_stress
+    ase_adaptor = AseAtomsAdaptor()
+
+    assert len(models) == 2, 'models should contain two models, one for dielectric constant and one for band gap'
+
+    def reward_fn(x):
+        G, L, XYZ, A, W = x
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            struct = ase_adaptor.get_structure(atoms)
+            
+            pred = models[0](struct)
+            dielectric_tensor = voigt_6_to_full_3x3_stress(pred)
+            eigenvalues, _ = np.linalg.eig(dielectric_tensor)
+            scalar_dielectric = np.mean(np.real(eigenvalues))
+            if np.isnan(scalar_dielectric):
+                return np.array(dummy_value)
+
+            band_gap = models[1](struct).item()
+            if np.isnan(band_gap):
+                return np.array(dummy_value)
+            
+            reward = - np.array(scalar_dielectric * band_gap)
+
+        except:
+            reward = np.array(dummy_value)  #TODO: check if this is a good idea
+        
+        return reward
+
+
+    def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
+        output = map(reward_fn, zip(*x))
+        output = np.array(list(output))
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
+
+    return reward_fn, batch_reward_fn

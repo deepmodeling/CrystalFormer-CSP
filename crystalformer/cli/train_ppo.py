@@ -63,7 +63,7 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
-    group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop'], help='reward function to use')
+    group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
     group.add_argument('--convex_path', type=str, default='/data/zdcao/crystal_gpt/dataset/alex/PBE/convex_hull_pbe_2023.12.29.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
@@ -230,6 +230,25 @@ def main():
         elif args.reward == "prop":
             from crystalformer.reinforce.reward import make_prop_reward_fn
             _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value, args.loss_type)
+
+        elif args.reward == "dielectric":
+            # TODO: refactor this part
+            # only available for matgl model
+            import matgl
+            import torch
+            # set float32 
+            torch.set_default_dtype(torch.float32)
+            print("--mlff_model and --mlff_path are ignored for dielectric reward")
+            
+            model = matgl.load_model("./data/version_6/model/")
+            model1 = model.predict_structure
+
+            model = matgl.load_model("/data/zdcao/website/matgl/pretrained_models/MEGNet-MP-2019.4.1-BandGap-mfi")
+            model2 = partial(model.predict_structure, state_attr=torch.tensor([0]))
+            models = [model1, model2]
+
+            from crystalformer.reinforce.reward import make_dielectric_reward_fn
+            _, batch_reward_fn = make_dielectric_reward_fn(models, args.dummy_value)
 
         else:
             raise NotImplementedError
