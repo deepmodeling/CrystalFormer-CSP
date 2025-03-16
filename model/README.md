@@ -2,7 +2,10 @@
 
 ## Alex-20
 
-The pre-trained model is available on [Google Drive](https://drive.google.com/file/d/1Fjt3bXzouAb-GX3ScAuejDA6eggtOYe4/view?usp=sharing). It can be downloaded using `wget`, `gdown`, or just by clicking the link. 
+The pre-trained model is available on [Google Drive](https://drive.google.com/file/d/1Fjt3bXzouAb-GX3ScAuejDA6eggtOYe4/view?usp=sharing). It can be downloaded using `wget`, `gdown`, or just by clicking the link.
+
+The reinforcement learning fine-tuning checkpoint is available on [Google Drive](https://drive.google.com/file/d/1LlrpWj1GWUBZb-Ix_D3DfXxPd6EVsY6e/view?usp=sharing). It can be downloaded using `wget`, `gdown`, or just by clicking the link.
+The reward is chosen to be the negative energy above the hull, which is calculated by the [Orb model](https://github.com/orbital-materials/orb-models) based on the Alexandria convex hull. 
 
 ### Model Parameters
 
@@ -35,7 +38,7 @@ Alex-20: contains ~1.3M general inorganic materials curated from the [Alexandria
 
 ## MP-20
 
-> [!WARNING]
+> [!IMPORTANT]   
 > The load the MP-20 checkpoint, you need to switch the `CrystalFormer` to 
 > version 0.3.x. The current version of the model is not compatible with the
 > MP-20 checkpoint.
