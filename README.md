@@ -28,6 +28,8 @@ crystal space, which is crucial for data and compute efficient generative modeli
   - [train](#train)
   - [sample](#sample)
   - [evaluate](#evaluate)
+- [Reinforcement Learning Fine-tuning](#reinforcement-learning-fine-tuning)
+  - [$E\_{hull}$ Reward](#e_hull-reward)
 - [How to cite](#how-to-cite)
 
 ## Model card
@@ -48,9 +50,9 @@ We only consider symmetry inequivalent atoms. The remaining atoms are restored b
 ## Status
 
 Major milestones are summarized below.
-
+- v0.4.2 : Add implementation of direct preference optimization.
 - v0.4.1 : Replace the absolute positional embedding with the Rotary Positional Embedding (RoPE).
-- v0.4 : Add reinforcement learning.
+- v0.4 : Add reinforcement learning (proximal policy optimization).
 - v0.3 : Add conditional generation in the plug-and-play manner.
 - v0.2 : Add Markov chain Monte Carlo (MCMC) sampling for template-based structure generation.
 - v0.1 : Initial implementations of crystalline material generation conditioned on the space group.
@@ -99,7 +101,7 @@ pip install -r requirements.txt
 
 ## Available Weights
 
-We release the weights of the model trained on the MP-20 dataset. More details can be seen in the [model](./model/README.md) folder.
+We release the weights of the model trained on the MP-20 dataset and Alex-20 dataset. More details can be seen in the [model](./model/README.md) folder.
 
 ## How to run
 
@@ -173,6 +175,31 @@ python ./scripts/compute_metrics_matbench.py --train_path TRAIN_PATH --test_path
 Note that the training, test, and generated datasets should contain the structures within the **same** space group `g` which is specified in the command `--label`.
 
 More details about the post-processing can be seen in the [scripts](./scripts/README.md) folder.
+
+## Reinforcement Learning Fine-tuning
+
+### $E_{hull}$ Reward
+
+```bash
+train_ppo --folder ./data/\
+          --restore_path YOUR_PATH\
+          --valid_path YOUR_PATH/alex_20/val.csv\
+          --test_path YOUR_PATH/mp_20/train.csv\
+          --reward ehull\
+          --convex_path YOUR_PATH/convex_hull_pbe_2023.12.29.json.bz2\
+          --mlff_model orb\
+          --mlff_path YOUR_PATH/orb-v2-20241011.ckpt
+```
+
+- `folder`: the folder to save the model and logs
+- `restore_path`: the path to the pre-trained model weights
+- `valid_path`: the path to the validation dataset
+- `test_path`: the path to the test dataset. The space group distribution will be loaded from this dataset and used for the sampling in the reinforcement learning fine-tuning
+- `reward`: the reward function to use, `ehull` means the energy above the convex hull
+- `convex_path`: the path to the convex hull data, which is used to calculate the $E_{hull}$
+- `mlff_model`: the machine learning force field model to predict the total energy
+- `mlff_path`: the path to load the checkpoint of the machine learning force field model
+
 
 ## How to cite
 

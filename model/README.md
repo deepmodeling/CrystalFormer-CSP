@@ -4,8 +4,6 @@
 
 The pre-trained model is available on [Google Drive](https://drive.google.com/file/d/1Fjt3bXzouAb-GX3ScAuejDA6eggtOYe4/view?usp=sharing) and [Hugging Face Model Hub](https://huggingface.co/zdcao/CrystalFormer/blob/main/alex20/PBE/epoch_005500.pkl). 
 
-The reinforcement learning fine-tuning checkpoint is available on [Google Drive](https://drive.google.com/file/d/1LlrpWj1GWUBZb-Ix_D3DfXxPd6EVsY6e/view?usp=sharing) and [Hugging Face Model Hub](https://huggingface.co/zdcao/CrystalFormer/blob/main/alex20/RL-ehull/epoch_000195.pkl). The reward is chosen to be the negative energy above the hull, which is calculated by the [Orb model](https://github.com/orbital-materials/orb-models) based on the Alexandria convex hull. 
-
 ### Model Parameters
 
 ```python
@@ -33,6 +31,11 @@ params, transformer = make_transformer(
 ### Training dataset
 
 Alex-20: contains ~1.3M general inorganic materials curated from the [Alexandria database](https://alexandria.icams.rub.de/), with $E_{hull} < 0.1$ eV/atom and no more than 20 atoms in unit cell. The dataset can be found in the [Google Drive](https://drive.google.com/drive/folders/1QeYz9lQX9Lk-OxhKBOwvuyKBecznPVlX?usp=drive_link) or [Hugging Face Datasets](https://huggingface.co/datasets/zdcao/alex-20).
+
+
+## Alex-20 RL
+
+The reinforcement learning fine-tuning checkpoint is available on [Google Drive](https://drive.google.com/file/d/1LlrpWj1GWUBZb-Ix_D3DfXxPd6EVsY6e/view?usp=sharing) and [Hugging Face Model Hub](https://huggingface.co/zdcao/CrystalFormer/blob/main/alex20/RL-ehull/epoch_000195.pkl). The reward is chosen to be the negative energy above the hull, which is calculated by the [Orb model](https://github.com/orbital-materials/orb-models) based on the Alexandria convex hull. 
 
 
 ## MP-20
