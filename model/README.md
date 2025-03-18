@@ -41,9 +41,7 @@ The reinforcement learning fine-tuning checkpoint is available on [Google Drive]
 ## MP-20
 
 > [!IMPORTANT]   
-> The load the MP-20 checkpoint, you need to switch the `CrystalFormer` to 
-> version 0.3.x. The current version of the model is not compatible with the
-> MP-20 checkpoint.
+> The load the MP-20 checkpoint, you need to switch the `CrystalFormer` to version 0.3 The current version of the model is not compatible with the MP-20 checkpoint.
 
 ### Checkpoint
 

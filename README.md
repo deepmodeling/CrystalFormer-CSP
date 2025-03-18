@@ -30,6 +30,7 @@ crystal space, which is crucial for data and compute efficient generative modeli
   - [evaluate](#evaluate)
 - [Reinforcement Learning Fine-tuning](#reinforcement-learning-fine-tuning)
   - [$E\_{hull}$ Reward](#e_hull-reward)
+  - [Dielectric FoM Reward](#dielectric-fom-reward)
 - [How to cite](#how-to-cite)
 
 ## Model card
@@ -184,7 +185,7 @@ More details about the post-processing can be seen in the [scripts](./scripts/RE
 train_ppo --folder ./data/\
           --restore_path YOUR_PATH\
           --valid_path YOUR_PATH/alex_20/val.csv\
-          --test_path YOUR_PATH/mp_20/train.csv\
+          --test_path YOUR_PATH/alex_20/train.csv\
           --reward ehull\
           --convex_path YOUR_PATH/convex_hull_pbe_2023.12.29.json.bz2\
           --mlff_model orb\
@@ -196,9 +197,29 @@ train_ppo --folder ./data/\
 - `valid_path`: the path to the validation dataset
 - `test_path`: the path to the test dataset. The space group distribution will be loaded from this dataset and used for the sampling in the reinforcement learning fine-tuning
 - `reward`: the reward function to use, `ehull` means the energy above the convex hull
-- `convex_path`: the path to the convex hull data, which is used to calculate the $E_{hull}$
-- `mlff_model`: the machine learning force field model to predict the total energy
+- `convex_path`: the path to the convex hull data, which is used to calculate the $E_{hull}$. Only used when the reward is `ehull`
+- `mlff_model`: the machine learning force field model to predict the total energy. We support [`orb`](https://github.com/orbital-materials/orb-models) and [`MACE`](https://github.com/ACEsuit/mace) models for the $E_{hull}$ reward
 - `mlff_path`: the path to load the checkpoint of the machine learning force field model
+
+### Dielectric FoM Reward
+
+```bash
+train_ppo --folder ./data/\
+          --restore_path YOUR_PATH\
+          --valid_path YOUR_PATH/alex_20/val.csv\
+          --test_path YOUR_PATH/alex_20/train.csv\
+          --reward dielectric\
+          --mlff_model matgl\
+          --mlff_path YOUR_PATH/model1,YOUR_PATH/model2
+```
+
+- `folder`: the folder to save the model and logs
+- `restore_path`: the path to the pre-trained model weights
+- `valid_path`: the path to the validation dataset
+- `test_path`: the path to the test dataset. The space group distribution will be loaded from this dataset and used for the sampling in the reinforcement learning fine-tuning
+- `reward`: the reward function to use, `dielectric` means the dielectric figure of merit (FoM), which is the product of the total dielectric constant and the band gap
+- `mlff_model`: the machine learning force field model to predict the total energy. We only support models in [`matgl`](https://github.com/materialsvirtuallab/matgl) for the dielectric reward
+- `mlff_path`: the path to load the checkpoint of the machine learning force field model. Note that you need to provide the model paths for the total dielectric constant and band gap, separated by the `,`
 
 
 ## How to cite

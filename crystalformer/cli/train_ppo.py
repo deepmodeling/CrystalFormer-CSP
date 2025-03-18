@@ -28,7 +28,7 @@ def main():
     group.add_argument('--lr_decay', type=float, default=0.0, help='lr decay')
     group.add_argument('--weight_decay', type=float, default=0.0, help='weight decay')
     group.add_argument('--clip_grad', type=float, default=1.0, help='clip gradient')
-    group.add_argument("--optimizer", type=str, default="adam", choices=["none", "adam", "adamw"], help="optimizer type")
+    group.add_argument("--optimizer", type=str, default="adam", choices=["adam", "adamw"], help="optimizer type")
 
     group.add_argument("--folder", default="./data/", help="the folder to save data")
     group.add_argument("--restore_path", default=None, help="checkpoint path or file")
@@ -73,7 +73,7 @@ def main():
 
     group = parser.add_argument_group('property reward parameters')
     group.add_argument('--target', type=float, default=-3, help='target property value to optimize')
-    group.add_argument('--dummy_value', type=float, default=5, help='dummy value for the property')
+    group.add_argument('--dummy_value', type=float, default=0, help='dummy value for the property')
     group.add_argument('--loss_type', type=str, default='mse', choices=['mse', 'mae'], help='loss type for the property reward')
 
     args = parser.parse_args()
@@ -165,107 +165,99 @@ def main():
     else:
         print("No checkpoint file found. Start from scratch.")
 
-    if args.optimizer != "none":
+    schedule = lambda t: args.lr/(1+args.lr_decay*t)
 
-        schedule = lambda t: args.lr/(1+args.lr_decay*t)
+    if args.optimizer == "adam":
+        optimizer = optax.chain(optax.clip_by_global_norm(args.clip_grad), 
+                                optax.scale_by_adam(), 
+                                optax.scale_by_schedule(schedule), 
+                                optax.scale(-1.))
+    elif args.optimizer == 'adamw':
+        optimizer = optax.chain(optax.clip(args.clip_grad),
+                                optax.adamw(learning_rate=schedule, weight_decay=args.weight_decay)
+                            )
 
-        if args.optimizer == "adam":
-            optimizer = optax.chain(optax.clip_by_global_norm(args.clip_grad), 
-                                    optax.scale_by_adam(), 
-                                    optax.scale_by_schedule(schedule), 
-                                    optax.scale(-1.))
-        elif args.optimizer == 'adamw':
-            optimizer = optax.chain(optax.clip(args.clip_grad),
-                                    optax.adamw(learning_rate=schedule, weight_decay=args.weight_decay)
-                                )
+    opt_state = optimizer.init(params)
+    try:
+        opt_state.update(ckpt["opt_state"])
+    except: 
+        print ("failed to update opt_state from checkpoint")
+        pass 
 
-        opt_state = optimizer.init(params)
-        try:
-            opt_state.update(ckpt["opt_state"])
-        except: 
-            print ("failed to update opt_state from checkpoint")
-            pass 
-
-        print("\n========== Load calculator and rl loss ==========")
-        print(f"Using {args.mlff_model} model at {args.mlff_path}")
-        if args.mlff_model == "mace":
-            from mace.calculators import mace_mp
-            calc = mace_mp(model=args.mlff_path,
-                           dispersion=False,
-                           default_dtype="float64",
-                           device='cuda')
-            
-        elif args.mlff_model == "orb":
-            from orb_models.forcefield import pretrained
-            from orb_models.forcefield.calculator import ORBCalculator
-
-            # Load the ORB forcefield model
-            orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
-            calc = ORBCalculator(orbff, device='cuda')
+    print("\n========== Load calculator and rl loss ==========")
+    print(f"Using {args.mlff_model} model at {args.mlff_path}")
+    if args.mlff_model == "mace":
+        from mace.calculators import mace_mp
+        calc = mace_mp(model=args.mlff_path,
+                        dispersion=False,
+                        default_dtype="float64",
+                        device='cuda')
         
-        elif args.mlff_model == "matgl":
-            # only available for property reward
-            import matgl
+    elif args.mlff_model == "orb":
+        from orb_models.forcefield import pretrained
+        from orb_models.forcefield.calculator import ORBCalculator
+
+        # Load the ORB forcefield model
+        orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
+        calc = ORBCalculator(orbff, device='cuda')
+    
+    elif args.mlff_model == "matgl":
+        # only available for property reward
+        import matgl
+        # try split the mlff_path according to the ',' symbol
+        if ',' in args.mlff_path:
+            import torch
+            torch.set_default_dtype(torch.float32)
+            model1 = matgl.load_model(args.mlff_path.split(',')[0])
+            model1 = model1.predict_structure
+            model2 = matgl.load_model(args.mlff_path.split(',')[1])
+            model2 = partial(model2.predict_structure, state_attr=torch.tensor([0]))
+            model = [model1, model2]
+            
+        else:
             model = matgl.load_model(args.mlff_path)
             model = model.predict_structure
 
-        else:
-            raise NotImplementedError
+    else:
+        raise NotImplementedError
 
-        if args.reward == "force":
-            from crystalformer.reinforce.reward import make_force_reward_fn
-            _, batch_reward_fn = make_force_reward_fn(calc)
+    if args.reward == "force":
+        from crystalformer.reinforce.reward import make_force_reward_fn
+        _, batch_reward_fn = make_force_reward_fn(calc)
 
-        elif args.reward == "ehull":
-            import json, bz2
-            from crystalformer.reinforce.reward import make_ehull_reward_fn
-            with bz2.open(args.convex_path) as fh:
-                ref_data = json.loads(fh.read().decode('utf-8'))
-                # remove 'structure' key in the 'entries' dictionary to reduce the size of the ref_data
-                for entry in ref_data['entries']:
-                    entry.pop('structure')
-                    
-            _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
-        
-        elif args.reward == "prop":
-            from crystalformer.reinforce.reward import make_prop_reward_fn
-            _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value, args.loss_type)
+    elif args.reward == "ehull":
+        import json, bz2
+        from crystalformer.reinforce.reward import make_ehull_reward_fn
+        with bz2.open(args.convex_path) as fh:
+            ref_data = json.loads(fh.read().decode('utf-8'))
+            # remove 'structure' key in the 'entries' dictionary to reduce the size of the ref_data
+            for entry in ref_data['entries']:
+                entry.pop('structure')
+                
+        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
+    
+    elif args.reward == "prop":
+        from crystalformer.reinforce.reward import make_prop_reward_fn
+        _, batch_reward_fn = make_prop_reward_fn(model, args.target, args.dummy_value, args.loss_type)
 
-        elif args.reward == "dielectric":
-            # TODO: refactor this part
-            # only available for matgl model
-            import matgl
-            import torch
-            # set float32 
-            torch.set_default_dtype(torch.float32)
-            print("--mlff_model and --mlff_path are ignored for dielectric reward")
-            
-            model = matgl.load_model("./data/version_6/model/")
-            model1 = model.predict_structure
-
-            model = matgl.load_model("/data/zdcao/website/matgl/pretrained_models/MEGNet-MP-2019.4.1-BandGap-mfi")
-            model2 = partial(model.predict_structure, state_attr=torch.tensor([0]))
-            models = [model1, model2]
-
-            from crystalformer.reinforce.reward import make_dielectric_reward_fn
-            _, batch_reward_fn = make_dielectric_reward_fn(models, args.dummy_value)
-
-        else:
-            raise NotImplementedError
-
-        print("\n========== Load partial sample function ==========")
-        sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
-        partial_sample_crystal = partial(sample_crystal, atom_mask=atom_mask, top_p=args.top_p, temperature=args.temperature)
-
-        print("\n========== Start RL training ==========")
-        ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
-
-        # PPO training
-        params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
-                                  params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
+    elif args.reward == "dielectric":
+        assert len(model) == 2, "Two models are required for dielectric reward"
+        from crystalformer.reinforce.reward import make_dielectric_reward_fn
+        _, batch_reward_fn = make_dielectric_reward_fn(model, args.dummy_value)
 
     else:
-        raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")
+        raise NotImplementedError
+
+    print("\n========== Load partial sample function ==========")
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
+    partial_sample_crystal = partial(sample_crystal, atom_mask=atom_mask, top_p=args.top_p, temperature=args.temperature)
+
+    print("\n========== Start RL training ==========")
+    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
+
+    # PPO training
+    params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
+                                params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
 
 
 if __name__ == "__main__":
