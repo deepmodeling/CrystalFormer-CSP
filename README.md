@@ -28,7 +28,7 @@ crystal space, which is crucial for data and compute efficient generative modeli
   - [train](#train)
   - [sample](#sample)
   - [evaluate](#evaluate)
-- [Reinforcement Learning Fine-tuning](#reinforcement-learning-fine-tuning)
+- [Reinforcement Fine-tuning](#reinforcement-fine-tuning)
   - [$E\_{hull}$ Reward](#e_hull-reward)
   - [Dielectric FoM Reward](#dielectric-fom-reward)
 - [How to cite](#how-to-cite)
@@ -177,7 +177,7 @@ Note that the training, test, and generated datasets should contain the structur
 
 More details about the post-processing can be seen in the [scripts](./scripts/README.md) folder.
 
-## Reinforcement Learning Fine-tuning
+## Reinforcement Fine-tuning
 
 ### $E_{hull}$ Reward
 
@@ -225,13 +225,25 @@ train_ppo --folder ./data/\
 ## How to cite
 
 ```bibtex
-@misc{cao2024space,
+@article{cao2024space,
       title={Space Group Informed Transformer for Crystalline Materials Generation}, 
       author={Zhendong Cao and Xiaoshan Luo and Jian Lv and Lei Wang},
       year={2024},
       eprint={2403.15734},
       archivePrefix={arXiv},
       primaryClass={cond-mat.mtrl-sci}
+}
+```
+
+```bibtex
+@article{cao2025crystalformerrl,
+      title={CrystalFormer-RL: Reinforcement Fine-Tuning for Materials Design}, 
+      author={Zhendong Cao and Lei Wang},
+      year={2025},
+      eprint={2504.02367},
+      archivePrefix={arXiv},
+      primaryClass={cond-mat.mtrl-sci},
+      url={https://arxiv.org/abs/2504.02367}, 
 }
 ```
 
