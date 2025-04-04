@@ -92,12 +92,6 @@ def main(args):
 
     origin_data = pd.read_csv(input_path)
 
-    if args.label is None:
-        G = origin_data['G']
-        G = np.array(G.tolist())
-    else:
-        G = np.array([int(args.label) for _ in range(len(L))])
-
     L,X,A,W = origin_data['L'],origin_data['X'],origin_data['A'],origin_data['W']
     L = L.apply(lambda x: literal_eval(x))
     X = X.apply(lambda x: literal_eval(x))
@@ -111,6 +105,12 @@ def main(args):
     A = np.array(A.tolist())
     W = np.array(W.tolist())
     print(L.shape,X.shape,A.shape,W.shape)
+
+    if args.label is None:
+        G = origin_data['G']
+        G = np.array(G.tolist())
+    else:
+        G = np.array([int(args.label) for _ in range(len(L))])
 
     ### Multiprocessing. Use it if only run on CPU
     p = multiprocessing.Pool(args.num_io_process)

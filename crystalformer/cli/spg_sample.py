@@ -34,7 +34,8 @@ def main():
     group.add_argument('--key_size', type=int, default=64, help='The key size')
     group.add_argument('--model_size', type=int, default=64, help='The model size')
     group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
-    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate')
+    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate for MLP')
+    group.add_argument('--attn_dropout', type=float, default=0.1, help='The dropout rate for attention')
 
     group = parser.add_argument_group('loss parameters')
     group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part relative to fc")
@@ -69,12 +70,17 @@ def main():
         args.num_io_process = num_cpu
 
     ################### Data #############################
-    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
-    G = test_data[0]
-    # spg_mask = jnp.zeros((230), dtype=int)
-    # convert space group to probability table
-    spg_mask = jnp.bincount(G, minlength=231)
-    spg_mask = spg_mask[1:] # remove 0
+    try:
+        print("\n========== Load dataset and get space group distribution =========")
+        test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+        G = test_data[0]
+        # convert space group to probability table
+        spg_mask = jnp.bincount(G, minlength=231)
+        spg_mask = spg_mask[1:] # remove 0
+    except:
+        print("\n====== failed to load dataset, back to uniform distribution ======")
+        spg_mask = jnp.ones((230), dtype=int)
+
     spg_mask = spg_mask / jnp.sum(spg_mask)
     print(spg_mask)
 
@@ -109,7 +115,7 @@ def main():
                                            args.transformer_layers, args.num_heads, 
                                            args.key_size, args.model_size, args.embed_size, 
                                            args.atom_types, args.wyck_types,
-                                           args.dropout_rate)
+                                           args.dropout_rate, args.attn_dropout)
     print ("# of transformer params", ravel_pytree(params)[0].size) 
 
     ################### Train #############################

@@ -42,7 +42,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl):
             a_logit = h_al[:, :atom_types]
         
             key, subkey = jax.random.split(key)
-            a_logit = a_logit + jnp.where(atom_mask[i, :], 1e10, 0.0) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
+            a_logit = a_logit + jnp.where(atom_mask[i, :], 0.0, -1e10) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
             a = sample_top_p(subkey, a_logit, top_p, temperature)  # use T1 for the first atom type
             A = A.at[:, i].set(a)
         
