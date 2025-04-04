@@ -1,9 +1,12 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+import joblib
 from pymatgen.core import Structure, Lattice
 
+from crystalformer.reinforce import ehull
 from crystalformer.src.wyckoff import wmax_table, mult_table, symops
+
 
 symops = np.array(symops)
 mult_table = np.array(mult_table)
@@ -106,18 +109,186 @@ def make_force_reward_fn(calculator, weight=1.0):
     return reward_fn, batch_reward_fn
 
 
-def make_distance_reward_fn():
+def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
+    """
+    Args:
+        calculator: ase calculator object
+        ref_data: reference data for ehull calculation
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+
+    ase_adaptor = AseAtomsAdaptor()
+
+    def energy_fn(x):
+        G, L, XYZ, A, W = x
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            atoms.calc = calculator
+            energy = atoms.get_potential_energy()
+            structure = ase_adaptor.get_structure(atoms)
+        except:
+            energy = np.inf
+            structure = None
+        
+        return structure, energy
+
+    def reward_fn(structure, energy):
+        if structure == None:
+            e_above_hull = np.inf
+        else:    
+            try: 
+                e_above_hull = ehull.forward_fn(structure, energy, ref_data)
+            except:
+                e_above_hull = np.inf
+
+        # clip e above hull to avoid too large or too small values
+        e_above_hull = np.clip(e_above_hull, -10, 10)
+
+        return e_above_hull
+    
+    def map_reward_fn(structures, energies):
+        output = map(reward_fn, structures, energies)
+
+        return list(output)
+    
+    def parallel_reward_fn(structures, energies):
+        xs = [(structures[i:i+batch], energies[i:i+batch]) for i in range(0, len(structures), batch)]
+        output = joblib.Parallel(
+                        n_jobs=n_jobs
+                    )(joblib.delayed(map_reward_fn)(*x) for x in xs)
+        # concatenate the output
+        output = np.concatenate(output)
+
+        return output
+
+    def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
+        structures, energies = zip(*map(energy_fn, zip(*x)))
+        output = parallel_reward_fn(structures, energies)
+        output = jnp.array(output)
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
+
+    return reward_fn, batch_reward_fn
+
+
+def make_prop_reward_fn(model, target, dummy_value=5, loss_type='mse'):
+
+    """
+    Args:
+        model: property prediction model, takes pymatgen structure as input, returns property value
+        target: target property value
+        dummy_value: dummy value to return if model fails to predict
+        loss_type: loss function type, 'mse' or 'mae'
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+
+    ase_adaptor = AseAtomsAdaptor()
 
     def reward_fn(x):
         G, L, XYZ, A, W = x
-        atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
-        dis_matrix = jnp.array(atoms.get_all_distances(mic=True, vector=False))
-        min_dis = jnp.min(jnp.where(dis_matrix == 0, jnp.inf, dis_matrix))  # avoid 0 distance
-
-        return jnp.array(1/min_dis)
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            struct = ase_adaptor.get_structure(atoms)
+            quantity = model(struct)
+            # if quantity is nan, return a dummy value
+            quantity = quantity if not np.isnan(quantity) else np.array(dummy_value)
+        except:
+            quantity = np.array(dummy_value)  #TODO: check if this is a good idea
+        
+        return quantity
 
     def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
         output = map(reward_fn, zip(*x))
-        return jnp.array(list(output))
+        output = jnp.array(list(output)) - target
+        
+        if loss_type == 'mae':
+            output = jnp.abs(output)
+        elif loss_type == 'mse':
+            output = output**2  # MSE loss
+        else:
+            raise ValueError('Invalid loss type')
+        
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
+
+    return reward_fn, batch_reward_fn
+
+
+def make_dielectric_reward_fn(models, dummy_value=0):
+    """
+    Reward function for dielectric reward. models contains two models, one for dielectric constant and one for band gap.
+    the reward is the product of the two quantities.
+
+    Args:
+        models: list of property prediction models, each takes pymatgen structure as input, returns property value
+        dummy_value: dummy value to return if model fails to predict
+
+    Returns:
+        reward_fn: single reward function
+        batch_reward_fn: batch reward function
+    """
+
+    from pymatgen.io.ase import AseAtomsAdaptor
+    from ase.stress import voigt_6_to_full_3x3_stress
+    ase_adaptor = AseAtomsAdaptor()
+
+    assert len(models) == 2, 'models should contain two models, one for dielectric constant and one for band gap'
+
+    def reward_fn(x):
+        G, L, XYZ, A, W = x
+        try: 
+            atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
+            struct = ase_adaptor.get_structure(atoms)
+            
+            pred = models[0](struct)
+            dielectric_tensor = voigt_6_to_full_3x3_stress(pred)
+            eigenvalues, _ = np.linalg.eig(dielectric_tensor)
+            scalar_dielectric = np.mean(np.real(eigenvalues))
+            if np.isnan(scalar_dielectric):
+                return np.array(dummy_value)
+
+            band_gap = models[1](struct).item()
+            if np.isnan(band_gap):
+                return np.array(dummy_value)
+            
+            reward = - np.array(scalar_dielectric * band_gap)
+
+        except:
+            reward = np.array(dummy_value)  #TODO: check if this is a good idea
+        
+        return reward
+
+
+    def batch_reward_fn(x):
+        x = jax.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
+        G, L, XYZ, A, W = x
+        G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+        x = (G, L, XYZ, A, W)
+        output = map(reward_fn, zip(*x))
+        output = np.array(list(output))
+        output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        return output
 
     return reward_fn, batch_reward_fn

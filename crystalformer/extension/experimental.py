@@ -21,8 +21,8 @@ def make_cond_logp(logp_fn, forward_fn, target, alpha):
         return y
 
     def callback_forward(G, L, XYZ, A, W, target):
-        shape = jax.eval_shape(forward, G, L, XYZ, A, W, target)
-        return jax.experimental.io_callback(forward, shape, G, L, XYZ, A, W, target)
+        result_shape = jax.ShapeDtypeStruct(G.shape, jnp.float32)
+        return jax.experimental.io_callback(forward, result_shape, G, L, XYZ, A, W, target)
 
     def cond_logp_fn(params, key, G, L, XYZ, A, W, is_training):
         '''

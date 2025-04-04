@@ -56,8 +56,8 @@ def calculate_hull(structure, energy, entries):
     entries = [ComputedStructureEntry.from_dict(i) for i in entries]
     pd = PhaseDiagram(entries)
 
-    entry = generate_CSE(structure, energy)
     try:
+        entry = generate_CSE(structure, energy)
         ehull = pd.get_e_above_hull(entry, allow_negative=True)
         print(f"Structure: {structure.formula}, E_hull: {ehull:.3f} eV/atom")
     except Exception as e:

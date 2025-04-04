@@ -1,10 +1,8 @@
 import jax
-jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 import os
 import optax
-from mace.calculators import mace_mp
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -13,9 +11,7 @@ from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
 import crystalformer.src.checkpoint as checkpoint
 
-from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
-from crystalformer.reinforce.reward import make_force_reward_fn
-from crystalformer.reinforce.sample import make_sample_crystal
+from crystalformer.reinforce.dpo import make_dpo_loss, train
 
 
 def main():
@@ -35,7 +31,9 @@ def main():
     group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
     group = parser.add_argument_group('dataset')
-    group.add_argument('--valid_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument('--chosen_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument('--rejected_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument("--val_ratio", type=float, default=0.2, help="validation ratio")
     group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
     group = parser.add_argument_group('transformer parameters')
@@ -48,7 +46,7 @@ def main():
     group.add_argument('--key_size', type=int, default=32, help='The key size')
     group.add_argument('--model_size', type=int, default=64, help='The model size')
     group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
-    group.add_argument('--dropout_rate', type=float, default=0.5, help='The dropout rate for MLP')
+    group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate for MLP')
     group.add_argument('--attn_dropout', type=float, default=0.1, help='The dropout rate for attention')
 
     group = parser.add_argument_group('physics parameters')
@@ -56,35 +54,22 @@ def main():
     group.add_argument('--atom_types', type=int, default=119, help='Atom types including the padded atoms')
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
-    group = parser.add_argument_group('sampling parameters')
-    group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
-    group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
-
     group = parser.add_argument_group('reinforcement learning parameters')
-    group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
-    group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
-    group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
-    group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
-    group.add_argument('--mlff_path', type=str, default='./data/2023-12-03-mace-128-L1_epoch-199.model', help='path to the MLFF model')
-        
+    parser.add_argument('--beta', type=float, default=0.1, help='beta for DPO loss')
+    parser.add_argument('--label_smoothing', type=float, default=0.0, help='label smoothing for DPO loss')
+    parser.add_argument('--gamma', type=float, default=0.0, help='logp regularization coefficient for DPO loss')
+    parser.add_argument('--ipo', action='store_true', help='use IPO loss instead of DPO loss')
 
     args = parser.parse_args()
 
     print("\n========== Load dataset ==========")
-    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    chosen_data = GLXYZAW_from_file(args.chosen_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    rejected_data = GLXYZAW_from_file(args.rejected_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
 
     print("================ parameters ================")
     # print all the parameters
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
-
-    if args.spacegroup is not None:
-        spg_mask = jnp.zeros((230), dtype=int)
-        for g in args.spacegroup:
-            spg_mask = spg_mask.at[int(g)-1].set(1)
-    else:
-        spg_mask = jnp.ones((230), dtype=int)
-    print("spacegroup mask", spg_mask)
 
     print("\n========== Prepare transformer ==========")
     ################### Model #############################
@@ -106,7 +91,8 @@ def main():
 
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "ppo_%d_beta_%g_" % (args.ppo_epochs, args.beta) \
+        output_path = args.folder \
+                    + "beta_%g_label_%g_gamma_%g_"%(args.beta, args.label_smoothing, args.gamma) \
                     + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                     + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -149,27 +135,16 @@ def main():
             print ("failed to update opt_state from checkpoint")
             pass 
 
-        print("\n========== Load calculator and rl loss ==========")
-        calc = mace_mp(model=args.mlff_path,
-                       dispersion=False,
-                       default_dtype="float64",
-                       device='cuda')
-
-        _, batch_reward_fn = make_force_reward_fn(calc)
-        # rl_loss_fn = make_reinforce_loss(logp_fn, batch_reward_fn)
-
-        print("\n========== Load partial sample function ==========")
-        atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
-        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-
-        sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
-
         print("\n========== Start RL training ==========")
-        ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
+        dpo_loss_fn = make_dpo_loss(logp_fn,
+                                    beta=args.beta,
+                                    label_smoothing=args.label_smoothing,
+                                    gamma=args.gamma,
+                                    ipo=args.ipo)
 
         # PPO training
-        params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                                  params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
+        params, opt_state = train(key, optimizer, opt_state, dpo_loss_fn, logp_fn, params, epoch_finished, 
+                                  args.epochs, args.batchsize, chosen_data, rejected_data, output_path, args.val_ratio)
 
     else:
         raise NotImplementedError("No optimizer specified. Please specify an optimizer in the config file.")

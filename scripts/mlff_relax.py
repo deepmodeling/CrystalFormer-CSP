@@ -13,6 +13,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 
 from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
+from ase.constraints import FixSymmetry
 
 
 def make_orb_calc(model_path, device="cuda"):
@@ -35,6 +36,7 @@ def make_matgl_calc(model_path, device="cuda"):
 
     return calc
 
+
 def make_mace_calc(model_path, device="cuda", default_dtype="float64"):
     from mace.calculators import mace_mp
 
@@ -45,7 +47,14 @@ def make_mace_calc(model_path, device="cuda", default_dtype="float64"):
     return calc
 
 
-def relax_structures(calc, structures, relaxation, fmax, steps):
+def make_dp_calc(model_path):
+    from deepmd.calculator import DP
+
+    calc = DP(model_path)
+    return calc
+
+
+def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
     """
     Args:
         calc: ASE calculator object
@@ -78,6 +87,15 @@ def relax_structures(calc, structures, relaxation, fmax, steps):
         initial_energies.append(initial_energy)
 
         if relaxation:
+            if fixsymmetry:
+                try:
+                    # Fix the space group symmetry of the structure
+                    c = FixSymmetry(atoms) 
+                    atoms.set_constraint(c)
+                except Exception as e:
+                    # sometimes the FixSymmetry constraint may not work if atoms are too close
+                    print(f"Error fixing symmetry: {e}")
+
             # The following code is adapted from matgl repo
             # https://github.com/materialsvirtuallab/matgl/blob/824c1c4cefa9129c0af7066523d1665515f42899/src/matgl/ext/ase.py#L218-L304
             # Relax the structure using the FIRE optimizer
@@ -116,6 +134,9 @@ def main(args):
     else:
         print("Relaxation is disabled. Only initial energies will be calculated.")
 
+    if args.fixsymmetry:
+        print("Fixing space group symmetry of the structures.")
+
     print(f"Using {args.model} model at {args.model_path}")
     if args.model == "orb":
         calc = make_orb_calc(args.model_path, args.device)
@@ -123,12 +144,14 @@ def main(args):
         calc = make_matgl_calc(args.model_path, args.device)
     elif args.model == "mace":
         calc = make_mace_calc(args.model_path, args.device)
+    elif args.model == "dp":
+        calc = make_dp_calc(args.model_path)
     else:
-        raise ValueError("Invalid model type. Please choose from 'orb', 'matgl', or 'mace'.")
+        raise ValueError("Invalid model type. Please choose from 'orb', 'matgl', 'mace' or 'dp'.")
 
     print("Calculating energies...")
     start_time = time()
-    results  = relax_structures(calc, structures, args.relaxation, args.fmax, args.steps)
+    results  = relax_structures(calc, structures, args.relaxation, args.fmax, args.steps, args.fixsymmetry)
     end_time = time()
     print(f"Relaxation took {end_time - start_time:.2f} seconds")
 
@@ -161,6 +184,7 @@ if __name__ == "__main__":
     parser.add_argument('--steps', type=int, default=500, help='max number of steps for relaxation')
     parser.add_argument('--label', default=None, help='label for the output file')
     parser.add_argument('--primitive', action='store_true', help='convert structures to primitive form')
+    parser.add_argument('--fixsymmetry', action='store_true', help='fix space group symmetry of the structures')
 
     args = parser.parse_args()
     main(args)

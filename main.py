@@ -1,11 +1,11 @@
-import jax 
-#jax.config.update("jax_enable_x64", True)
+import jax
 import jax.numpy as jnp 
 from jax.flatten_util import ravel_pytree
 import optax
 import os
 import multiprocessing
 import math
+import pandas as pd
 
 from crystalformer.src.utils import GLXYZAW_from_file, letter_to_number
 from crystalformer.src.elements import element_dict, element_list
@@ -284,10 +284,11 @@ else:
     else:
         T1 = args.temperature
 
-    mc_steps = args.nsweeps * args.n_max
-    print("mc_steps", mc_steps)
-    mcmc = make_mcmc_step(params, n_max=args.n_max, atom_types=args.atom_types, atom_mask=atom_mask, constraints=constraints)
-    update_lattice = make_update_lattice(transformer, params, args.atom_types, args.Kl, args.top_p, args.temperature)
+    if args.mcmc:
+        mc_steps = args.nsweeps * args.n_max
+        print("mc_steps", mc_steps)
+        mcmc = make_mcmc_step(params, n_max=args.n_max, atom_types=args.atom_types, atom_mask=atom_mask, constraints=constraints)
+        update_lattice = make_update_lattice(transformer, params, args.atom_types, args.Kl, args.top_p, args.temperature)
 
     num_batches = math.ceil(args.num_samples / args.batchsize)
     name, extension = args.output_filename.rsplit('.', 1)
@@ -322,7 +323,6 @@ else:
 
         # output L, X, A, W, M, AW to csv file
         # output logp_w, logp_xyz, logp_a, logp_l to csv file
-        import pandas as pd
         data = pd.DataFrame()
         data['L'] = np.array(L).tolist()
         data['X'] = np.array(XYZ).tolist()
