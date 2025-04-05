@@ -3,7 +3,7 @@
   <h2> Crystal Generation with Space Group Informed Transformer</h2> 
 </div>
 
-[![arXiv](https://img.shields.io/badge/arXiv-2403.15734-b31b1b.svg)](https://arxiv.org/abs/2403.15734)
+[![arXiv](https://img.shields.io/badge/arXiv-2403.15734-b31b1b.svg)](https://arxiv.org/abs/2403.15734) [![arXiv](https://img.shields.io/badge/arXiv-2504.02367-b31b1b.svg)](https://arxiv.org/abs/2504.02367)
 
 _CrystalFormer_ is a transformer-based autoregressive model specifically designed for space group-controlled generation of crystalline materials. The space group symmetry significantly simplifies the
 crystal space, which is crucial for data and compute efficient generative modeling of crystalline materials.
@@ -83,6 +83,9 @@ pip install -U "jax[cpu]"
 ```
 
 ### CUDA (GPU) installation
+
+> [!CAUTION]
+> CrystalFormer requires JAX versions between v0.4.25 and v0.4.35. Please avoid using versions newer than v0.4.35 to prevent compatibility issues. If you have already installed a newer version, please uninstall it first and then install one within the required range.
 
 If you intend to use CUDA (GPU) to speed up the training, it is important to install the appropriate version of `jax` and `jaxlib`. It is recommended to check the [jax docs](https://github.com/google/jax?tab=readme-ov-file#installation) for the installation guide. The basic installation command is given below:
 
