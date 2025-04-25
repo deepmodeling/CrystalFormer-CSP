@@ -48,14 +48,15 @@ Note that the training, test, and generated datasets should contain the structur
 
 
 ### Relaxation
-`mlff_relax.py` is a script to relax the generated structures using pretrained machine learning force field. Now we support the [`orb`](https://github.com/orbital-materials/orb-models), [`MACE`](https://github.com/ACEsuit/mace) and [`matgl`](https://github.com/materialsvirtuallab/matgl) models. Please install corresponding packages before running the script.
+`mlff_relax.py` is a script to relax the generated structures using pretrained machine learning force field. Now we support the [`orb`](https://github.com/orbital-materials/orb-models), [`MACE`](https://github.com/ACEsuit/mace), [`matgl`](https://github.com/materialsvirtuallab/matgl) and [`deepmd-kit`](https://github.com/deepmodeling/deepmd-kit) models. Please install corresponding packages before running the script.
 
 ```bash
-python mlff_relax.py --restore_path RESTORE_PATH --filename FILENAME --relaxation --model_path MODEL_PATH
+python mlff_relax.py --restore_path RESTORE_PATH --filename FILENAME --relaxation --model orb --model_path MODEL_PATH
 ```
 - `restore_path`: the path to the generated structures
 - `filename`: the filename of the generated structures
 - `relaxation`: whether to relax the structures, if not specified, the script will only predict the energy of the structures without relaxation
+- `model`: the model to use for relaxation, which can be `orb`, `mace`, `matgl` or `dp`
 - `model_path`: the path to the machine learning force field checkpoint
 - `primitive`: whether to convert the structures to primitive cells, if not specified, the script will only relax the structures without converting to primitive cells. This can be used to reduce the number of atoms in the structures and speed up the relaxation process
 - `fixsymmetry`: whether to fix the space group symmetry of the structures in the relaxation process
