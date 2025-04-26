@@ -9,6 +9,7 @@
   - [Relaxation](#relaxation)
   - [Energy Above the Hull](#energy-above-the-hull)
   - [Embedding Visualization](#embedding-visualization)
+  - [Stable, Unique and Novel Structures](#stable-unique-and-novel-structures)
   - [Structure Visualization](#structure-visualization)
 
 ### Transform
@@ -93,6 +94,17 @@ python plot_embeddings.py --restore_path RESTORE_PATH
 ```
 
 - `restore_path`: the path to the model checkpoint
+
+### Stable, Unique and Novel Structures
+`check_sun_materials.py` is a script to check the stable, unique and novel structures based on the given reference dataset.
+
+```bash
+python check_sun_materials.py --restore_path RESTORE_PATH --filename FILENAME --ref_path REF_PATH
+```
+
+- `restore_path`: the path to the generated structures
+- `filename`: the filename of the generated structures
+- `ref_path`: the path to the reference dataset
 
 ### Structure Visualization
 `structure_visualization.ipynb` is a notebook to visualize the generated structures.
