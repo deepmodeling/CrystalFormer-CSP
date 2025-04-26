@@ -23,6 +23,7 @@ crystal space, which is crucial for data and compute efficient generative modeli
   - [CPU installation](#cpu-installation)
   - [CUDA (GPU) installation](#cuda-gpu-installation)
   - [install required packages](#install-required-packages)
+  - [command line tools](#command-line-tools)
 - [Available Weights](#available-weights)
 - [How to run](#how-to-run)
   - [train](#train)
@@ -104,6 +105,13 @@ pip install --upgrade "jax[cuda12]"
 pip install -r requirements.txt
 ```
 
+### command line tools
+To use the command line tools, you need to install the `crystalformer` package. You can use the following command to install the package:
+
+```bash
+pip install .
+```
+
 ## Available Weights
 
 We release the weights of the model trained on the MP-20 dataset and Alex-20 dataset. More details can be seen in the [model](./model/README.md) folder.
@@ -153,6 +161,9 @@ python ./scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --nu
 - `output_path`: the path to read the generated `L, W, A, X` and save the `cif` files
 - `label`: the label to save the `cif` files, which is the space group number `g`
 - `num_io_process`: the number of processes
+
+> [!IMPORTANT]
+> The following evaluation script requires the [`SMACT`](https://github.com/WMD-group/SMACT), [`matminer`](https://github.com/hackingmaterials/matminer), and [`matbench-genmetrics`](https://github.com/sparks-baird/matbench-genmetrics) packages. We recommend installing them in a separate environment to avoid conflicts with other packages.
 
 Calculate the structure and composition validity of the generated structures:
 
