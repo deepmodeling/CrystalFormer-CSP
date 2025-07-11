@@ -74,6 +74,7 @@ group.add_argument('--temperature', type=float, default=1.0, help='temperature u
 group.add_argument('--T1', type=float, default=None, help='temperature used for sampling the first atom type')
 group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 group.add_argument('--num_samples', type=int, default=1000, help='number of test samples')
+group.add_argument('--save_path', type=str, default=None, help='path to save the sampled structures')
 group.add_argument('--output_filename', type=str, default='output.csv', help='outfile to save sampled structures')
 
 group = parser.add_argument_group('MCMC parameters')
@@ -191,7 +192,7 @@ if args.optimizer != "none" or args.restore_path is None:
     os.makedirs(output_path, exist_ok=True)
     print("Create directory for output: %s" % output_path)
 else:
-    output_path = os.path.dirname(args.restore_path)
+    output_path = os.path.dirname(args.save_path)  if args.save_path else os.path.dirname(args.restore_path)
     print("Will output samples to: %s" % output_path)
 
 
