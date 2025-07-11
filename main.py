@@ -6,6 +6,8 @@ import os
 import multiprocessing
 import math
 import pandas as pd
+import numpy as np 
+np.set_printoptions(threshold=np.inf)
 
 from crystalformer.src.utils import GLXYZAW_from_file, letter_to_number
 from crystalformer.src.elements import element_dict, element_list
@@ -96,7 +98,7 @@ if args.optimizer != "none":
     valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
 else:
     assert (args.spacegroup is not None) # for inference we need to specify space group
-    test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    # test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
     
     # jnp.set_printoptions(threshold=jnp.inf)  # print full array 
     constraints = jnp.arange(0, args.n_max, 1)
@@ -227,50 +229,6 @@ if args.optimizer != "none":
     params, opt_state = train(key, optimizer, opt_state, loss_fn, params, epoch_finished, args.epochs, args.batchsize, train_data, valid_data, output_path, args.val_interval)
 
 else:
-    pass
-
-    print("\n========== Print out some test data for the given space group ==========")
-    import numpy as np 
-    np.set_printoptions(threshold=np.inf)
-
-    G, L, XYZ, A, W = test_data
-    print (G.shape, L.shape, XYZ.shape, A.shape, W.shape)
-
-    idx = jnp.where(G==args.spacegroup,size=5)
-    G = G[idx]
-    L = L[idx]
-    XYZ = XYZ[idx]
-    A = A[idx]
-    W = W[idx]
-    
-    num_sites = jnp.sum(A!=0, axis=1)
-    print ("num_sites:", num_sites)
-    @jax.vmap
-    def lookup(G, W):
-        return mult_table[G-1, W] # (n_max, )
-    M = lookup(G, W) # (batchsize, n_max)
-    num_atoms = M.sum(axis=-1)
-    print ("num_atoms:", num_atoms)
-
-    print ("G:", G)
-    print ("A:\n", A)
-    for a in A: 
-       print([element_list[i] for i in a])
-    print ("W:\n",W)
-    print ("XYZ:\n",XYZ)
-
-    outputs = jax.vmap(transformer, (None, None, 0, 0, 0, 0, 0, None), (0))(params, key, G, XYZ, A, W, M, False)
-    print ("outputs.shape", outputs.shape)
-
-    h_al = outputs[:, 1::5, :] # (:, n_max, :)
-    a_logit = h_al[:, :, :args.atom_types]
-    l_logit, mu, sigma = jnp.split(h_al[jnp.arange(h_al.shape[0]), num_sites, 
-                                       args.atom_types:args.atom_types+args.Kl+2*6*args.Kl], 
-                                       [args.Kl, args.Kl+6*args.Kl], axis=-1)
-    print ("L:\n",L)
-    print ("exp(l_logit):\n", jnp.exp(l_logit))
-    print ("mu:\n", mu.reshape(-1, args.Kl, 6))
-    print ("sigma:\n", sigma.reshape(-1, args.Kl, 6))
 
     print("\n========== Start sampling ==========")
     jax.config.update("jax_enable_x64", True) # to get off compilation warning, and to prevent sample nan lattice 
