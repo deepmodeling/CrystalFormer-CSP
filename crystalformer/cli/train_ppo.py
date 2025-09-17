@@ -57,7 +57,7 @@ def main():
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
     group = parser.add_argument_group('sampling parameters')
-    group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
+    group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets seperated by spaces, e.g. Bi Ti O')
     group.add_argument('--remove_radioactive', action='store_true', help='remove radioactive elements and noble gas')
     group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')

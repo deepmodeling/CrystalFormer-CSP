@@ -65,6 +65,9 @@ if __name__=='__main__':
                     elif not ('_path' in arg or 'folder' in arg):
                         if '_' in arg:
                             arg = "".join([s[0] for s in arg.split('_')])
+                        elif arg == 'elements':
+                            arg = ''
+                            value = elements_str 
                         logname += "%s%s_" % (arg, value)
                 logname = logname[:-1] + '.log'
 

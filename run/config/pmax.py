@@ -2,10 +2,10 @@ import subprocess
 import numpy as np 
 import time 
 
-spacegroup=167 
-elements='Si' 
-
-nickname = 'firsttry-' + elements + '-' + str(spacegroup) 
+spacegroup=160
+elements='Si C' 
+elements_str = '-'.join(elements.split(' '))
+nickname = 'firsttry-' + elements_str + '-' + str(spacegroup) 
 
 ###############################
 num_io_process = 20
@@ -14,7 +14,7 @@ reward='ehull'
 mlff_model='orb'
 beta = 0.0
 epochs = 500 
-batchsize = 500
+batchsize = 100
 
 restore_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'

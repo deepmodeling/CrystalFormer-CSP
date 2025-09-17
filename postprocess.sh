@@ -11,7 +11,7 @@ DEFAULT_BASE_DATA_PATH="/home/user_wanglei/private/datafile/crystalgpt"
 DEFAULT_RESTORE_PATH="${DEFAULT_BASE_DATA_PATH}/firsttry-Si-167/csp-17274/ppo_5_beta_0_adam_bs_500_lr_1e-05_decay_0_clip_1_A_119_W_28_N_21_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1"
 DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v2-20241011.ckpt"
 DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2"
-DEFAULT_ELEMENTS="Si"
+DEFAULT_ELEMENTS=("Si")
 DEFAULT_SPACEGROUP="167"
 DEFAULT_NUM_SAMPLES="1000"
 DEFAULT_BATCHSIZE="1000"
@@ -27,7 +27,7 @@ usage() {
     echo "  -r, --restore-path PATH     Base restore path (default: $DEFAULT_RESTORE_PATH)"
     echo "  -m, --model-path PATH       Model checkpoint path (default: $DEFAULT_MODEL_PATH)"
     echo "  -c, --convex-hull PATH      Convex hull path (default: $DEFAULT_CONVEX_HULL_PATH)"
-    echo "  -e, --elements ELEMENTS     Elements (default: $DEFAULT_ELEMENTS)"
+    echo "  -e, --elements ELEMENTS     Elements, can specify multiple (default: ${DEFAULT_ELEMENTS[*]})"
     echo "  -s, --spacegroup GROUP      Space group (default: $DEFAULT_SPACEGROUP)"
     echo "  -n, --num-samples NUM       Number of samples (default: $DEFAULT_NUM_SAMPLES)"
     echo "  -b, --batchsize SIZE        Batch size (default: $DEFAULT_BATCHSIZE)"
@@ -42,13 +42,14 @@ usage() {
     echo ""
     echo "Example:"
     echo "  $0 -r /path/to/restore -e Si -s 167"
+    echo "  $0 -e C Si -s 167  # Multiple elements"
 }
 
 # Parse command line arguments
 RESTORE_PATH="$DEFAULT_RESTORE_PATH"
 MODEL_PATH="$DEFAULT_MODEL_PATH"
 CONVEX_HULL_PATH="$DEFAULT_CONVEX_HULL_PATH"
-ELEMENTS="$DEFAULT_ELEMENTS"
+ELEMENTS=("${DEFAULT_ELEMENTS[@]}")
 SPACEGROUP="$DEFAULT_SPACEGROUP"
 NUM_SAMPLES="$DEFAULT_NUM_SAMPLES"
 BATCHSIZE="$DEFAULT_BATCHSIZE"
@@ -75,8 +76,13 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -e|--elements)
-            ELEMENTS="$2"
-            shift 2
+            ELEMENTS=()
+            shift
+            # Collect all elements until we hit another option or end of arguments
+            while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
+                ELEMENTS+=("$1")
+                shift
+            done
             ;;
         -s|--spacegroup)
             SPACEGROUP="$2"
@@ -155,7 +161,7 @@ echo "=== CrystalGPT Postprocessing Pipeline ==="
 echo "Restore path: $RESTORE_PATH"
 echo "Model path: $MODEL_PATH"
 echo "Convex hull path: $CONVEX_HULL_PATH"
-echo "Elements: $ELEMENTS"
+echo "Elements: ${ELEMENTS[*]}"
 echo "Space group: $SPACEGROUP"
 echo "Number of samples: $NUM_SAMPLES"
 echo "Batch size: $BATCHSIZE"
@@ -170,7 +176,7 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
     python ./main.py \
         --optimizer none \
         --restore_path "$EPOCH_PATH" \
-        --elements "$ELEMENTS" \
+        --elements "${ELEMENTS[@]}" \
         --spacegroup "$SPACEGROUP" \
         --num_samples "$NUM_SAMPLES" \
         --batchsize "$BATCHSIZE" \
