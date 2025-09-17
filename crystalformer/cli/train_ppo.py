@@ -34,7 +34,7 @@ def main():
     group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
     group = parser.add_argument_group('dataset')
-    group.add_argument('--valid_path', default='/data/zdcao/crystal_gpt/dataset/mp_20/val.csv', help='')
+    group.add_argument('--valid_path', default=None, help='')
     group.add_argument('--test_path', default=None, help='dataset to get the space group distribution')
     group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
@@ -57,6 +57,7 @@ def main():
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
     group = parser.add_argument_group('sampling parameters')
+    group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets, e.g. Bi, Ti, O')
     group.add_argument('--remove_radioactive', action='store_true', help='remove radioactive elements and noble gas')
     group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
@@ -77,9 +78,12 @@ def main():
     group.add_argument('--loss_type', type=str, default='mse', choices=['mse', 'mae'], help='loss type for the property reward')
 
     args = parser.parse_args()
-
-    print("\n========== Load dataset ==========")
-    valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    
+    if args.valid_path is not None:
+        print("\n========== Load validation dataset ==========")
+        valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+    else:
+        valid_data = None
 
     print("================ parameters ================")
     # print all the parameters
@@ -88,14 +92,14 @@ def main():
 
     ################### Data #############################
     try:
-        print("\n========== Load dataset and get space group distribution =========")
+        print("\n========== Load test dataset and get space group distribution =========")
         test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
         G = test_data[0]
         # convert space group to probability table
         spg_mask = jnp.bincount(G, minlength=231)
         spg_mask = spg_mask[1:] # remove 0
     except:
-        print("\n====== failed to load dataset ======")
+        print("\n====== Failed to load test dataset ======")
         if args.spacegroup is not None:
             print("Spacegroup specified, will sample from the specified spacegroups")
             spg_mask = jnp.zeros((230), dtype=int)
@@ -108,18 +112,29 @@ def main():
 
     print("spacegroup mask", spg_mask)
 
-    if args.remove_radioactive:
-        from crystalformer.src.elements import radioactive_elements_dict, noble_gas_dict
-        # remove radioactive elements and noble gas
-        atom_mask = [1] + [1 if i not in radioactive_elements_dict.values() and i not in noble_gas_dict.values() else 0 for i in range(1, args.atom_types)]
+    if args.elements is not None:
+        from crystalformer.src.elements import element_dict
+        idx = [element_dict[e] for e in args.elements]
+        atom_mask = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
         atom_mask = jnp.array(atom_mask)
         atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-        print('sampling structure formed by non-radioactive elements and non-noble gas')
-            
+        print ('sampling structure formed by these elements:', args.elements)
+        print (atom_mask)
+
     else:
-        atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
-        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-        print('sampling structure formed by all elements')
+
+        if args.remove_radioactive:
+            from crystalformer.src.elements import radioactive_elements_dict, noble_gas_dict
+            # remove radioactive elements and noble gas
+            atom_mask = [1] + [1 if i not in radioactive_elements_dict.values() and i not in noble_gas_dict.values() else 0 for i in range(1, args.atom_types)]
+            atom_mask = jnp.array(atom_mask)
+            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+            print('sampling structure formed by non-radioactive elements and non-noble gas')
+                
+        else:
+            atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
+            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
+            print('sampling structure formed by all elements')
 
     print("atom_mask", atom_mask)
 
@@ -184,7 +199,7 @@ def main():
         print ("failed to update opt_state from checkpoint")
         pass 
 
-    print("\n========== Load calculator and rl loss ==========")
+    print("\n========== Load mlff ==========")
     print(f"Using {args.mlff_model} model at {args.mlff_path}")
     if args.mlff_model == "mace":
         from mace.calculators import mace_mp
@@ -199,6 +214,7 @@ def main():
 
         # Load the ORB forcefield model
         orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
+        #orbff = pretrained.orb_v3_conservative_inf_omat(args.mlff_path, device='cuda') 
         calc = ORBCalculator(orbff, device='cuda')
     
     elif args.mlff_model == "matgl":
@@ -220,6 +236,8 @@ def main():
 
     else:
         raise NotImplementedError
+
+    print("\n========== Load rl reward ==========")
 
     if args.reward == "force":
         from crystalformer.reinforce.reward import make_force_reward_fn

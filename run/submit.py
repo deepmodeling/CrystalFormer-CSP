@@ -21,6 +21,8 @@ if __name__=='__main__':
         from config.ln01 import * 
     elif 'bright90' in machinename:
         from config.bright90 import * 
+    elif 'slurm-client' in machinename:
+        from config.pmax import *
     else:
         print ('where am I ?', machinename)
         sys.exit(1)
@@ -28,7 +30,7 @@ if __name__=='__main__':
 
     from pygit2 import Repository
     head = Repository('.').head
-    branch = head.shorthand + "-" + head.target.hex[:5]
+    branch = head.shorthand + "-" + head.target.raw.hex()[:5]
 
     resfolder = os.path.join(resfolder, branch) + '/'
 
@@ -42,34 +44,18 @@ if __name__=='__main__':
     subprocess.check_call(cmd)
     
     if True:
-                args = {'n_max':n_max, 
-                        'atom_types': atom_types, 
-                        'wyck_types': wyck_types, 
+                args = {
+                        'epochs':epochs, 
+                        'batchsize':batchsize, 
                         'folder':resfolder,
-                        'Nf':Nf, 
-                        'Kx':Kx, 
-                        'Kl':Kl,
-                        'h0_size': h0_size, 
-                        'transformer_layers':transformer_layers, 
-                        'num_heads':num_heads, 
-                        'key_size':key_size,
-                        'model_size':model_size, 
-                        'embed_size':embed_size, 
-                        'lr':lr, 
-                        'lr_decay': lr_decay, 
-                        'weight_decay': weight_decay, 
-                        'clip_grad': clip_grad, 
-                        'batchsize': batchsize,
-                        'epochs': epochs, 
-                        'optimizer': optimizer, 
-                        'train_path' : train_path,  
-                        'valid_path' : valid_path,  
-                        'test_path' : test_path,  
-                        'dropout_rate' : dropout_rate,  
-                        'num_io_process' : num_io_process, 
-                        'lamb_a': lamb_a,  
-                        'lamb_w': lamb_w,  
-                        'lamb_l': lamb_l,  
+                        'reward': reward, 
+                        'elements': elements, 
+                        'spacegroup': spacegroup, 
+                        'mlff_model': mlff_model, 
+                        'restore_path': restore_path, 
+                        'convex_path': convex_path, 
+                        'mlff_path': mlff_path, 
+                        'beta':beta
                         }
 
                 logname = jobdir 

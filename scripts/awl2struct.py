@@ -120,8 +120,7 @@ def main(args):
 
     data = pd.DataFrame()
     data['cif'] = structures
-    data.to_csv(output_path, mode='a', index=False, header=True)
-
+    data.to_csv(output_path, mode='w', index=False, header=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')

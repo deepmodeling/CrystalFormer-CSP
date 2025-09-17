@@ -63,12 +63,16 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err v_loss v_loss_w v_loss_a v_loss_xyz v_loss_l\n")
+        if valid_data is not None:
+            f.write("epoch f_mean f_err v_loss v_loss_w v_loss_a v_loss_xyz v_loss_l\n")
+        else:
+            f.write("epoch f_mean f_err f_min f_max\n")
+
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
     loss_fn = jax.jit(loss_fn, static_argnums=7)
     
-    for epoch in range(epoch_finished+1, epochs+1):
+    for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
         G = jax.random.choice(subkey1,
@@ -78,15 +82,20 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         XYZ, A, W, _, L = sample_crystal(subkey2, params, G)
 
         x = (G, L, XYZ, A, W)
-        rewards = - batch_reward_fn(x)  # inverse reward
+        rewards = - batch_reward_fn(x)  # ppo maximize this reward
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
+        f_min = jnp.min(rewards)
+        f_max = jnp.max(rewards)
 
         # running average baseline
         baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
-
-        f.write( ("%6d" + 2*"  %.6f") % (epoch, f_mean, f_err))
+        
+        if valid_data is not None:
+            f.write( ("%6d" + 2*"  %.6f") % (epoch, f_mean, f_err))
+        else:
+            f.write( ("%6d" + 4*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max))
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
@@ -108,37 +117,38 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss) = value
-            print(f"epoch {epoch}, loss {jnp.mean(ppo_loss):.6f} {jnp.mean(kl_loss):.6f}")
+            #print(f"epoch {epoch}, loss {jnp.mean(ppo_loss):.6f} {jnp.mean(kl_loss):.6f}")
+        
+        if valid_data is not None:
+            valid_loss = 0.0 
+            valid_aux = 0.0, 0.0, 0.0, 0.0
+            num_samples = len(valid_data[0])
+            num_batches = math.ceil(num_samples / batchsize)
+            for batch_idx in range(num_batches):
+                start_idx = batch_idx * batchsize
+                end_idx = min(start_idx + batchsize, num_samples)
+                batch_data = jax.tree_util.tree_map(lambda x: x[start_idx:end_idx], valid_data)
 
-        valid_loss = 0.0 
-        valid_aux = 0.0, 0.0, 0.0, 0.0
-        num_samples = len(valid_data[0])
-        num_batches = math.ceil(num_samples / batchsize)
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * batchsize
-            end_idx = min(start_idx + batchsize, num_samples)
-            batch_data = jax.tree_util.tree_map(lambda x: x[start_idx:end_idx], valid_data)
+                key, subkey = jax.random.split(key)
+                loss, aux = loss_fn(params, subkey, *batch_data, False)
+                valid_loss, valid_aux = jax.tree_util.tree_map(
+                        lambda acc, i: acc + i,
+                        (valid_loss, valid_aux), 
+                        (loss, aux)
+                        )
 
-            key, subkey = jax.random.split(key)
-            loss, aux = loss_fn(params, subkey, *batch_data, False)
             valid_loss, valid_aux = jax.tree_util.tree_map(
-                    lambda acc, i: acc + i,
-                    (valid_loss, valid_aux), 
-                    (loss, aux)
-                    )
+                        lambda x: x/num_batches, 
+                        (valid_loss, valid_aux)
+                        ) 
+            valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
+            f.write( (5*"  %.6f" + "\n") % (valid_loss,
+                                            valid_loss_w, 
+                                            valid_loss_a, 
+                                            valid_loss_xyz, 
+                                            valid_loss_l))
 
-        valid_loss, valid_aux = jax.tree_util.tree_map(
-                    lambda x: x/num_batches, 
-                    (valid_loss, valid_aux)
-                    ) 
-        valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
-        f.write( (5*"  %.6f" + "\n") % (valid_loss,
-                                        valid_loss_w, 
-                                        valid_loss_a, 
-                                        valid_loss_xyz, 
-                                        valid_loss_l))
-
-        if epoch % 5 == 0:
+        if epoch % 10 == 0:
             ckpt = {"params": params,
                     "opt_state" : opt_state
                    }
