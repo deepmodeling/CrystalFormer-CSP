@@ -53,7 +53,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch t_loss v_loss t_loss_w v_loss_w t_loss_a v_loss_a t_loss_xyz v_loss_xyz t_loss_l v_loss_l\n")
+        f.write("epoch t_loss v_loss t_loss_g v_loss_g t_loss_w v_loss_w t_loss_a v_loss_a t_loss_xyz v_loss_xyz t_loss_l v_loss_l\n")
  
     for epoch in range(epoch_finished+1, epochs+1):
         key, subkey = jax.random.split(key)
@@ -62,7 +62,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         _, train_L, _, _, _ = train_data
 
         train_loss = 0.0 
-        train_aux = 0.0, 0.0, 0.0, 0.0
+        train_aux = 0.0, 0.0, 0.0, 0.0, 0.0
         num_samples = train_L.shape[0]
         if num_samples % batchsize == 0:
             num_batches = math.ceil(num_samples / batchsize)
@@ -90,7 +90,7 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
         if epoch % val_interval == 0:
             _, valid_L, _, _, _ = valid_data 
             valid_loss = 0.0 
-            valid_aux = 0.0, 0.0, 0.0, 0.0
+            valid_aux = 0.0, 0.0, 0.0, 0.0, 0.0
             num_samples = valid_L.shape[0]
             if num_samples % batchsize == 0:
                 num_batches = math.ceil(num_samples / batchsize)
@@ -116,11 +116,12 @@ def train(key, optimizer, opt_state, loss_fn, params, epoch_finished, epochs, ba
                         (valid_loss, valid_aux)
                         ) 
 
-            train_loss_w, train_loss_a, train_loss_xyz, train_loss_l = train_aux
-            valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
+            train_loss_g, train_loss_w, train_loss_a, train_loss_xyz, train_loss_l = train_aux
+            valid_loss_g, valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
 
-            f.write( ("%6d" + 10*"  %.6f" + "\n") % (epoch, 
+            f.write( ("%6d" + 12*"  %.6f" + "\n") % (epoch, 
                                                     train_loss,   valid_loss,
+                                                    train_loss_g, valid_loss_g, 
                                                     train_loss_w, valid_loss_w, 
                                                     train_loss_a, valid_loss_a, 
                                                     train_loss_xyz, valid_loss_xyz, 

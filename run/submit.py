@@ -5,6 +5,7 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", action='store_true', help="Run or not")
+    parser.add_argument('--mode', type=str, default='pretrain', choices=['pretrain', 'finetune'], help='')
     parser.add_argument("--waitfor", type=int, help="wait for this job for finish")
     input = parser.parse_args()
 
@@ -43,10 +44,16 @@ if __name__=='__main__':
     cmd = ['mkdir', '-p', resfolder]
     subprocess.check_call(cmd)
     
-    if True:
-                args = {
+    if input.mode == 'finetune':
+        print ("rl finetune  mode")
+
+        prog = 'train_ppo'
+
+        args = {
                         'epochs':epochs, 
                         'batchsize':batchsize, 
+                        'lr':lr, 
+                        'n_max':n_max,
                         'folder':resfolder,
                         'reward': reward, 
                         'elements': elements, 
@@ -58,19 +65,56 @@ if __name__=='__main__':
                         'beta':beta
                         }
 
-                logname = jobdir 
-                for arg, value in args.items():
-                    if isinstance(value, bool):
-                        logname += ("%s_" % arg if value else "")
-                    elif not ('_path' in arg or 'folder' in arg):
-                        if '_' in arg:
-                            arg = "".join([s[0] for s in arg.split('_')])
-                        elif arg == 'elements':
-                            arg = ''
-                            value = elements_str 
-                        logname += "%s%s_" % (arg, value)
-                logname = logname[:-1] + '.log'
+    elif input.mode == 'pretrain':
+        print ("pretrain mode")
+                
+        prog = 'python /home/user_wanglei/private/homefile/crystal_gpt/main.py'
 
-                jobname = os.path.basename(os.path.dirname(logname))
+        args = {'n_max':n_max,
+                        'atom_types': atom_types,
+                        'wyck_types': wyck_types,
+                        'folder':resfolder,
+                        'Nf':Nf,
+                        'Kx':Kx,
+                        'Kl':Kl,
+                        'h0_size': h0_size,
+                        'transformer_layers':transformer_layers,
+                        'num_heads':num_heads,
+                        'key_size':key_size,
+                        'model_size':model_size,
+                        'embed_size':embed_size,
+                        'lr':lr,
+                        'lr_decay': lr_decay,
+                        'weight_decay': weight_decay,
+                        'clip_grad': clip_grad,
+                        'batchsize': batchsize,
+                        'epochs': epochs,
+                        'optimizer': optimizer,
+                        'train_path' : train_path,
+                        'valid_path' : valid_path,
+                        'test_path' : test_path,
+                        'dropout_rate' : dropout_rate,
+                        'num_io_process' : num_io_process,
+                        'lamb_a': lamb_a,
+                        'lamb_w': lamb_w,
+                        'lamb_l': lamb_l,
+                        }
 
-                jobid = submitJob(prog,args,jobname,logname,run=input.run, wait=input.waitfor)
+
+
+    logname = jobdir 
+    for arg, value in args.items():
+        if isinstance(value, bool):
+            logname += ("%s_" % arg if value else "")
+        elif not ('_path' in arg or 'folder' in arg):
+            if '_' in arg:
+                arg = "".join([s[0] for s in arg.split('_')])
+            elif arg == 'elements':
+                arg = ''
+                value = elements_str 
+            logname += "%s%s_" % (arg, value)
+    logname = logname[:-1] + '.log'
+
+    jobname = os.path.basename(os.path.dirname(logname))
+
+    jobid = submitJob(prog,args,jobname,logname,run=input.run, wait=input.waitfor)

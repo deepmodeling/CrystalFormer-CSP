@@ -2,10 +2,40 @@ import subprocess
 import numpy as np 
 import time 
 
-spacegroup=160
-elements='Si C' 
-elements_str = '-'.join(elements.split(' '))
-nickname = 'firsttry-' + elements_str + '-' + str(spacegroup) 
+nickname = 'csp'
+
+###############################
+atom_types = 119
+
+Nf = 5
+Kx, Kl = 16, 4
+h0_size = 256
+transformer_layers = 4
+num_heads = 8
+key_size = 32
+model_size = 64
+embed_size = 32
+dropout_rate = 0.3
+
+optimizer = 'adam'
+weight_decay = 0.0 
+lr = 1e-4
+lr_decay = 0.0
+clip_grad = 1.0
+batchsize = 100
+epochs = 10000
+
+lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
+
+num_io_process = 20
+
+n_max = 21
+wyck_types = 28
+
+mp20_folder = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/'
+train_path = mp20_folder+'/train.csv'
+valid_path = mp20_folder+'/val.csv'
+test_path = mp20_folder+'/test.csv'
 
 ###############################
 num_io_process = 20
@@ -13,10 +43,9 @@ num_io_process = 20
 reward='ehull'
 mlff_model='orb'
 beta = 0.0
-epochs = 500 
-batchsize = 100
 
-restore_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20'
+restore_path=None
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 
@@ -55,7 +84,7 @@ echo "A total of $SLURM_NTASKS tasks is used"\n
 echo Job started at `date`\n'''
     job += str(bin) + ' '
     for key, val in args.items():
-        if isinstance(val, bool):
+        if isinstance(val, bool) or val is None:
             job += (" --%s" % key if val else "")
         else:
             job += " --%s %s" % (key, val)

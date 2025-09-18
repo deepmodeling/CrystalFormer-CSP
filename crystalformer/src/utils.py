@@ -237,10 +237,10 @@ if __name__=='__main__':
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
-    #csv_file = '../data/mini.csv'
+    csv_file = '../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
-    csv_file = '/home/wanglei/cdvae/data/mp_20/train.csv'
+    #csv_file = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/train.csv'
 
     G, L, XYZ, A, W = GLXYZAW_from_file(csv_file, atom_types, wyck_types, n_max)
     
@@ -250,12 +250,31 @@ if __name__=='__main__':
     print (A.shape)
     print (W.shape)
     
-    print ('L:\n',L)
-    print ('XYZ:\n',XYZ)
+    #print ('L:\n',L)
+    #print ('XYZ:\n',XYZ)
+    print ('A:\n', A)
 
 
     @jax.vmap
     def lookup(G, W):
         return mult_table[G-1, W] # (n_max, )
     M = lookup(G, W) # (batchsize, n_max)
+    print ('M:\n', M)
     print ('N:\n', M.sum(axis=-1))
+
+    from formula import find_composition_vector, formula_string
+    composition = jax.vmap(find_composition_vector)(A, M)
+    for i in range(len(A)):
+        formula = formula_string(composition[i])
+
+        print (formula)
+        print (composition[i])
+
+
+
+
+
+
+
+
+
