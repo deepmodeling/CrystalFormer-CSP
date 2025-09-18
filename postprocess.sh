@@ -28,6 +28,7 @@ usage() {
     echo "  -m, --model-path PATH       Model checkpoint path (default: $DEFAULT_MODEL_PATH)"
     echo "  -c, --convex-hull PATH      Convex hull path (default: $DEFAULT_CONVEX_HULL_PATH)"
     echo "  -e, --elements ELEMENTS     Elements, can specify multiple (default: ${DEFAULT_ELEMENTS[*]})"
+    echo "                              Special case: use 'X' to enable --remove_radioactive flag"
     echo "  -s, --spacegroup GROUP      Space group (default: $DEFAULT_SPACEGROUP)"
     echo "  -n, --num-samples NUM       Number of samples (default: $DEFAULT_NUM_SAMPLES)"
     echo "  -b, --batchsize SIZE        Batch size (default: $DEFAULT_BATCHSIZE)"
@@ -43,6 +44,7 @@ usage() {
     echo "Example:"
     echo "  $0 -r /path/to/restore -e Si -s 167"
     echo "  $0 -e C Si -s 167  # Multiple elements"
+    echo "  $0 -e X -s 167     # Use --remove_radioactive flag"
 }
 
 # Parse command line arguments
@@ -173,14 +175,27 @@ echo "=========================================="
 if [[ "$SKIP_SAMPLE" == false ]]; then
     echo ""
     echo "Step 1: Sampling structures..."
-    python ./main.py \
-        --optimizer none \
-        --restore_path "$EPOCH_PATH" \
-        --elements "${ELEMENTS[@]}" \
-        --spacegroup "$SPACEGROUP" \
-        --num_samples "$NUM_SAMPLES" \
-        --batchsize "$BATCHSIZE" \
+    
+    # Build the command arguments
+    SAMPLE_ARGS=(
+        --optimizer none
+        --restore_path "$EPOCH_PATH"
+        --spacegroup "$SPACEGROUP"
+        --num_samples "$NUM_SAMPLES"
+        --batchsize "$BATCHSIZE"
         --temperature "$TEMPERATURE"
+    )
+    
+    # Handle elements vs remove_radioactive logic
+    if [[ "${ELEMENTS[0]}" == "X" ]]; then
+        echo "Using --remove_radioactive flag (elements=X)"
+        SAMPLE_ARGS+=(--remove_radioactive)
+    else
+        echo "Using elements: ${ELEMENTS[*]}"
+        SAMPLE_ARGS+=(--elements "${ELEMENTS[@]}")
+    fi
+    
+    python ./main.py "${SAMPLE_ARGS[@]}"
     
     if [[ $? -ne 0 ]]; then
         echo "Error: Sampling failed"
