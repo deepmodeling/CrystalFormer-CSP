@@ -195,18 +195,20 @@ else:
         key, subkey = jax.random.split(key)
         G, XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, w_mask, args.top_p, args.temperature)
 
+        print ("G:\n", G)  # spacegroup
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
         print ("W:\n", W)  # Wyckoff positions
         print ("M:\n", M)  # multiplicity 
         print ("N:\n", M.sum(axis=-1)) # total number of atoms
         print ("L:\n", L)  # lattice
-        for a in A:
-           print([element_list[i] for i in a])
+        for g, a in zip(G, A):
+           print(g, [element_list[i] for i in a])
 
-        # output L, X, A, W, M, AW to csv file
-        # output logp_w, logp_xyz, logp_a, logp_l to csv file
+        # output G, L, X, A, W, M, AW to csv file
+        # output logp_g, logp_w, logp_xyz, logp_a, logp_l to csv file
         data = pd.DataFrame()
+        data['G'] = np.array(G).tolist()
         data['L'] = np.array(L).tolist()
         data['X'] = np.array(XYZ).tolist()
         data['A'] = np.array(A).tolist()

@@ -71,7 +71,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
         # (0) G 
         g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230)
         key, subkey = jax.random.split(key)
-        G = sample_top_p(subkey, g_logit, top_p, temperature)
+        G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
 
         # (1) W 
         w_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[1][:, 5*i] # (batchsize, output_size)

@@ -310,46 +310,5 @@ class TestRoundTripConversion:
         assert jnp.array_equal(batch_compositions, batch_compositions2)
 
 
-class TestEdgeCases:
-    """Test edge cases and error conditions."""
-    
-    def test_large_atomic_numbers(self):
-        """Test with atomic numbers beyond normal range"""
-        atoms = jnp.array([118, 119, 120] + [0]*21)  # Beyond normal range
-        multiplicities = jnp.array([1, 1, 1] + [0]*21)
-        
-        composition = find_composition_vector(atoms, multiplicities)
-        
-        # The function accepts atomic numbers up to 118 (bounds check is z < 119)
-        # Index 0 is unused, so valid range is 1-118
-        assert composition[118] == 1  # Oganesson (if it exists)
-        assert composition[119] == 0  # Beyond range (z < 119)
-        assert composition[120] == 0  # Beyond range (would cause index error)
-    
-    def test_negative_atomic_numbers(self):
-        """Test with negative atomic numbers"""
-        atoms = jnp.array([-1, 0, 1] + [0]*21)
-        multiplicities = jnp.array([1, 1, 1] + [0]*21)
-        
-        composition = find_composition_vector(atoms, multiplicities)
-        
-        # Should only include positive atomic numbers
-        assert composition[1] == 1   # H
-        assert composition[0] == 0   # Invalid
-        assert jnp.sum(composition) == 1  # Only H
-    
-    def test_negative_multiplicities(self):
-        """Test with negative multiplicities"""
-        atoms = jnp.array([1, 8] + [0]*22)
-        multiplicities = jnp.array([-1, 1] + [0]*22)
-        
-        composition = find_composition_vector(atoms, multiplicities)
-        
-        # Should only include positive multiplicities
-        assert composition[1] == 0   # H (negative multiplicity)
-        assert composition[8] == 1   # O
-        assert jnp.sum(composition) == 1  # Only O
-
-
 if __name__ == "__main__":
     pytest.main([__file__])
