@@ -66,12 +66,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
     atom_mask = atom_mask.at[0].set(1) # mask = 1 for allowed elements
        
     def body_fn(i, state):
-        key, G, W, A, X, Y, Z, L = state 
-
-        # (0) G 
-        g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230)
-        key, subkey = jax.random.split(key)
-        G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
+        key, W, A, X, Y, Z, L = state 
 
         # (1) W 
         w_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[1][:, 5*i] # (batchsize, output_size)
@@ -135,7 +130,7 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
         z = xyz[:, 2]
         Z = Z.at[:, i].set(z)
 
-        return key, G, W, A, X, Y, Z, L
+        return key, W, A, X, Y, Z, L
         
     # we waste computation time by always working with the maximum length sequence, but we save compilation time
     G = jnp.zeros((batchsize,), dtype=int)
@@ -145,8 +140,13 @@ def sample_crystal(key, transformer, params, n_max, batchsize, atom_types, wyck_
     Y = jnp.zeros((batchsize, n_max))
     Z = jnp.zeros((batchsize, n_max))
     L = jnp.zeros((batchsize, n_max, Kl+2*6*Kl)) # we accumulate lattice params and sample lattice after
+    
+    #start from sampling the space group
+    g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230)
+    key, subkey = jax.random.split(key)
+    G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
 
-    key, G, W, A, X, Y, Z, L = jax.lax.fori_loop(0, n_max, body_fn, (key, G, W, A, X, Y, Z, L))
+    key, W, A, X, Y, Z, L = jax.lax.fori_loop(0, n_max, body_fn, (key, W, A, X, Y, Z, L))
 
     @jax.vmap
     def lookup(g, w):
