@@ -74,6 +74,9 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     job += '''
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
+
+cd /home/user_wanglei/private/homefile/crystal_gpt/
+echo Current working directory is `pwd`
 echo "The current job ID is $SLURM_JOB_ID"
 echo List of CUDA devices: $CUDA_VISIBLE_DEVICES
 echo "Running on $SLURM_JOB_NUM_NODES nodes:"

@@ -60,7 +60,7 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
 
         g_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                   jax.nn.gelu,
-                                  hk.Linear(embed_size, w_init=initializer)]
+                                  hk.Linear(230, w_init=initializer)]
                                   )(c_embeddings)
         # normalization
         g_logit -= jax.scipy.special.logsumexp(g_logit) # (230, )

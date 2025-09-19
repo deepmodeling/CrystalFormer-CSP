@@ -68,7 +68,7 @@ if __name__=='__main__':
     elif input.mode == 'pretrain':
         print ("pretrain mode")
                 
-        prog = 'python /home/user_wanglei/private/homefile/crystal_gpt/main.py'
+        prog = 'python main.py'
 
         args = {'n_max':n_max,
                         'atom_types': atom_types,
