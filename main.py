@@ -231,7 +231,6 @@ else:
         data['logp'] = np.array(logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l).tolist()
 
         data = data.sort_values(by='logp', ascending=False) # sort by logp
-        header = False if os.path.exists(filename) else True
-        data.to_csv(filename, mode='a', index=False, header=header)
+        data.to_csv(filename, mode='w', index=False, header=True)
 
         print ("Wrote samples to %s"%filename)

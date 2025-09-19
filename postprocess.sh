@@ -8,16 +8,24 @@ set -e  # Exit on any error
 
 # Default configuration
 DEFAULT_BASE_DATA_PATH="/home/user_wanglei/private/datafile/crystalgpt"
-DEFAULT_RESTORE_PATH="${DEFAULT_BASE_DATA_PATH}/firsttry-Si-167/csp-17274/ppo_5_beta_0_adam_bs_500_lr_1e-05_decay_0_clip_1_A_119_W_28_N_21_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1"
+DEFAULT_RESTORE_PATH="${DEFAULT_BASE_DATA_PATH}/csp/csp-85ed6/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_4_H_8_k_32_m_64_e_32_drop_0.3_0.1/"
 DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v2-20241011.ckpt"
 DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2"
-DEFAULT_ELEMENTS=("Si")
-DEFAULT_SPACEGROUP="167"
+DEFAULT_FORMULA="H2O"
 DEFAULT_NUM_SAMPLES="1000"
 DEFAULT_BATCHSIZE="1000"
 DEFAULT_TEMPERATURE="1.0"
 DEFAULT_NUM_IO_PROCESS="20"
-DEFAULT_EPOCH="epoch_005515.pkl"
+DEFAULT_EPOCH="epoch_000700.pkl"
+DEFAULT_NF="5"
+DEFAULT_KX="16"
+DEFAULT_KL="4"
+DEFAULT_H0_SIZE="256"
+DEFAULT_TRANSFORMER_LAYERS="4"
+DEFAULT_NUM_HEADS="8"
+DEFAULT_KEY_SIZE="32"
+DEFAULT_MODEL_SIZE="64"
+DEFAULT_EMBED_SIZE="32"
 
 # Function to display usage
 usage() {
@@ -27,14 +35,21 @@ usage() {
     echo "  -r, --restore-path PATH     Base restore path (default: $DEFAULT_RESTORE_PATH)"
     echo "  -m, --model-path PATH       Model checkpoint path (default: $DEFAULT_MODEL_PATH)"
     echo "  -c, --convex-hull PATH      Convex hull path (default: $DEFAULT_CONVEX_HULL_PATH)"
-    echo "  -e, --elements ELEMENTS     Elements, can specify multiple (default: ${DEFAULT_ELEMENTS[*]})"
-    echo "                              Special case: use 'X' to enable --remove_radioactive flag"
-    echo "  -s, --spacegroup GROUP      Space group (default: $DEFAULT_SPACEGROUP)"
+    echo "  -f, --formula FORMULA       Formula (default: ${DEFAULT_FORMULA})"
     echo "  -n, --num-samples NUM       Number of samples (default: $DEFAULT_NUM_SAMPLES)"
     echo "  -b, --batchsize SIZE        Batch size (default: $DEFAULT_BATCHSIZE)"
     echo "  -t, --temperature TEMP      Temperature (default: $DEFAULT_TEMPERATURE)"
     echo "  -p, --num-io-process NUM    Number of IO processes (default: $DEFAULT_NUM_IO_PROCESS)"
     echo "  -k, --epoch EPOCH           Epoch file (default: $DEFAULT_EPOCH)"
+    echo "  --Nf NF                     Nf parameter (default: $DEFAULT_NF)"
+    echo "  --Kx KX                     Kx parameter (default: $DEFAULT_KX)"
+    echo "  --Kl KL                     Kl parameter (default: $DEFAULT_KL)"
+    echo "  --h0-size H0_SIZE           H0 size parameter (default: $DEFAULT_H0_SIZE)"
+    echo "  --transformer-layers LAYERS Transformer layers (default: $DEFAULT_TRANSFORMER_LAYERS)"
+    echo "  --num-heads HEADS           Number of heads (default: $DEFAULT_NUM_HEADS)"
+    echo "  --key-size SIZE             Key size (default: $DEFAULT_KEY_SIZE)"
+    echo "  --model-size SIZE           Model size (default: $DEFAULT_MODEL_SIZE)"
+    echo "  --embed-size SIZE           Embed size (default: $DEFAULT_EMBED_SIZE)"
     echo "  --skip-sample               Skip the sampling step"
     echo "  --skip-convert              Skip the structure conversion step"
     echo "  --skip-energy               Skip the energy computation step"
@@ -42,22 +57,28 @@ usage() {
     echo "  -h, --help                  Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 -r /path/to/restore -e Si -s 167"
-    echo "  $0 -e C Si -s 167  # Multiple elements"
-    echo "  $0 -e X -s 167     # Use --remove_radioactive flag"
+    echo "  $0 -r /path/to/restore -f H2O"
 }
 
 # Parse command line arguments
 RESTORE_PATH="$DEFAULT_RESTORE_PATH"
 MODEL_PATH="$DEFAULT_MODEL_PATH"
 CONVEX_HULL_PATH="$DEFAULT_CONVEX_HULL_PATH"
-ELEMENTS=("${DEFAULT_ELEMENTS[@]}")
-SPACEGROUP="$DEFAULT_SPACEGROUP"
+FORMULA="$DEFAULT_FORMULA"
 NUM_SAMPLES="$DEFAULT_NUM_SAMPLES"
 BATCHSIZE="$DEFAULT_BATCHSIZE"
 TEMPERATURE="$DEFAULT_TEMPERATURE"
 NUM_IO_PROCESS="$DEFAULT_NUM_IO_PROCESS"
 EPOCH="$DEFAULT_EPOCH"
+NF="$DEFAULT_NF"
+KX="$DEFAULT_KX"
+KL="$DEFAULT_KL"
+H0_SIZE="$DEFAULT_H0_SIZE"
+TRANSFORMER_LAYERS="$DEFAULT_TRANSFORMER_LAYERS"
+NUM_HEADS="$DEFAULT_NUM_HEADS"
+KEY_SIZE="$DEFAULT_KEY_SIZE"
+MODEL_SIZE="$DEFAULT_MODEL_SIZE"
+EMBED_SIZE="$DEFAULT_EMBED_SIZE"
 SKIP_SAMPLE=false
 SKIP_CONVERT=false
 SKIP_ENERGY=false
@@ -77,17 +98,8 @@ while [[ $# -gt 0 ]]; do
             CONVEX_HULL_PATH="$2"
             shift 2
             ;;
-        -e|--elements)
-            ELEMENTS=()
-            shift
-            # Collect all elements until we hit another option or end of arguments
-            while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
-                ELEMENTS+=("$1")
-                shift
-            done
-            ;;
-        -s|--spacegroup)
-            SPACEGROUP="$2"
+        -f|--formula)
+            FORMULA="$2"
             shift 2
             ;;
         -n|--num-samples)
@@ -108,6 +120,42 @@ while [[ $# -gt 0 ]]; do
             ;;
         -k|--epoch)
             EPOCH="$2"
+            shift 2
+            ;;
+        --Nf)
+            NF="$2"
+            shift 2
+            ;;
+        --Kx)
+            KX="$2"
+            shift 2
+            ;;
+        --Kl)
+            KL="$2"
+            shift 2
+            ;;
+        --h0-size)
+            H0_SIZE="$2"
+            shift 2
+            ;;
+        --transformer-layers)
+            TRANSFORMER_LAYERS="$2"
+            shift 2
+            ;;
+        --num-heads)
+            NUM_HEADS="$2"
+            shift 2
+            ;;
+        --key-size)
+            KEY_SIZE="$2"
+            shift 2
+            ;;
+        --model-size)
+            MODEL_SIZE="$2"
+            shift 2
+            ;;
+        --embed-size)
+            EMBED_SIZE="$2"
             shift 2
             ;;
         --skip-sample)
@@ -156,15 +204,14 @@ fi
 
 # Construct full paths
 EPOCH_PATH="${RESTORE_PATH}/${EPOCH}"
-OUTPUT_STRUCT_FILE="output_${SPACEGROUP}_struct.csv"
+OUTPUT_STRUCT_FILE="output_${FORMULA}_struct.csv"
 RELAXED_STRUCT_FILE="relaxed_structures.csv"
 
 echo "=== CrystalGPT Postprocessing Pipeline ==="
 echo "Restore path: $RESTORE_PATH"
 echo "Model path: $MODEL_PATH"
 echo "Convex hull path: $CONVEX_HULL_PATH"
-echo "Elements: ${ELEMENTS[*]}"
-echo "Space group: $SPACEGROUP"
+echo "Formula: $FORMULA"
 echo "Number of samples: $NUM_SAMPLES"
 echo "Batch size: $BATCHSIZE"
 echo "Temperature: $TEMPERATURE"
@@ -180,22 +227,22 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
     SAMPLE_ARGS=(
         --optimizer none
         --restore_path "$EPOCH_PATH"
-        --spacegroup "$SPACEGROUP"
         --num_samples "$NUM_SAMPLES"
         --batchsize "$BATCHSIZE"
+        --formula "$FORMULA"
         --temperature "$TEMPERATURE"
+        --Nf "$NF"
+        --Kx "$KX"
+        --Kl "$KL"
+        --h0_size "$H0_SIZE"
+        --transformer_layers "$TRANSFORMER_LAYERS"
+        --num_heads "$NUM_HEADS"
+        --key_size "$KEY_SIZE"
+        --model_size "$MODEL_SIZE"
+        --embed_size "$EMBED_SIZE"
     )
     
-    # Handle elements vs remove_radioactive logic
-    if [[ "${ELEMENTS[0]}" == "X" ]]; then
-        echo "Using --remove_radioactive flag (elements=X)"
-        SAMPLE_ARGS+=(--remove_radioactive)
-    else
-        echo "Using elements: ${ELEMENTS[*]}"
-        SAMPLE_ARGS+=(--elements "${ELEMENTS[@]}")
-    fi
-    
-    python ./main.py "${SAMPLE_ARGS[@]}"
+    python ./main.py "${SAMPLE_ARGS[@]}" 
     
     if [[ $? -ne 0 ]]; then
         echo "Error: Sampling failed"
@@ -210,9 +257,10 @@ fi
 if [[ "$SKIP_CONVERT" == false ]]; then
     echo ""
     echo "Step 2: Converting structures..."
+
     python ./scripts/awl2struct.py \
         --output_path "$RESTORE_PATH/" \
-        --label "$SPACEGROUP" \
+        --formula "$FORMULA" \
         --num_io_process "$NUM_IO_PROCESS"
     
     if [[ $? -ne 0 ]]; then
@@ -228,6 +276,7 @@ fi
 if [[ "$SKIP_ENERGY" == false ]]; then
     echo ""
     echo "Step 3: Computing energy..."
+
     python ./scripts/mlff_relax.py \
         --restore_path "$RESTORE_PATH/" \
         --filename "$OUTPUT_STRUCT_FILE" \
@@ -247,11 +296,11 @@ fi
 if [[ "$SKIP_EHULL" == false ]]; then
     echo ""
     echo "Step 4: Computing e-hull..."
+
     python ./scripts/e_above_hull_alex.py \
         --convex_path "$CONVEX_HULL_PATH" \
         --restore_path "$RESTORE_PATH/" \
-        --filename "$RELAXED_STRUCT_FILE" \
-        --label "$SPACEGROUP"
+        --filename "$RELAXED_STRUCT_FILE" 
     
     if [[ $? -ne 0 ]]; then
         echo "Error: E-hull computation failed"

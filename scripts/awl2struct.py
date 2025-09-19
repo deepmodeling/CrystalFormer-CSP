@@ -83,16 +83,16 @@ def get_struct_from_lawx(G, L, A, W, X):
 
 
 def main(args):
-    if args.label is not None:
-        input_path = args.output_path + f'output_{args.label}.csv'
-        output_path = args.output_path + f'output_{args.label}_struct.csv'
+    if args.formula is not None:
+        input_path = args.output_path + f'output_{args.formula}.csv'
+        output_path = args.output_path + f'output_{args.formula}_struct.csv'
     else:
         input_path = args.output_path + f'output.csv'
         output_path = args.output_path + f'output_struct.csv'
 
     origin_data = pd.read_csv(input_path)
 
-    L,X,A,W = origin_data['L'],origin_data['X'],origin_data['A'],origin_data['W']
+    G,L,X,A,W = origin_data['G'], origin_data['L'],origin_data['X'],origin_data['A'],origin_data['W']
     L = L.apply(lambda x: literal_eval(x))
     X = X.apply(lambda x: literal_eval(x))
     A = A.apply(lambda x: literal_eval(x))
@@ -100,17 +100,12 @@ def main(args):
     # M = M.apply(lambda x: literal_eval(x))
 
     # convert array of list to numpy ndarray
+    G = np.array(G.tolist())
     L = np.array(L.tolist())
     X = np.array(X.tolist())
     A = np.array(A.tolist())
     W = np.array(W.tolist())
     print(L.shape,X.shape,A.shape,W.shape)
-
-    if args.label is None:
-        G = origin_data['G']
-        G = np.array(G.tolist())
-    else:
-        G = np.array([int(args.label) for _ in range(len(L))])
 
     ### Multiprocessing. Use it if only run on CPU
     p = multiprocessing.Pool(args.num_io_process)
@@ -125,7 +120,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--output_path', default='./', help='filepath of the output and input file')
-    parser.add_argument('--label', default=None, help='output file label')
+    parser.add_argument('--formula', type=str, help='formula')
     parser.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
     args = parser.parse_args()
     main(args)

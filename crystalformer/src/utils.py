@@ -237,7 +237,7 @@ if __name__=='__main__':
     import numpy as np 
     np.set_printoptions(threshold=np.inf)
     
-    csv_file = '../data/mini.csv'
+    csv_file = '../../data/mini.csv'
     #csv_file = '/home/wanglei/cdvae/data/carbon_24/val.csv'
     #csv_file = '/home/wanglei/cdvae/data/perov_5/val.csv'
     #csv_file = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/train.csv'
@@ -269,12 +269,5 @@ if __name__=='__main__':
 
         print (formula)
         print (composition[i])
-
-
-
-
-
-
-
 
 

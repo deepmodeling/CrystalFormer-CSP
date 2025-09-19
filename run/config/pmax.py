@@ -3,16 +3,19 @@ import numpy as np
 import time 
 
 nickname = 'csp'
+resfolder = '/home/user_wanglei/private/datafile/crystalgpt/' + nickname  + '/' 
 
 ###############################
+n_max = 21
+wyck_types = 28
 atom_types = 119
 
 Nf = 5
 Kx, Kl = 16, 4
 h0_size = 256
-transformer_layers = 4
-num_heads = 8
-key_size = 32
+transformer_layers = 8
+num_heads = 16
+key_size = 64
 model_size = 64
 embed_size = 32
 dropout_rate = 0.3
@@ -28,9 +31,6 @@ epochs = 10000
 lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
 
 num_io_process = 20
-
-n_max = 21
-wyck_types = 28
 
 mp20_folder = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/'
 train_path = mp20_folder+'/train.csv'
@@ -50,8 +50,6 @@ convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/co
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 
 ###############################
-prog = 'train_ppo'
-resfolder = '/home/user_wanglei/private/datafile/crystalgpt/' + nickname  + '/' 
 
 def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
