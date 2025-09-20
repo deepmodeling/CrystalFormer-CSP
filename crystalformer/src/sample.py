@@ -60,13 +60,13 @@ def sample_x(key, h_x, Kx, top_p, temperature, batchsize):
     return key, x 
 
 
-def make_sample_crystal(transformer, n_max, batchsize, atom_types, wyck_types, Kx, Kl, composition, w_mask, top_p,         temperature):
+def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, composition, w_mask, top_p, temperature):
 
-    @partial(jax.jit)
-    def sample_crystal(key, params):
+    atom_mask = jnp.where(composition>0, jnp.ones((atom_types)), jnp.zeros((atom_types)))
+    atom_mask = atom_mask.at[0].set(1) # mask = 1 for allowed elements
 
-        atom_mask = jnp.where(composition>0, jnp.ones((atom_types)), jnp.zeros((atom_types)))
-        atom_mask = atom_mask.at[0].set(1) # mask = 1 for allowed elements
+    @partial(jax.jit, static_argnums=2)
+    def sample_crystal(key, params, batchsize):
            
         def body_fn(i, state):
             key, W, A, X, Y, Z, L = state 

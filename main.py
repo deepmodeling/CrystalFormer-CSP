@@ -181,7 +181,7 @@ else:
     print ('composition vector of', args.formula)
     print (composition)
 
-    sample_crystal = make_sample_crystal(transformer, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, w_mask, args.top_p, args.temperature)
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, w_mask, args.top_p, args.temperature)
 
     if args.seed is not None:
         key = jax.random.PRNGKey(args.seed) # reset key for sampling if seed is provided
@@ -195,7 +195,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        G, XYZ, A, W, M, L = sample_crystal(subkey, params)
+        G, XYZ, A, W, M, L = sample_crystal(subkey, params, n_sample)
 
         print ("G:\n", G)  # spacegroup
         print ("XYZ:\n", XYZ)  # fractional coordinate 

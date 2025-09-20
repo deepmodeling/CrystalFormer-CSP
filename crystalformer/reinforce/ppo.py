@@ -72,7 +72,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
         key, subkey = jax.random.split(key)
-        G, XYZ, A, W, _, L = sample_crystal(subkey, params)
+        G, XYZ, A, W, _, L = sample_crystal(subkey, params, batchsize)
 
         x = (G, L, XYZ, A, W)
         rewards = - batch_reward_fn(x)  # ppo maximize this reward

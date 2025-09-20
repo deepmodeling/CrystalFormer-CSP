@@ -214,7 +214,7 @@ def main():
 
     print("\n========== Load sample function ==========")
 
-    sample_crystal = make_sample_crystal(transformer, args.n_max, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, None, args.top_p, args.temperature)
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, None, args.top_p, args.temperature)
 
     print("\n========== Start RL training ==========")
     ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
