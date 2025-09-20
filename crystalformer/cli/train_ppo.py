@@ -11,11 +11,11 @@ warnings.filterwarnings("ignore")
 from crystalformer.src.utils import GLXYZAW_from_file
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
+from crystalformer.src.sample import make_sample_crystal
+from crystalformer.src.formula import formula_string_to_composition_vector
 import crystalformer.src.checkpoint as checkpoint
 
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
-from crystalformer.reinforce.sample import make_sample_crystal
-
 
 def main():
     import argparse
@@ -33,9 +33,6 @@ def main():
     group.add_argument("--folder", default="./data/", help="the folder to save data")
     group.add_argument("--restore_path", default=None, help="checkpoint path or file")
 
-    group = parser.add_argument_group('dataset')
-    group.add_argument('--valid_path', default=None, help='')
-    group.add_argument('--test_path', default=None, help='dataset to get the space group distribution')
     group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 
     group = parser.add_argument_group('transformer parameters')
@@ -57,13 +54,11 @@ def main():
     group.add_argument('--wyck_types', type=int, default=28, help='Number of possible multiplicites including 0')
 
     group = parser.add_argument_group('sampling parameters')
-    group.add_argument('--elements', type=str, default=None, nargs='+', help='name of the chemical elemenets seperated by spaces, e.g. Bi Ti O')
-    group.add_argument('--remove_radioactive', action='store_true', help='remove radioactive elements and noble gas')
+    group.add_argument('--formula', type=str, default=None, help='chemical formula of the compound')
     group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
     group = parser.add_argument_group('reinforcement learning parameters')
-    group.add_argument('--spacegroup', default=None, nargs='+', help='the number of spacegroups to sample from')
     group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
     group.add_argument('--convex_path', type=str, default='/data/zdcao/crystal_gpt/dataset/alex/PBE/convex_hull_pbe_2023.12.29.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
@@ -79,64 +74,11 @@ def main():
 
     args = parser.parse_args()
     
-    if args.valid_path is not None:
-        print("\n========== Load validation dataset ==========")
-        valid_data = GLXYZAW_from_file(args.valid_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
-    else:
-        valid_data = None
-
     print("================ parameters ================")
     # print all the parameters
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
 
-    ################### Data #############################
-    try:
-        print("\n========== Load test dataset and get space group distribution =========")
-        test_data = GLXYZAW_from_file(args.test_path, args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
-        G = test_data[0]
-        # convert space group to probability table
-        spg_mask = jnp.bincount(G, minlength=231)
-        spg_mask = spg_mask[1:] # remove 0
-    except:
-        print("\n====== Failed to load test dataset ======")
-        if args.spacegroup is not None:
-            print("Spacegroup specified, will sample from the specified spacegroups")
-            spg_mask = jnp.zeros((230), dtype=int)
-            for g in args.spacegroup:
-                spg_mask = spg_mask.at[int(g)-1].set(1)
-            
-        else:
-            print("No spacegroup specified, will sample from all spacegroups")
-            spg_mask = jnp.ones((230), dtype=int)
-
-    print("spacegroup mask", spg_mask)
-
-    if args.elements is not None:
-        from crystalformer.src.elements import element_dict
-        idx = [element_dict[e] for e in args.elements]
-        atom_mask = [1] + [1 if a in idx else 0 for a in range(1, args.atom_types)]
-        atom_mask = jnp.array(atom_mask)
-        atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-        print ('sampling structure formed by these elements:', args.elements)
-        print (atom_mask)
-
-    else:
-
-        if args.remove_radioactive:
-            from crystalformer.src.elements import radioactive_elements_dict, noble_gas_dict
-            # remove radioactive elements and noble gas
-            atom_mask = [1] + [1 if i not in radioactive_elements_dict.values() and i not in noble_gas_dict.values() else 0 for i in range(1, args.atom_types)]
-            atom_mask = jnp.array(atom_mask)
-            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-            print('sampling structure formed by non-radioactive elements and non-noble gas')
-                
-        else:
-            atom_mask = jnp.zeros((args.atom_types), dtype=int) # we will do nothing to a_logit in sampling
-            atom_mask = jnp.stack([atom_mask] * args.n_max, axis=0)
-            print('sampling structure formed by all elements')
-
-    print("atom_mask", atom_mask)
 
     print("\n========== Prepare transformer ==========")
     ################### Model #############################
@@ -152,13 +94,17 @@ def main():
 
     print ("# of transformer params", ravel_pytree(params)[0].size) 
 
+    composition = formula_string_to_composition_vector(args.formula)
+    print ('composition vector of', args.formula)
+    print (composition)
+
     ################### Train #############################
 
     loss_fn, logp_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
 
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "ppo_%d_beta_%g_" % (args.ppo_epochs, args.beta) \
+        output_path = args.folder + "%s_ppo_%d_beta_%g_" % (args.formula, args.ppo_epochs, args.beta) \
                     + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                     + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -266,16 +212,16 @@ def main():
     else:
         raise NotImplementedError
 
-    print("\n========== Load partial sample function ==========")
-    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl)
-    partial_sample_crystal = partial(sample_crystal, atom_mask=atom_mask, top_p=args.top_p, temperature=args.temperature)
+    print("\n========== Load sample function ==========")
+
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.batchsize, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, None, args.top_p, args.temperature)
 
     print("\n========== Start RL training ==========")
     ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
     # PPO training
-    params, opt_state = train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, partial_sample_crystal,
-                                params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, valid_data, output_path)
+    params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
+                                params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
 
 
 if __name__ == "__main__":

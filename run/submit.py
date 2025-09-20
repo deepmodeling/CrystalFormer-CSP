@@ -5,7 +5,7 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", action='store_true', help="Run or not")
-    parser.add_argument('--mode', type=str, default='pretrain', choices=['pretrain', 'finetune'], help='')
+    parser.add_argument('--mode', type=str, default=None, choices=['pretrain', 'finetune'], help='')
     parser.add_argument("--waitfor", type=int, help="wait for this job for finish")
     input = parser.parse_args()
 
@@ -43,47 +43,50 @@ if __name__=='__main__':
 
     cmd = ['mkdir', '-p', resfolder]
     subprocess.check_call(cmd)
+
+    # Base arguments common to all modes
+    args = {'n_max':n_max,
+                    'atom_types': atom_types,
+                    'wyck_types': wyck_types,
+                    'folder':resfolder,
+                    'Nf':Nf,
+                    'Kx':Kx,
+                    'Kl':Kl,
+                    'h0_size': h0_size,
+                    'transformer_layers':transformer_layers,
+                    'num_heads':num_heads,
+                    'key_size':key_size,
+                    'model_size':model_size,
+                    'embed_size':embed_size
+                    }
     
     if input.mode == 'finetune':
         print ("rl finetune  mode")
 
         prog = 'train_ppo'
 
-        args = {
+        # Extend args with finetune-specific parameters
+        args.update({
                         'epochs':epochs, 
                         'batchsize':batchsize, 
                         'lr':lr, 
-                        'n_max':n_max,
-                        'folder':resfolder,
                         'reward': reward, 
-                        'elements': elements, 
-                        'spacegroup': spacegroup, 
+                        'formula': formula, 
                         'mlff_model': mlff_model, 
                         'restore_path': restore_path, 
                         'convex_path': convex_path, 
                         'mlff_path': mlff_path, 
-                        'beta':beta
-                        }
+                        'beta':beta, 
+                        'dropout_rate' : finetune_dropout_rate
+                        })
 
     elif input.mode == 'pretrain':
         print ("pretrain mode")
                 
         prog = 'python main.py'
 
-        args = {'n_max':n_max,
-                        'atom_types': atom_types,
-                        'wyck_types': wyck_types,
-                        'folder':resfolder,
-                        'Nf':Nf,
-                        'Kx':Kx,
-                        'Kl':Kl,
-                        'h0_size': h0_size,
-                        'transformer_layers':transformer_layers,
-                        'num_heads':num_heads,
-                        'key_size':key_size,
-                        'model_size':model_size,
-                        'embed_size':embed_size,
-                        'lr':lr,
+        # Extend args with pretrain-specific parameters
+        args.update({        'lr':lr,
                         'lr_decay': lr_decay,
                         'weight_decay': weight_decay,
                         'clip_grad': clip_grad,
@@ -93,14 +96,15 @@ if __name__=='__main__':
                         'train_path' : train_path,
                         'valid_path' : valid_path,
                         'test_path' : test_path,
-                        'dropout_rate' : dropout_rate,
+                        'dropout_rate' : pretrain_dropout_rate,
                         'num_io_process' : num_io_process,
                         'lamb_a': lamb_a,
                         'lamb_w': lamb_w,
                         'lamb_l': lamb_l,
-                        }
+                        })
 
-
+    else:
+        raise ValueError(f"Invalid mode '{input.mode}'. Must be one of: {['pretrain', 'finetune']}")
 
     logname = jobdir 
     for arg, value in args.items():

@@ -18,7 +18,9 @@ num_heads = 16
 key_size = 64
 model_size = 64
 embed_size = 32
-dropout_rate = 0.3
+
+pretrain_dropout_rate = 0.3
+finetune_dropout_rate = 0.0
 
 optimizer = 'adam'
 weight_decay = 0.0 
@@ -38,14 +40,13 @@ valid_path = mp20_folder+'/val.csv'
 test_path = mp20_folder+'/test.csv'
 
 ###############################
-num_io_process = 20
 
 reward='ehull'
 mlff_model='orb'
 beta = 0.0
+formula = 'H2O'
 
-#restore_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20'
-restore_path=None
+restore_path='~/private/datafile/crystalgpt/csp/csp-5cf65/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_64_l_8_H_16_k_64_m_64_e_32_drop_0.3_0.1/epoch_000500.pkl'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 

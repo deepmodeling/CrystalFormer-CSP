@@ -20,8 +20,8 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
     def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
-        logp = logp_w + logp_xyz + logp_a + logp_l
+        logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
+        logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
 
         kl_loss = logp - pretrain_logp
         advantages = advantages - beta * kl_loss
@@ -41,7 +41,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, valid_data, path):
+def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     num_devices = jax.local_device_count()
     batch_per_device = batchsize // num_devices
@@ -63,10 +63,7 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        if valid_data is not None:
-            f.write("epoch f_mean f_err v_loss v_loss_w v_loss_a v_loss_xyz v_loss_l\n")
-        else:
-            f.write("epoch f_mean f_err f_min f_max\n")
+        f.write("epoch f_mean f_err f_min f_max\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -74,12 +71,8 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
     
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
-        key, subkey1, subkey2 = jax.random.split(key, 3)
-        G = jax.random.choice(subkey1,
-                              a=jnp.arange(1, 231, 1),
-                              p=spg_mask,
-                              shape=(batchsize, ))
-        XYZ, A, W, _, L = sample_crystal(subkey2, params, G)
+        key, subkey = jax.random.split(key)
+        G, XYZ, A, W, _, L = sample_crystal(subkey, params)
 
         x = (G, L, XYZ, A, W)
         rewards = - batch_reward_fn(x)  # ppo maximize this reward
@@ -92,21 +85,18 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
         baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
         
-        if valid_data is not None:
-            f.write( ("%6d" + 2*"  %.6f") % (epoch, f_mean, f_err))
-        else:
-            f.write( ("%6d" + 4*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max))
+        f.write( ("%6d" + 4*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max))
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
-        old_logp = logp_w + logp_xyz + logp_a + logp_l
+        logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
+        old_logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
 
-        logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
-        pretrain_logp = logp_w + logp_xyz + logp_a + logp_l
+        logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
+        pretrain_logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
 
         x = jax.tree_util.tree_map(lambda _x: _x.reshape(shape_prefix + _x.shape[1:]), x)
         old_logp = old_logp.reshape(shape_prefix + old_logp.shape[1:])
@@ -118,35 +108,6 @@ def train(key, optimizer, opt_state, spg_mask, loss_fn, logp_fn, batch_reward_fn
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss) = value
             #print(f"epoch {epoch}, loss {jnp.mean(ppo_loss):.6f} {jnp.mean(kl_loss):.6f}")
-        
-        if valid_data is not None:
-            valid_loss = 0.0 
-            valid_aux = 0.0, 0.0, 0.0, 0.0
-            num_samples = len(valid_data[0])
-            num_batches = math.ceil(num_samples / batchsize)
-            for batch_idx in range(num_batches):
-                start_idx = batch_idx * batchsize
-                end_idx = min(start_idx + batchsize, num_samples)
-                batch_data = jax.tree_util.tree_map(lambda x: x[start_idx:end_idx], valid_data)
-
-                key, subkey = jax.random.split(key)
-                loss, aux = loss_fn(params, subkey, *batch_data, False)
-                valid_loss, valid_aux = jax.tree_util.tree_map(
-                        lambda acc, i: acc + i,
-                        (valid_loss, valid_aux), 
-                        (loss, aux)
-                        )
-
-            valid_loss, valid_aux = jax.tree_util.tree_map(
-                        lambda x: x/num_batches, 
-                        (valid_loss, valid_aux)
-                        ) 
-            valid_loss_w, valid_loss_a, valid_loss_xyz, valid_loss_l = valid_aux
-            f.write( (5*"  %.6f" + "\n") % (valid_loss,
-                                            valid_loss_w, 
-                                            valid_loss_a, 
-                                            valid_loss_xyz, 
-                                            valid_loss_l))
 
         if epoch % 10 == 0:
             ckpt = {"params": params,

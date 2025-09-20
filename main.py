@@ -13,7 +13,7 @@ from crystalformer.src.utils import GLXYZAW_from_file, letter_to_number
 from crystalformer.src.elements import element_dict, element_list
 from crystalformer.src.transformer import make_transformer  
 from crystalformer.src.train import train
-from crystalformer.src.sample import sample_crystal
+from crystalformer.src.sample import make_sample_crystal
 from crystalformer.src.loss import make_loss_fn
 import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.wyckoff import mult_table
@@ -181,6 +181,8 @@ else:
     print ('composition vector of', args.formula)
     print (composition)
 
+    sample_crystal = make_sample_crystal(transformer, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, w_mask, args.top_p, args.temperature)
+
     if args.seed is not None:
         key = jax.random.PRNGKey(args.seed) # reset key for sampling if seed is provided
 
@@ -193,7 +195,7 @@ else:
         end_idx = min(start_idx + args.batchsize, args.num_samples)
         n_sample = end_idx - start_idx
         key, subkey = jax.random.split(key)
-        G, XYZ, A, W, M, L = sample_crystal(subkey, transformer, params, args.n_max, n_sample, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, w_mask, args.top_p, args.temperature)
+        G, XYZ, A, W, M, L = sample_crystal(subkey, params)
 
         print ("G:\n", G)  # spacegroup
         print ("XYZ:\n", XYZ)  # fractional coordinate 
