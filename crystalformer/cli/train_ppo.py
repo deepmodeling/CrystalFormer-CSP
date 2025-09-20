@@ -214,14 +214,14 @@ def main():
 
     print("\n========== Load sample function ==========")
 
-    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, composition, None, args.top_p, args.temperature)
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature)
 
     print("\n========== Start RL training ==========")
     ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                                params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
+                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
 
 
 if __name__ == "__main__":

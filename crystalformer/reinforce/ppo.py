@@ -41,7 +41,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
+def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, composition, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     num_devices = jax.local_device_count()
     batch_per_device = batchsize // num_devices
@@ -72,7 +72,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
         key, subkey = jax.random.split(key)
-        G, XYZ, A, W, _, L = sample_crystal(subkey, params, batchsize)
+        G, XYZ, A, W, _, L = sample_crystal(subkey, params, batchsize, composition)
 
         x = (G, L, XYZ, A, W)
         rewards = - batch_reward_fn(x)  # ppo maximize this reward
