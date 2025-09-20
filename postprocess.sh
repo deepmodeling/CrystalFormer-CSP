@@ -26,6 +26,7 @@ DEFAULT_NUM_HEADS="8"
 DEFAULT_KEY_SIZE="32"
 DEFAULT_MODEL_SIZE="64"
 DEFAULT_EMBED_SIZE="32"
+DEFAULT_RELAXATION="true"
 
 # Function to display usage
 usage() {
@@ -44,12 +45,13 @@ usage() {
     echo "  --Nf NF                     Nf parameter (default: $DEFAULT_NF)"
     echo "  --Kx KX                     Kx parameter (default: $DEFAULT_KX)"
     echo "  --Kl KL                     Kl parameter (default: $DEFAULT_KL)"
-    echo "  --h0-size H0_SIZE           H0 size parameter (default: $DEFAULT_H0_SIZE)"
+    echo "  --h0_size H0_SIZE           H0 size parameter (default: $DEFAULT_H0_SIZE)"
     echo "  --transformer-layers LAYERS Transformer layers (default: $DEFAULT_TRANSFORMER_LAYERS)"
-    echo "  --num-heads HEADS           Number of heads (default: $DEFAULT_NUM_HEADS)"
-    echo "  --key-size SIZE             Key size (default: $DEFAULT_KEY_SIZE)"
-    echo "  --model-size SIZE           Model size (default: $DEFAULT_MODEL_SIZE)"
-    echo "  --embed-size SIZE           Embed size (default: $DEFAULT_EMBED_SIZE)"
+    echo "  --num_heads HEADS           Number of heads (default: $DEFAULT_NUM_HEADS)"
+    echo "  --key_size SIZE             Key size (default: $DEFAULT_KEY_SIZE)"
+    echo "  --model_size SIZE           Model size (default: $DEFAULT_MODEL_SIZE)"
+    echo "  --embed_size SIZE           Embed size (default: $DEFAULT_EMBED_SIZE)"
+    echo "  --relaxation RELAXATION     Enable/disable relaxation (default: $DEFAULT_RELAXATION)"
     echo "  --skip-sample               Skip the sampling step"
     echo "  --skip-convert              Skip the structure conversion step"
     echo "  --skip-energy               Skip the energy computation step"
@@ -58,6 +60,8 @@ usage() {
     echo ""
     echo "Example:"
     echo "  $0 -r /path/to/restore -f H2O"
+    echo "  $0 --relaxation false  # Disable relaxation"
+    echo "  $0 --relaxation true   # Enable relaxation (default)"
 }
 
 # Parse command line arguments
@@ -79,6 +83,7 @@ NUM_HEADS="$DEFAULT_NUM_HEADS"
 KEY_SIZE="$DEFAULT_KEY_SIZE"
 MODEL_SIZE="$DEFAULT_MODEL_SIZE"
 EMBED_SIZE="$DEFAULT_EMBED_SIZE"
+RELAXATION="$DEFAULT_RELAXATION"
 SKIP_SAMPLE=false
 SKIP_CONVERT=false
 SKIP_ENERGY=false
@@ -134,28 +139,32 @@ while [[ $# -gt 0 ]]; do
             KL="$2"
             shift 2
             ;;
-        --h0-size)
+        --h0_size)
             H0_SIZE="$2"
             shift 2
             ;;
-        --transformer-layers)
+        --transformer_layers)
             TRANSFORMER_LAYERS="$2"
             shift 2
             ;;
-        --num-heads)
+        --num_heads)
             NUM_HEADS="$2"
             shift 2
             ;;
-        --key-size)
+        --key_size)
             KEY_SIZE="$2"
             shift 2
             ;;
-        --model-size)
+        --model_size)
             MODEL_SIZE="$2"
             shift 2
             ;;
-        --embed-size)
+        --embed_size)
             EMBED_SIZE="$2"
+            shift 2
+            ;;
+        --relaxation)
+            RELAXATION="$2"
             shift 2
             ;;
         --skip-sample)
@@ -277,11 +286,20 @@ if [[ "$SKIP_ENERGY" == false ]]; then
     echo ""
     echo "Step 3: Computing energy..."
 
-    python ./scripts/mlff_relax.py \
-        --restore_path "$RESTORE_PATH/" \
-        --filename "$OUTPUT_STRUCT_FILE" \
-        --model orb \
+    # Build mlff_relax command arguments
+    MLFF_ARGS=(
+        --restore_path "$RESTORE_PATH/"
+        --filename "$OUTPUT_STRUCT_FILE"
+        --model orb
         --model_path "$MODEL_PATH"
+    )
+    
+    # Add relaxation flag if enabled
+    if [[ "$RELAXATION" == "true" ]]; then
+        MLFF_ARGS+=(--relaxation)
+    fi
+    
+    python ./scripts/mlff_relax.py "${MLFF_ARGS[@]}"
     
     if [[ $? -ne 0 ]]; then
         echo "Error: Energy computation failed"
@@ -297,10 +315,19 @@ if [[ "$SKIP_EHULL" == false ]]; then
     echo ""
     echo "Step 4: Computing e-hull..."
 
-    python ./scripts/e_above_hull_alex.py \
-        --convex_path "$CONVEX_HULL_PATH" \
-        --restore_path "$RESTORE_PATH/" \
-        --filename "$RELAXED_STRUCT_FILE" 
+    # Build e_above_hull_alex command arguments
+    EHULL_ARGS=(
+        --convex_path "$CONVEX_HULL_PATH"
+        --restore_path "$RESTORE_PATH/"
+        --filename "$RELAXED_STRUCT_FILE"
+    )
+    
+    # Add relaxation flag if enabled
+    if [[ "$RELAXATION" == "true" ]]; then
+        EHULL_ARGS+=(--relaxation)
+    fi
+    
+    python ./scripts/e_above_hull_alex.py "${EHULL_ARGS[@]}" 
     
     if [[ $? -ne 0 ]]; then
         echo "Error: E-hull computation failed"

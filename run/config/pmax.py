@@ -12,7 +12,7 @@ atom_types = 119
 
 Nf = 5
 Kx, Kl = 16, 4
-h0_size = 256
+h0_size = 64
 transformer_layers = 8
 num_heads = 16
 key_size = 64
@@ -26,7 +26,7 @@ lr = 1e-4
 lr_decay = 0.0
 clip_grad = 1.0
 batchsize = 100
-epochs = 10000
+epochs = 5000
 
 lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
 
