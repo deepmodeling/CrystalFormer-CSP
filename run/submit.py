@@ -67,9 +67,9 @@ if __name__=='__main__':
 
         # Extend args with finetune-specific parameters
         args.update({
-                        'epochs':epochs, 
-                        'batchsize':batchsize, 
-                        'lr':lr, 
+                        'epochs':finetune_epochs, 
+                        'batchsize':finetune_batchsize, 
+                        'lr':finetune_lr, 
                         'reward': reward, 
                         'formula': formula, 
                         'mlff_model': mlff_model, 
@@ -86,12 +86,12 @@ if __name__=='__main__':
         prog = 'python main.py'
 
         # Extend args with pretrain-specific parameters
-        args.update({        'lr':lr,
+        args.update({   'lr':pretrain_lr,
                         'lr_decay': lr_decay,
+                        'epochs': pretrain_epochs, 
                         'weight_decay': weight_decay,
                         'clip_grad': clip_grad,
-                        'batchsize': batchsize,
-                        'epochs': epochs,
+                        'batchsize': pretrain_batchsize,
                         'optimizer': optimizer,
                         'train_path' : train_path,
                         'valid_path' : valid_path,

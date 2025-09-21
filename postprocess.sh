@@ -13,7 +13,6 @@ DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v2-20241011.
 DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2"
 DEFAULT_FORMULA="H2O"
 DEFAULT_NUM_SAMPLES="1000"
-DEFAULT_BATCHSIZE="1000"
 DEFAULT_TEMPERATURE="1.0"
 DEFAULT_NUM_IO_PROCESS="20"
 DEFAULT_EPOCH="epoch_000700.pkl"
@@ -26,7 +25,7 @@ DEFAULT_NUM_HEADS="8"
 DEFAULT_KEY_SIZE="32"
 DEFAULT_MODEL_SIZE="64"
 DEFAULT_EMBED_SIZE="32"
-DEFAULT_RELAXATION="true"
+DEFAULT_RELAXATION="false"
 
 # Function to display usage
 usage() {
@@ -38,7 +37,6 @@ usage() {
     echo "  -c, --convex-hull PATH      Convex hull path (default: $DEFAULT_CONVEX_HULL_PATH)"
     echo "  -f, --formula FORMULA       Formula (default: ${DEFAULT_FORMULA})"
     echo "  -n, --num-samples NUM       Number of samples (default: $DEFAULT_NUM_SAMPLES)"
-    echo "  -b, --batchsize SIZE        Batch size (default: $DEFAULT_BATCHSIZE)"
     echo "  -t, --temperature TEMP      Temperature (default: $DEFAULT_TEMPERATURE)"
     echo "  -p, --num-io-process NUM    Number of IO processes (default: $DEFAULT_NUM_IO_PROCESS)"
     echo "  -k, --epoch EPOCH           Epoch file (default: $DEFAULT_EPOCH)"
@@ -70,7 +68,6 @@ MODEL_PATH="$DEFAULT_MODEL_PATH"
 CONVEX_HULL_PATH="$DEFAULT_CONVEX_HULL_PATH"
 FORMULA="$DEFAULT_FORMULA"
 NUM_SAMPLES="$DEFAULT_NUM_SAMPLES"
-BATCHSIZE="$DEFAULT_BATCHSIZE"
 TEMPERATURE="$DEFAULT_TEMPERATURE"
 NUM_IO_PROCESS="$DEFAULT_NUM_IO_PROCESS"
 EPOCH="$DEFAULT_EPOCH"
@@ -109,10 +106,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -n|--num-samples)
             NUM_SAMPLES="$2"
-            shift 2
-            ;;
-        -b|--batchsize)
-            BATCHSIZE="$2"
             shift 2
             ;;
         -t|--temperature)
@@ -222,7 +215,6 @@ echo "Model path: $MODEL_PATH"
 echo "Convex hull path: $CONVEX_HULL_PATH"
 echo "Formula: $FORMULA"
 echo "Number of samples: $NUM_SAMPLES"
-echo "Batch size: $BATCHSIZE"
 echo "Temperature: $TEMPERATURE"
 echo "Epoch file: $EPOCH"
 echo "=========================================="
@@ -237,7 +229,7 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
         --optimizer none
         --restore_path "$EPOCH_PATH"
         --num_samples "$NUM_SAMPLES"
-        --batchsize "$BATCHSIZE"
+        --batchsize "$NUM_SAMPLES"
         --formula "$FORMULA"
         --temperature "$TEMPERATURE"
         --Nf "$NF"

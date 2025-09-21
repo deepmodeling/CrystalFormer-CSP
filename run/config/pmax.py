@@ -2,8 +2,9 @@ import subprocess
 import numpy as np 
 import time 
 
+dataset = 'alex20'
 nickname = 'csp'
-resfolder = '/home/user_wanglei/private/datafile/crystalgpt/' + nickname  + '/' 
+resfolder = '/home/user_wanglei/private/datafile/crystalgpt/' + nickname  + '/' + dataset + '/'
 
 ###############################
 n_max = 21
@@ -24,27 +25,41 @@ finetune_dropout_rate = 0.0
 
 optimizer = 'adam'
 weight_decay = 0.0 
-lr = 1e-4
+pretrain_lr = 1e-4
+finetune_lr = 1e-5
 lr_decay = 0.0
 clip_grad = 1.0
-batchsize = 100
-epochs = 5000
+
+pretrain_batchsize = 8000
+finetune_batchsize = 100
+
+pretrain_epochs = 10000
+finetune_epochs = 5000 
 
 lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
 
 num_io_process = 20
 
 mp20_folder = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/'
-train_path = mp20_folder+'/train.csv'
-valid_path = mp20_folder+'/val.csv'
-test_path = mp20_folder+'/test.csv'
+alex20_folder = '/opt/data/bcmdata/ZONES/data/PROJECTS/datafile/PRIVATE/zdcao/crystal_gpt/dataset/alex/PBE/alex20/'
+
+if dataset == 'mp20':
+    train_path = mp20_folder+'/train.csv'
+    valid_path = mp20_folder+'/val.csv'
+    test_path = mp20_folder+'/test.csv'
+elif dataset == 'alex20':
+    train_path = alex20_folder+'/train.lmdb'
+    valid_path = alex20_folder+'/val.lmdb'
+    test_path = alex20_folder+'/test.lmdb'
+else:
+    raise ValueError(f"Invalid mode '{dataset}'. Must be one of: {['mp20', 'alex20']}")
 
 ###############################
 
 reward='ehull'
 mlff_model='orb'
 beta = 0.0
-formula = 'H2O'
+formula = 'C'
 
 restore_path='~/private/datafile/crystalgpt/csp/csp-5cf65/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_64_l_8_H_16_k_64_m_64_e_32_drop_0.3_0.1/epoch_000500.pkl'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
@@ -59,9 +74,9 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --partition=home
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
-#SBATCH --mem=64G
-#SBATCH --gres=gpu:A800:1
-#SBATCH --time=24:00:00
+#SBATCH --mem=32G
+#SBATCH --gres=gpu:A800:8
+#SBATCH --time=48:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
 #SBATCH --error=%s'''%(num_io_process,jobname,logname,logname)
