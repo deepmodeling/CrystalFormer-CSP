@@ -26,6 +26,7 @@ DEFAULT_KEY_SIZE="32"
 DEFAULT_MODEL_SIZE="64"
 DEFAULT_EMBED_SIZE="32"
 DEFAULT_RELAXATION="false"
+DEFAULT_LABEL=""
 
 # Function to display usage
 usage() {
@@ -50,6 +51,7 @@ usage() {
     echo "  --model_size SIZE           Model size (default: $DEFAULT_MODEL_SIZE)"
     echo "  --embed_size SIZE           Embed size (default: $DEFAULT_EMBED_SIZE)"
     echo "  --relaxation RELAXATION     Enable/disable relaxation (default: $DEFAULT_RELAXATION)"
+    echo "  --label LABEL               Label for the experiment (default: '')"
     echo "  --skip-sample               Skip the sampling step"
     echo "  --skip-convert              Skip the structure conversion step"
     echo "  --skip-energy               Skip the energy computation step"
@@ -81,6 +83,7 @@ KEY_SIZE="$DEFAULT_KEY_SIZE"
 MODEL_SIZE="$DEFAULT_MODEL_SIZE"
 EMBED_SIZE="$DEFAULT_EMBED_SIZE"
 RELAXATION="$DEFAULT_RELAXATION"
+LABEL="$DEFAULT_LABEL"
 SKIP_SAMPLE=false
 SKIP_CONVERT=false
 SKIP_ENERGY=false
@@ -158,6 +161,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --relaxation)
             RELAXATION="$2"
+            shift 2
+            ;;
+        --label)
+            LABEL="$2"
             shift 2
             ;;
         --skip-sample)
@@ -313,6 +320,11 @@ if [[ "$SKIP_EHULL" == false ]]; then
         --restore_path "$RESTORE_PATH/"
         --filename "$RELAXED_STRUCT_FILE"
     )
+    
+    # Add label if provided
+    if [[ -n "$LABEL" ]]; then
+        EHULL_ARGS+=(--label "$LABEL")
+    fi
     
     # Add relaxation flag if enabled
     if [[ "$RELAXATION" == "true" ]]; then
