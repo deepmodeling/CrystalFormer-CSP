@@ -49,10 +49,12 @@ def make_transformer(key, Nf, Kx, Kl, n_max, h0_size, num_layers, num_heads, key
         initializer = hk.initializers.TruncatedNormal(0.01)
 
         # compute embeddings
-        c_embeddings = hk.Linear(embed_size, w_init=initializer)(composition*1.0)
-        g_embeddings = hk.get_parameter('g_embeddings', [230, embed_size], init=initializer)[G-1]
-        w_embeddings = hk.get_parameter('w_embeddings', [wyck_types, embed_size], init=initializer)[W]
-        a_embeddings = hk.get_parameter('a_embeddings', [atom_types, embed_size], init=initializer)[A]
+        g_embeddings = hk.get_parameter('g_embedding_table', [230, embed_size], init=initializer)[G-1]
+        w_embeddings = hk.get_parameter('w_embedding_table', [wyck_types, embed_size], init=initializer)[W]
+        a_embedding_table = hk.get_parameter('a_embedding_table', [atom_types, embed_size], init=initializer)
+
+        a_embeddings = a_embedding_table[A] # (n, embed_size)
+        c_embeddings = (a_embedding_table * composition[:, None]).sum(axis=0) # (embed_size, ) 
 
         g_logit = hk.Sequential([hk.Linear(h0_size, w_init=initializer),
                                   jax.nn.gelu,

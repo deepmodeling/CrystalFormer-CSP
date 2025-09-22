@@ -30,10 +30,10 @@ ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path)
 print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
 ckpt = checkpoint.load_data(ckpt_filename)
 
-a_embeddings = ckpt["params"]["~"]["a_embeddings"]
+a_embeddings = ckpt["params"]["~"]["a_embedding_table"]
 a_a = cosine_similarity(a_embeddings, a_embeddings)
 
-g_embeddings = ckpt["params"]["~"]["g_embeddings"]
+g_embeddings = ckpt["params"]["~"]["g_embedding_table"]
 g_g = cosine_similarity(g_embeddings, g_embeddings)
 
 print (a_a.shape, g_g.shape)
