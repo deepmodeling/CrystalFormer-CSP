@@ -95,6 +95,7 @@ def main(args):
     data['unrelaxed_ehull'] = unrelaxed_ehull_list
 
     if args.relaxation:
+        print ('\n==============================')
         print ('Relaxed ehull')
         # with mp.Pool(args.num_io_process) as p:
         #     relaxed_ehull_list = p.map_async(partial_forward_fn, zip(structures, data['final_energy'])).get()

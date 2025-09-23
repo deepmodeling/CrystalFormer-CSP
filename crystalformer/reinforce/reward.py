@@ -173,7 +173,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
         x = (G, L, XYZ, A, W)
         structures, energies = zip(*map(energy_fn, zip(*x)))
-        output = parallel_reward_fn(structures, energies)
+        output = map_reward_fn(structures, energies)
         output = jnp.array(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
 

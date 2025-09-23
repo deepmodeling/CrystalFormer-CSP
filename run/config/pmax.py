@@ -31,7 +31,7 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 100
+finetune_batchsize = 500
 
 pretrain_epochs = 10000
 finetune_epochs = 5000 
@@ -59,7 +59,7 @@ else:
 reward='ehull'
 mlff_model='orb'
 beta = 0.1
-formula = 'C'
+formula = 'TaCr2O6'
 
 restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-92792/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
@@ -75,7 +75,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:A800:1
+#SBATCH --gres=gpu:A100_80G:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
