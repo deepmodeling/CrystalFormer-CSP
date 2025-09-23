@@ -63,7 +63,8 @@ def get_atoms_from_GLXYZAW(G, L, XYZ, A, W):
     xs_list = [symmetrize_atoms(G, w, x) for w, x in zip(W, X)]
     A_list = np.repeat(A, [len(xs) for xs in xs_list])
     X_list = np.concatenate(xs_list)
-    struct = Structure(lattice, A_list, X_list).to_ase_atoms()
+    struct = Structure(lattice, A_list, X_list)
+    struct = struct.get_primitive_structure().to_ase_atoms()
     return struct
 
 

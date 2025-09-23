@@ -1,5 +1,5 @@
 import warnings
-# To suppress warnings for clearer output
+# To suppress warnings for clearer outnp.nan
 warnings.simplefilter("ignore")
 
 import pandas as pd
@@ -82,8 +82,11 @@ def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
         struct = structures[i]
         atoms = ase_adaptor.get_atoms(struct)
         atoms.calc = calc
-
-        initial_energy = atoms.get_potential_energy()
+    
+        try:
+            initial_energy = atoms.get_potential_energy()
+        except Exception as e:
+            initial_energy = None
         initial_energies.append(initial_energy)
 
         if relaxation:

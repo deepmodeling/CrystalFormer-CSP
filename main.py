@@ -200,10 +200,14 @@ else:
         print ("G:\n", G)  # spacegroup
         print ("XYZ:\n", XYZ)  # fractional coordinate 
         print ("A:\n", A)  # element type
-        print ("W:\n", W)  # Wyckoff positions
+        print ("W:\n")  # Wyckoff positions
+        for (g, w) in zip(G, W):
+            print (g, [_w.item() for _w in w])
         print ("M:\n", M)  # multiplicity 
         print ("N:\n", M.sum(axis=-1)) # total number of atoms
-        print ("L:\n", L)  # lattice
+        print ("L:\n")  # lattice
+        for g, l in zip(G, L):
+            print (g, l)
         for g, a in zip(G, A):
            print(g, [element_list[i] for i in a])
 
@@ -222,6 +226,9 @@ else:
         length = length/num_atoms[:, None]**(1/3)
         angle = angle * (jnp.pi / 180) # to rad
         L = jnp.concatenate([length, angle], axis=-1)
+        print ("reduced L:\n")  # lattice
+        for g, l in zip(G, L):
+            print (g, l)
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
 

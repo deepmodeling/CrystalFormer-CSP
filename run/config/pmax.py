@@ -13,14 +13,14 @@ atom_types = 119
 
 Nf = 5
 Kx, Kl = 16, 4
-h0_size = 64
-transformer_layers = 8
+h0_size = 256
+transformer_layers = 16
 num_heads = 16
 key_size = 64
 model_size = 64
 embed_size = 32
 
-pretrain_dropout_rate = 0.3
+pretrain_dropout_rate = 0.1
 finetune_dropout_rate = 0.0
 
 optimizer = 'adam'
@@ -58,10 +58,10 @@ else:
 
 reward='ehull'
 mlff_model='orb'
-beta = 0.0
+beta = 0.1
 formula = 'C'
 
-restore_path='~/private/datafile/crystalgpt/csp/csp-5cf65/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_64_l_8_H_16_k_64_m_64_e_32_drop_0.3_0.1/epoch_000500.pkl'
+restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-92792/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 
@@ -75,7 +75,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:A800:8
+#SBATCH --gres=gpu:A800:1
 #SBATCH --time=48:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s

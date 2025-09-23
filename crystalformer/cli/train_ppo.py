@@ -198,7 +198,7 @@ def main():
             for entry in ref_data['entries']:
                 entry.pop('structure')
                 
-        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data)
+        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data, n_jobs=args.num_io_process)
     
     elif args.reward == "prop":
         from crystalformer.reinforce.reward import make_prop_reward_fn
