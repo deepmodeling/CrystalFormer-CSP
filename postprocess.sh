@@ -9,9 +9,8 @@ set -e  # Exit on any error
 # Default configuration
 DEFAULT_BASE_DATA_PATH="/home/user_wanglei/private/datafile/crystalgpt"
 DEFAULT_RESTORE_PATH="${DEFAULT_BASE_DATA_PATH}/csp/csp-85ed6/adam_bs_100_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_4_H_8_k_32_m_64_e_32_drop_0.3_0.1/"
-DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v2-20241011.ckpt"
-#DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v3-conservative-inf-omat-20250404.ckpt"
-DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2"
+DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt"
+DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe.json.bz2"
 DEFAULT_FORMULA="H2O"
 DEFAULT_NUM_SAMPLES="1000"
 DEFAULT_TEMPERATURE="1.0"

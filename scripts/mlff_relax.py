@@ -22,9 +22,8 @@ def make_orb_calc(model_path, device="cuda"):
     from orb_models.forcefield.calculator import ORBCalculator
 
     # Load the ORB forcefield model
-    orbff = pretrained.orb_v2(model_path, device=device) 
-    #orbff = pretrained.orb_v3_conservative_inf_omat(device=device,
-    #                                                precision="float32-high")
+    orbff = pretrained.orb_v3_conservative_inf_omat(model_path, device=device,
+                                                    precision="float32-high")
     calc = ORBCalculator(orbff, device=device)
 
     return calc
