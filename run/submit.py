@@ -96,6 +96,7 @@ if __name__=='__main__':
                         'train_path' : train_path,
                         'valid_path' : valid_path,
                         'test_path' : test_path,
+                        'restore_path': restore_path, 
                         'dropout_rate' : pretrain_dropout_rate,
                         'num_io_process' : num_io_process,
                         'lamb_a': lamb_a,

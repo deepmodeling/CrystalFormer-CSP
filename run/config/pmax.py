@@ -75,8 +75,8 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:A100_80G:1
-#SBATCH --time=48:00:00
+#SBATCH --gres=gpu:A800:8
+#SBATCH --time=72:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
 #SBATCH --error=%s'''%(num_io_process,jobname,logname,logname)

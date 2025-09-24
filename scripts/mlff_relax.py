@@ -15,6 +15,7 @@ from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
 from ase.constraints import FixSymmetry
 
+from symmetry import find_spg
 
 def make_orb_calc(model_path, device="cuda"):
     from orb_models.forcefield import pretrained
@@ -22,6 +23,8 @@ def make_orb_calc(model_path, device="cuda"):
 
     # Load the ORB forcefield model
     orbff = pretrained.orb_v2(model_path, device=device) 
+    #orbff = pretrained.orb_v3_conservative_inf_omat(device=device,
+    #                                                precision="float32-high")
     calc = ORBCalculator(orbff, device=device)
 
     return calc
@@ -66,7 +69,7 @@ def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
     Returns:
         initial_energies: List of initial energies
         final_energies: List of final energies
-        relaxed_cif_strings: List of relaxed structures in CIF format
+        relaxed_cif_dicts: List of relaxed structures in CIF format
         formula_list: List of formulas of the structures
 
     if relaxation is False, the final energies will be the same as the initial energies
@@ -76,7 +79,7 @@ def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
 
     initial_energies = []
     final_energies = []
-    relaxed_cif_strings = []
+    relaxed_cif_dicts = []
 
     for i in tqdm(range(len(structures))):
         struct = structures[i]
@@ -106,16 +109,16 @@ def relax_structures(calc, structures, relaxation, fmax, steps, fixsymmetry):
             FIRE(optimizer).run(fmax=fmax, steps=steps)  # Run the FIRE optimizer for 100 steps
             
             final_energies.append(atoms.get_potential_energy())
-            relaxed_cif_strings.append(ase_adaptor.get_structure(atoms).as_dict())
+            relaxed_cif_dicts.append(ase_adaptor.get_structure(atoms).as_dict())
 
         else:
             final_energies.append(initial_energy)
-            relaxed_cif_strings.append(struct.as_dict())
+            relaxed_cif_dicts.append(struct.as_dict())
 
 
     formula_list = [struct.composition.formula for struct in structures]
 
-    return initial_energies, final_energies, relaxed_cif_strings, formula_list
+    return initial_energies, final_energies, relaxed_cif_dicts, formula_list
 
 
 def main(args):
@@ -158,12 +161,19 @@ def main(args):
     end_time = time()
     print(f"Relaxation took {end_time - start_time:.2f} seconds")
 
-    initial_energies, final_energies, relaxed_cif_strings, formula_list = results
+    initial_energies, final_energies, relaxed_cif_dicts, formula_list = results
     output_data = pd.DataFrame()
     output_data['initial_energy'] = initial_energies
     output_data['final_energy'] = final_energies
-    output_data['relaxed_cif'] = relaxed_cif_strings
+    output_data['relaxed_cif'] = relaxed_cif_dicts
     output_data['formula'] = formula_list
+
+    print ("spacegroup of unrelaxed structures")
+    print ([find_spg(structure, args.tol) for structure in structures])
+
+    if args.relaxation and (not args.fixsymmetry):
+        print ("spacegroup of relaxed structures")
+        print ([find_spg(Structure.from_dict(structure, args.tol)) for structure in relaxed_cif_dicts])
 
     if args.label:
         output_data.to_csv(os.path.join(args.restore_path, f"relaxed_structures_{args.label}.csv"),
@@ -184,6 +194,7 @@ if __name__ == "__main__":
     parser.add_argument('--filename', default='output_struct.csv', help='filename of the csv file containing the structures')
     parser.add_argument('--relaxation', action='store_true', help='whether to relax the structures')
     parser.add_argument('--fmax', type=float, default=0.1, help='maximum force tolerance for relaxation')
+    parser.add_argument('--tol', type=float, default=0.01, help='tolerance for symmetry analysis')
     parser.add_argument('--steps', type=int, default=500, help='max number of steps for relaxation')
     parser.add_argument('--label', default=None, help='label for the output file')
     parser.add_argument('--primitive', action='store_true', help='convert structures to primitive form')
