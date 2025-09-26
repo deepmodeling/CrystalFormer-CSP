@@ -2,7 +2,7 @@ import subprocess
 import numpy as np 
 import time 
 
-dataset = 'alex20'
+dataset = 'alex20s'
 nickname = 'csp'
 resfolder = '/home/user_wanglei/private/datafile/crystalgpt/' + nickname  + '/' + dataset + '/'
 
@@ -42,6 +42,7 @@ num_io_process = 20
 
 mp20_folder = '/home/user_wanglei/private/homefile/cdvae/data/mp_20/'
 alex20_folder = '/opt/data/bcmdata/ZONES/data/PROJECTS/datafile/PRIVATE/zdcao/crystal_gpt/dataset/alex/PBE/alex20/'
+alex20s_folder = '/opt/data/bcmdata/ZONES/data/PROJECTS/datafile/PRIVATE/zdcao/crystal_gpt/dataset/alex/PBE_20241204/'
 
 if dataset == 'mp20':
     train_path = mp20_folder+'/train.csv'
@@ -51,17 +52,22 @@ elif dataset == 'alex20':
     train_path = alex20_folder+'/train.lmdb'
     valid_path = alex20_folder+'/val.lmdb'
     test_path = alex20_folder+'/test.lmdb'
+elif dataset == 'alex20s':
+    train_path = alex20s_folder+'/train.lmdb'
+    valid_path = alex20s_folder+'/val.lmdb'
+    test_path = alex20s_folder+'/test.lmdb'
 else:
-    raise ValueError(f"Invalid mode '{dataset}'. Must be one of: {['mp20', 'alex20']}")
+    raise ValueError(f"Invalid mode '{dataset}'. Must be one of: {['mp20', 'alex20', 'alex20s']}")
 
 ###############################
 
 reward='ehull'
 mlff_model='orb'
 beta = 0.1
-formula = 'TaCr2O6'
+formula = 'TiO2'
 
-restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-92792/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex21/csp-6000f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+restore_path = None
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 
@@ -76,7 +82,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:A800:8
-#SBATCH --time=72:00:00
+#SBATCH --time=168:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
 #SBATCH --error=%s'''%(num_io_process,jobname,logname,logname)

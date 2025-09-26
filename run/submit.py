@@ -96,13 +96,15 @@ if __name__=='__main__':
                         'train_path' : train_path,
                         'valid_path' : valid_path,
                         'test_path' : test_path,
-                        'restore_path': restore_path, 
                         'dropout_rate' : pretrain_dropout_rate,
                         'num_io_process' : num_io_process,
                         'lamb_a': lamb_a,
                         'lamb_w': lamb_w,
                         'lamb_l': lamb_l,
                         })
+
+        if restore_path is not None:
+            args.update({'restore_path': restore_path})
 
     else:
         raise ValueError(f"Invalid mode '{input.mode}'. Must be one of: {['pretrain', 'finetune']}")
