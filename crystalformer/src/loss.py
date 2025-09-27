@@ -105,6 +105,14 @@ def make_loss_fn(n_max, atom_types, wyck_types, Kx, Kl, transformer, lamb_a=1.0,
         
     return loss_fn, logp_fn
 
+def topk_recall(logp_g, y, ks=(1,10,30,40)):
+    ranks = jnp.argsort(-logp_g, axis=1)  
+    out = {}
+    for k in ks:
+        hit = (ranks[:, :k] == y[:, None]).any(axis=1)
+        out[k] = hit.mean() * 100.0
+    return out
+
 if __name__=='__main__':
     from utils import GLXYZAW_from_file
     from transformer import make_transformer
