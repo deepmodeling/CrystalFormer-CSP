@@ -289,7 +289,8 @@ if [[ "$SKIP_ENERGY" == false ]]; then
     MLFF_ARGS=(
         --restore_path "$RESTORE_PATH/"
         --filename "$OUTPUT_STRUCT_FILE"
-        --model orb
+        --model orb-v3-conservative-inf-mpa
+        --primitive
         --model_path "$MODEL_PATH"
     )
     
@@ -298,7 +299,7 @@ if [[ "$SKIP_ENERGY" == false ]]; then
         MLFF_ARGS+=(--relaxation)
     fi
     
-    python ./scripts/mlff_relax.py "${MLFF_ARGS[@]}"
+    python ./scripts/mlff_relax_batch.py "${MLFF_ARGS[@]}"
     
     if [[ $? -ne 0 ]]; then
         echo "Error: Energy computation failed"
