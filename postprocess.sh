@@ -12,7 +12,9 @@ DEFAULT_RESTORE_PATH="${DEFAULT_BASE_DATA_PATH}/csp/csp-85ed6/adam_bs_100_lr_0.0
 DEFAULT_MODEL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt"
 DEFAULT_CONVEX_HULL_PATH="${DEFAULT_BASE_DATA_PATH}/checkpoint/alex20/convex_hull_pbe.json.bz2"
 DEFAULT_FORMULA="H2O"
-DEFAULT_NUM_SAMPLES="1000"
+DEFAULT_K="30"
+DEFAULT_NUM_SAMPLES="10"
+DEFAULT_BATCHSIZE="100"
 DEFAULT_TEMPERATURE="1.0"
 DEFAULT_NUM_IO_PROCESS="20"
 DEFAULT_EPOCH="epoch_000700.pkl"
@@ -37,10 +39,12 @@ usage() {
     echo "  -m, --model-path PATH       Model checkpoint path (default: $DEFAULT_MODEL_PATH)"
     echo "  -c, --convex-hull PATH      Convex hull path (default: $DEFAULT_CONVEX_HULL_PATH)"
     echo "  -f, --formula FORMULA       Formula (default: ${DEFAULT_FORMULA})"
-    echo "  -n, --num-samples NUM       Number of samples (default: $DEFAULT_NUM_SAMPLES)"
     echo "  -t, --temperature TEMP      Temperature (default: $DEFAULT_TEMPERATURE)"
     echo "  -p, --num-io-process NUM    Number of IO processes (default: $DEFAULT_NUM_IO_PROCESS)"
-    echo "  -k, --epoch EPOCH           Epoch file (default: $DEFAULT_EPOCH)"
+    echo "  -e, --epoch EPOCH           Epoch file (default: $DEFAULT_EPOCH)"
+    echo "  -k  --K                     Number of top spacegroups (default: $DEFAULT_K)"
+    echo "  -n, --num_samples           Number of samples for each spacegroup (default: $DEFAULT_NUM_SAMPLES)"
+    echo "  -b, --batchsize             Number of batchsize (default: $DEFAULT_BATCHSIZE)"
     echo "  --Nf NF                     Nf parameter (default: $DEFAULT_NF)"
     echo "  --Kx KX                     Kx parameter (default: $DEFAULT_KX)"
     echo "  --Kl KL                     Kl parameter (default: $DEFAULT_KL)"
@@ -73,6 +77,9 @@ NUM_SAMPLES="$DEFAULT_NUM_SAMPLES"
 TEMPERATURE="$DEFAULT_TEMPERATURE"
 NUM_IO_PROCESS="$DEFAULT_NUM_IO_PROCESS"
 EPOCH="$DEFAULT_EPOCH"
+K="$DEFAULT_K"
+NUM_SAMPLES="$DEFAULT_SAMPLES"
+BATCHSIZE="$DEFAULT_BATCHSIZE"
 NF="$DEFAULT_NF"
 KX="$DEFAULT_KX"
 KL="$DEFAULT_KL"
@@ -107,8 +114,12 @@ while [[ $# -gt 0 ]]; do
             FORMULA="$2"
             shift 2
             ;;
-        -n|--num-samples)
+        -n|--num_samples)
             NUM_SAMPLES="$2"
+            shift 2
+            ;;
+        -b|--batchsize)
+            BATCHSIZE="$2"
             shift 2
             ;;
         -t|--temperature)
@@ -119,8 +130,12 @@ while [[ $# -gt 0 ]]; do
             NUM_IO_PROCESS="$2"
             shift 2
             ;;
-        -k|--epoch)
+        -e|--epoch)
             EPOCH="$2"
+            shift 2
+            ;;
+        -k|--K)
+            K="$2"
             shift 2
             ;;
         --Nf)
@@ -235,8 +250,9 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
     SAMPLE_ARGS=(
         --optimizer none
         --restore_path "$EPOCH_PATH"
+        --K "$K"
+        --batchsize "$BATCHSIZE"
         --num_samples "$NUM_SAMPLES"
-        --batchsize "$NUM_SAMPLES"
         --formula "$FORMULA"
         --temperature "$TEMPERATURE"
         --Nf "$NF"

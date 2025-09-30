@@ -60,7 +60,7 @@ def sample_x(key, h_x, Kx, top_p, temperature, batchsize):
     return key, x 
 
 
-def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature):
+def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature, K=0):
 
     @partial(jax.jit, static_argnums=2)
     def sample_crystal(key, params, batchsize, composition):
@@ -145,9 +145,15 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         L = jnp.zeros((batchsize, n_max, Kl+2*6*Kl)) # we accumulate lattice params and sample lattice after
         
         #start from sampling the space group
-        g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230)
-        key, subkey = jax.random.split(key)
-        G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
+        g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230) actually should be same along batchsize axis 
+
+        if K == 0: 
+            key, subkey = jax.random.split(key)
+            G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
+        else:
+            # select top K spacegroups
+            G = jnp.argsort(-g_logit[0])[:K] +1  # (K, ) 
+            G = G.repeat(batchsize//K) # (batchsize, )
 
         key, W, A, X, Y, Z, L = jax.lax.fori_loop(0, n_max, body_fn, (key, W, A, X, Y, Z, L))
 
