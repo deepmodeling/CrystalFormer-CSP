@@ -29,6 +29,7 @@ DEFAULT_MODEL_SIZE="64"
 DEFAULT_EMBED_SIZE="32"
 DEFAULT_RELAXATION="false"
 DEFAULT_LABEL=""
+DEFAULT_SPACEGROUP=""
 
 # Function to display usage
 usage() {
@@ -56,6 +57,7 @@ usage() {
     echo "  --embed_size SIZE           Embed size (default: $DEFAULT_EMBED_SIZE)"
     echo "  --relaxation RELAXATION     Enable/disable relaxation (default: $DEFAULT_RELAXATION)"
     echo "  --label LABEL               Label for the experiment (default: '')"
+    echo "  --spacegroup ID             Spacegroup ID (default: None)"
     echo "  --skip-sample               Skip the sampling step"
     echo "  --skip-convert              Skip the structure conversion step"
     echo "  --skip-energy               Skip the energy computation step"
@@ -91,6 +93,7 @@ MODEL_SIZE="$DEFAULT_MODEL_SIZE"
 EMBED_SIZE="$DEFAULT_EMBED_SIZE"
 RELAXATION="$DEFAULT_RELAXATION"
 LABEL="$DEFAULT_LABEL"
+SPACEGROUP="$DEFAULT_SPACEGROUP"
 SKIP_SAMPLE=false
 SKIP_CONVERT=false
 SKIP_ENERGY=false
@@ -182,6 +185,10 @@ while [[ $# -gt 0 ]]; do
             LABEL="$2"
             shift 2
             ;;
+        --spacegroup)
+            SPACEGROUP="$2"
+            shift 2
+            ;;
         --skip-sample)
             SKIP_SAMPLE=true
             shift
@@ -265,6 +272,11 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
         --model_size "$MODEL_SIZE"
         --embed_size "$EMBED_SIZE"
     )
+    
+    # Add spacegroup argument if specified
+    if [[ -n "$SPACEGROUP" ]]; then
+        SAMPLE_ARGS+=(--spacegroup "$SPACEGROUP")
+    fi
     
     python ./main.py "${SAMPLE_ARGS[@]}" 
     

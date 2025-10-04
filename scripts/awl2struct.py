@@ -9,6 +9,7 @@ import itertools
 import argparse
 
 from pymatgen.core import Structure, Lattice
+from pymatgen.core.composition import Composition
 from wyckoff import wmax_table, mult_table, symops
 
 symops = np.array(symops)
@@ -82,6 +83,35 @@ def get_struct_from_lawx(G, L, A, W, X):
     return struct.as_dict()
 
 
+def check_formula_match(struct_dict, target_formula):
+    """
+    Check if a structure matches the target formula
+    
+    Args:
+        struct_dict: Dictionary representation of the structure
+        target_formula: Target chemical formula (e.g., "H2O", "SiO2")
+    
+    Returns:
+        bool: True if the structure matches the target formula
+    """
+    if target_formula is None:
+        return True
+    
+    try:
+        # Create Structure object from dict
+        struct = Structure.from_dict(struct_dict)
+        # Get composition
+        composition = struct.composition
+        # Parse target formula
+        target_comp = Composition(target_formula)
+        
+        # Check if compositions match (allowing for different ordering)
+        return composition.reduced_formula == target_comp.reduced_formula
+    except Exception as e:
+        print(f"Error checking formula match: {e}")
+        return False
+
+
 def main(args):
     if args.formula is not None:
         input_path = args.output_path + f'output_{args.formula}.csv'
@@ -112,6 +142,16 @@ def main(args):
     structures = p.starmap_async(get_struct_from_lawx, zip(G, L, A, W, X)).get()
     p.close()
     p.join()
+
+    # Filter structures to match the target formula if specified
+    if args.formula is not None:
+        print(f"Filtering structures to match formula: {args.formula}")
+        filtered_structures = []
+        for i, struct in enumerate(structures):
+            if check_formula_match(struct, args.formula):
+                filtered_structures.append(struct)
+        print(f"Total structures: {len(structures)}, Matching formula: {len(filtered_structures)}")
+        structures = filtered_structures
 
     data = pd.DataFrame()
     data['cif'] = structures

@@ -69,7 +69,8 @@ group.add_argument('--wyckoff', type=str, default=None, nargs='+', help='The Wyc
 group.add_argument('--formula', type=str, default=None, help='chemical formula of the compound')
 group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
 group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
-group.add_argument('--K', type=int, default=30, help='top K number of space groups')
+group.add_argument('--K', type=int, default=30, help='top K number of space groups. 0 means we sample spacegroup')
+group.add_argument('--spacegroup', type=int, default=None, help='the spacegroup number 1-230')
 group.add_argument('--num_samples', type=int, default=10, help='number of samples for each space group')
 group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 group.add_argument('--save_path', type=str, default=None, help='path to save the sampled structures')
@@ -181,8 +182,12 @@ else:
     composition = formula_string_to_composition_vector(args.formula)
     print ('composition vector of', args.formula)
     print (composition)
+    if args.spacegroup is None: 
+        print ('select top K spacegroups', args.K)
+    else:
+        print ('targeting spacegroup No.', args.spacegroup)
 
-    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, w_mask, args.top_p, args.temperature, args.K)
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, w_mask, args.top_p, args.temperature, args.K, args.spacegroup)
 
     if args.seed is not None:
         key = jax.random.PRNGKey(args.seed) # reset key for sampling if seed is provided
@@ -190,14 +195,17 @@ else:
     name, extension = args.output_filename.rsplit('.', 1)
     filename = os.path.join(output_path, 
                             f"{name}_{args.formula}.{extension}")
-    # for each space group we generate batchsize samples 
-    total_num_samples = args.K * args.num_samples 
+
+    if args.K>0:
+        # for each space group we generate batchsize samples 
+        total_num_samples = args.K * args.num_samples 
+        assert (args.batchsize % args.K == 0), \
+        f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
+    else:
+        total_num_samples = args.num_samples
 
     assert (total_num_samples % args.batchsize == 0), \
     f"Total samples ({total_num_samples}) must be divisible by batch size ({args.batchsize})"
-
-    assert (args.batchsize % args.K == 0), \
-    f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
 
     for batch_idx in range(total_num_samples // args.batchsize):
         key, subkey = jax.random.split(key)

@@ -58,7 +58,7 @@ def main(args):
         g_logit, h = transformer(params, key, composition, G, XYZ, A, W, M, is_train) # (5*n_max+1, ...)
         return g_logit
 
-    ks = [1,10,30,40,50]
+    ks = [1,10,20,30,40,50]
     def compute_recall(data):
         G, L, XYZ, A, W = data
         g_logit = g_logit_fn(params, key, G, L, XYZ, A, W, False)
