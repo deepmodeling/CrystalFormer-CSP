@@ -64,10 +64,11 @@ else:
 reward='ehull'
 mlff_model='orb'
 beta = 0.1
-formula = 'TiO2'
+formula = 'Ti13Al9Co8'
 
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-6000f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
-restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path = None
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
@@ -82,7 +83,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:A800:8
+#SBATCH --gres=gpu:A100_80G:1
 #SBATCH --time=168:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s

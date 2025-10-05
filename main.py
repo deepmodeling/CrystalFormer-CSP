@@ -183,7 +183,10 @@ else:
     print ('composition vector of', args.formula)
     print (composition)
     if args.spacegroup is None: 
-        print ('select top K spacegroups', args.K)
+        if args.K >0:
+            print ('select top K spacegroups', args.K)
+        else:
+            print ('sample spacegroup with temperature', args.temperature)
     else:
         print ('targeting spacegroup No.', args.spacegroup)
 
@@ -197,7 +200,7 @@ else:
                             f"{name}_{args.formula}.{extension}")
 
     if args.K>0:
-        # for each space group we generate batchsize samples 
+        # for each space group we generate args.num_samples samples 
         total_num_samples = args.K * args.num_samples 
         assert (args.batchsize % args.K == 0), \
         f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
@@ -254,6 +257,10 @@ else:
         data['logp'] = np.array(logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l).tolist()
 
         data = data.sort_values(by='logp', ascending=False) # sort by logp
-        data.to_csv(filename, mode='w', index=False, header=True)
+        
+        # Use write mode for first batch, append mode for subsequent batches
+        write_mode = 'w' if batch_idx == 0 else 'a'
+        write_header = True if batch_idx == 0 else False
+        data.to_csv(filename, mode=write_mode, index=False, header=write_header)
 
-        print ("Wrote samples to %s"%filename)
+        print ("Wrote samples to %s (batch %d/%d)"%(filename, batch_idx + 1, total_num_samples // args.batchsize))

@@ -6,6 +6,7 @@ import math
 from functools import partial
 
 import crystalformer.src.checkpoint as checkpoint
+from crystalformer.src.formula import find_composition_vector
 from crystalformer.src.lattice import norm_lattice
 
 
@@ -72,10 +73,17 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
         key, subkey = jax.random.split(key)
-        G, XYZ, A, W, _, L = sample_crystal(subkey, params, batchsize, composition)
+        G, XYZ, A, W, M, L = sample_crystal(subkey, params, batchsize, composition)
+
+        actual_compositions = jax.vmap(find_composition_vector)(A, M)
+        formula_match = jnp.all(actual_compositions == composition, axis=1)
 
         x = (G, L, XYZ, A, W)
-        rewards = - batch_reward_fn(x)  # ppo maximize this reward
+        # ppo maximize this reward
+        rewards = jnp.where(formula_match, 
+                            -batch_reward_fn(x), 
+                            jnp.full((batchsize,), -10.0)
+                            )
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
         f_min = jnp.min(rewards)
