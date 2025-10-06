@@ -64,7 +64,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max\n")
+        f.write("epoch f_mean f_err f_min f_max formula_match_fraction\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -77,6 +77,9 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         actual_compositions = jax.vmap(find_composition_vector)(A, M)
         formula_match = jnp.all(actual_compositions == composition, axis=1)
+        
+        # Compute fraction of formula matches
+        formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
 
         x = (G, L, XYZ, A, W)
         # ppo maximize this reward
@@ -93,7 +96,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
         
-        f.write( ("%6d" + 4*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max))
+        f.write( ("%6d" + 5*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction))
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)

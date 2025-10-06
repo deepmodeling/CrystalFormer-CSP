@@ -60,12 +60,12 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
-    group.add_argument('--convex_path', type=str, default='/data/zdcao/crystal_gpt/dataset/alex/PBE/convex_hull_pbe_2023.12.29.json.bz2')
+    group.add_argument('--convex_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
     group.add_argument('--mlff_model', type=str, default='orb', choices=['mace', 'orb', 'matgl'], help='the model to use for RL reward')
-    group.add_argument('--mlff_path', type=str, default='./data/orb-v2-20241011.ckpt', help='path to the MLFF model')
+    group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
 
     group = parser.add_argument_group('property reward parameters')
     group.add_argument('--target', type=float, default=-3, help='target property value to optimize')
@@ -159,8 +159,7 @@ def main():
         from orb_models.forcefield.calculator import ORBCalculator
 
         # Load the ORB forcefield model
-        orbff = pretrained.orb_v2(args.mlff_path, device='cuda') 
-        #orbff = pretrained.orb_v3_conservative_inf_omat(args.mlff_path, device='cuda') 
+        orbff = pretrained.orb_v3_conservative_inf_omat(args.mlff_path, device='cuda', precision="float32-high") 
         calc = ORBCalculator(orbff, device='cuda')
     
     elif args.mlff_model == "matgl":

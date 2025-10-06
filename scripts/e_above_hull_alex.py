@@ -59,7 +59,7 @@ def calculate_hull(structure, energy, entries):
     try:
         entry = generate_CSE(structure, energy)
         ehull = pd.get_e_above_hull(entry, allow_negative=True)
-        print(f"Structure: {structure.formula}, E_hull: {ehull:.3f} eV/atom")
+        print(f"Structure: {structure.formula}, E_hull: {ehull:.6f} eV/atom")
     except Exception as e:
         print(f"Structure: {structure.formula}, E_hull: Error: {e}")
         ehull = None

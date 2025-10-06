@@ -15,10 +15,10 @@ Nf = 5
 Kx, Kl = 16, 4
 h0_size = 256
 transformer_layers = 16
-num_heads = 16
-key_size = 64
-model_size = 64
-embed_size = 32
+num_heads = 8
+key_size = 16
+model_size = 128
+embed_size = 128
 
 pretrain_dropout_rate = 0.1
 finetune_dropout_rate = 0.0
@@ -31,7 +31,7 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 500
+finetune_batchsize = 1000
 
 pretrain_epochs = 10000
 finetune_epochs = 5000 
@@ -64,14 +64,17 @@ else:
 reward='ehull'
 mlff_model='orb'
 beta = 0.1
-formula = 'Ti13Al9Co8'
+formula = 'Zr4O' #'Ti13Al9Co8'
 
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-6000f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
-restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
+restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-0d128/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0.1_0.1/'
 #restore_path = None
-convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
-mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
+#convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
+#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
+mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
+convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2'
 
 ###############################
 
