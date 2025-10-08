@@ -55,6 +55,8 @@ def main():
 
     group = parser.add_argument_group('sampling parameters')
     group.add_argument('--formula', type=str, default=None, help='chemical formula of the compound')
+    group.add_argument('--K', type=int, default=0, help='top K number of space groups. 0 means we sample spacegroup')
+    group.add_argument('--spacegroup', type=int, default=None, help='the spacegroup number 1-230')
     group.add_argument('--top_p', type=float, default=1.0, help='1.0 means un-modified logits, smaller value of p give give less diverse samples')
     group.add_argument('--temperature', type=float, default=1.0, help='temperature used for sampling')
 
@@ -213,7 +215,7 @@ def main():
 
     print("\n========== Load sample function ==========")
 
-    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature)
+    sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature, args.K, args.spacegroup)
 
     print("\n========== Start RL training ==========")
     ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)

@@ -64,7 +64,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max formula_match_fraction\n")
+        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -80,12 +80,15 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         
         # Compute fraction of formula matches
         formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
+        
+        # Compute unique number of space groups (one-liner, JIT-friendly)
+        unique_space_groups = jnp.sum(jnp.sum(jnp.arange(1, 231)[:, None] == G[None, :], axis=1) > 0)
 
         x = (G, L, XYZ, A, W)
         # ppo maximize this reward
         rewards = jnp.where(formula_match, 
                             -batch_reward_fn(x), 
-                            jnp.full((batchsize,), -10.0)
+                            jnp.full((batchsize,), -20.0) # very negative value for un-matched formula
                             )
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
@@ -96,7 +99,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
         advantages = rewards - baseline
         
-        f.write( ("%6d" + 5*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction))
+        f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)

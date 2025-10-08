@@ -80,6 +80,9 @@ if __name__=='__main__':
                         'dropout_rate' : finetune_dropout_rate
                         })
 
+        if spacegroup is not None:
+            args.update({'spacegroup': spacegroup})
+
     elif input.mode == 'pretrain':
         print ("pretrain mode")
                 
