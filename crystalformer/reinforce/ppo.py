@@ -85,11 +85,13 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         unique_space_groups = jnp.sum(jnp.sum(jnp.arange(1, 231)[:, None] == G[None, :], axis=1) > 0)
 
         x = (G, L, XYZ, A, W)
-        # ppo maximize this reward
-        rewards = jnp.where(formula_match, 
-                            -batch_reward_fn(x), 
-                            jnp.full((batchsize,), -20.0) # very negative value for un-matched formula
-                            )
+
+        x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
+        rewards_matched = -batch_reward_fn(x_matched)
+        
+        rewards = jnp.full((batchsize,), -20.0)
+        rewards = rewards.at[formula_match].set(rewards_matched)
+
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
         f_min = jnp.min(rewards)

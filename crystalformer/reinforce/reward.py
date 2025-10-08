@@ -6,7 +6,8 @@ from pymatgen.core import Structure, Lattice
 
 from crystalformer.reinforce import ehull
 from crystalformer.src.wyckoff import wmax_table, mult_table, symops
-
+from ase.optimize import FIRE
+from ase.filters import FrechetCellFilter
 
 symops = np.array(symops)
 mult_table = np.array(mult_table)
@@ -130,6 +131,9 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         try: 
             atoms = get_atoms_from_GLXYZAW(G, L, XYZ, A, W)
             atoms.calc = calculator
+            #relax the structure before evaluating ehull
+            optimizer = FrechetCellFilter(atoms)
+            FIRE(optimizer).run(fmax=0.01, steps=500)  
             energy = atoms.get_potential_energy()
             structure = ase_adaptor.get_structure(atoms)
         except:
