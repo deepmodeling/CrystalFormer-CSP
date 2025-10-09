@@ -72,11 +72,14 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
-        key, subkey = jax.random.split(key)
-        G, XYZ, A, W, M, L = sample_crystal(subkey, params, batchsize, composition)
+        # Keep sampling until at least one crystal matches the formula
+        formula_match = jnp.array([False])
+        while not jnp.any(formula_match):
+            key, subkey = jax.random.split(key)
+            G, XYZ, A, W, M, L = sample_crystal(subkey, params, batchsize, composition)
 
-        actual_compositions = jax.vmap(find_composition_vector)(A, M)
-        formula_match = jnp.all(actual_compositions == composition, axis=1)
+            actual_compositions = jax.vmap(find_composition_vector)(A, M)
+            formula_match = jnp.all(actual_compositions == composition, axis=1)
         
         # Compute fraction of formula matches
         formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
