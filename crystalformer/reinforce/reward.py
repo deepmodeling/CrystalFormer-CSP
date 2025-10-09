@@ -205,7 +205,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         #structures, energies = zip(*map(energy_fn, zip(*x)))
 
         #batch relax 
-        structures = list(map(get_atoms_from_GLXYZAW, zip(*x)))
+        structures = [get_atoms_from_GLXYZAW(*t) for t in zip(*x)]
         relaxer = BatchRelaxer(calculator.model,
                            device='cuda',
                            fmax=0.01,
