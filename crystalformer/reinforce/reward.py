@@ -8,11 +8,36 @@ from crystalformer.reinforce import ehull
 from crystalformer.src.wyckoff import wmax_table, mult_table, symops
 from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
+from pymatgen.io.ase import AseAtomsAdaptor
+
+from BatchRelaxer import BatchRelaxer
 
 symops = np.array(symops)
 mult_table = np.array(mult_table)
 wmax_table = np.array(wmax_table)
 
+
+def relax_structures(relaxer, atoms_list):
+    """
+    Args:
+        relaxer: BatchRelaxer object
+        structures: List of ASE atoms 
+
+    Returns:
+        final_structures: List of final structures
+        final_energies: List of final energies
+
+    """
+
+    ase_adaptor = AseAtomsAdaptor()
+
+    relaxation_trajectories = relaxer.relax(atoms_list)
+
+    # Extract the relaxed structures and corresponding energies
+    final_structures = [traj[-1] for traj in relaxation_trajectories.values()]
+    final_energies = [structure.info['total_energy'] for structure in final_structures]
+    final_structures = [ase_adaptor.get_structure(struct) for struct in final_structures]
+    return final_structures, final_energies
 
 def symmetrize_atoms(g, w, x):
     '''
@@ -122,8 +147,6 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         batch_reward_fn: batch reward function
     """
 
-    from pymatgen.io.ase import AseAtomsAdaptor
-
     ase_adaptor = AseAtomsAdaptor()
 
     def energy_fn(x):
@@ -175,8 +198,23 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         x = jax.tree_util.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
         G, L, XYZ, A, W = x
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
+
         x = (G, L, XYZ, A, W)
-        structures, energies = zip(*map(energy_fn, zip(*x)))
+        
+        #series relax
+        #structures, energies = zip(*map(energy_fn, zip(*x)))
+
+        #batch relax 
+        structures = list(map(get_atoms_from_GLXYZAW, zip(*x)))
+        relaxer = BatchRelaxer(calculator.model,
+                           device='cuda',
+                           fmax=0.01,
+                           max_n_steps=500, 
+                           max_natoms_per_batch=10000,
+                           filter="FRECHETCELLFILTER",
+                           optimizer="FIRE")
+        structures, energies = relax_structures(relaxer, structures)
+
         output = map_reward_fn(structures, energies)
         output = jnp.array(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
