@@ -210,7 +210,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
                            device='cuda',
                            fmax=0.01,
                            max_n_steps=500, 
-                           max_natoms_per_batch=10000,
+                           max_natoms_per_batch=1000,
                            filter="FRECHETCELLFILTER",
                            optimizer="FIRE")
         structures, energies = relax_structures(relaxer, structures)

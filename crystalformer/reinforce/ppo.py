@@ -74,12 +74,18 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         # Keep sampling until at least one crystal matches the formula
         formula_match = jnp.array([False])
-        while not jnp.any(formula_match):
+        max_attempts = 100
+        attempt = 0
+        while not jnp.any(formula_match) and attempt < max_attempts:
             key, subkey = jax.random.split(key)
             G, XYZ, A, W, M, L = sample_crystal(subkey, params, batchsize, composition)
 
             actual_compositions = jax.vmap(find_composition_vector)(A, M)
             formula_match = jnp.all(actual_compositions == composition, axis=1)
+            attempt += 1
+        
+        if attempt >= max_attempts:
+            raise RuntimeError(f"Epoch {epoch} - Could not generate formula-matching crystals after {max_attempts} attempts. Stopping training.")
         
         # Compute fraction of formula matches
         formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))

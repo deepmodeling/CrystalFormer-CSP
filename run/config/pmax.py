@@ -31,7 +31,7 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 1000
+finetune_batchsize = 2000
 
 pretrain_epochs = 10000
 finetune_epochs = 5000 
@@ -100,6 +100,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     job += '''
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 cd /home/user_wanglei/private/homefile/crystal_gpt/
 echo Current working directory is `pwd`
