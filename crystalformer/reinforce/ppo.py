@@ -106,10 +106,8 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_min = jnp.min(rewards)
         f_max = jnp.max(rewards)
 
-        # running average baseline
-        #baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
-        baseline = f_mean
-        advantages = rewards - baseline
+        advantages = rewards - f_mean
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)  
         
         f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 
