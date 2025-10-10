@@ -107,8 +107,12 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_max = jnp.max(rewards)
 
         # running average baseline
-        baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
-        advantages = rewards - baseline
+        #baseline = f_mean if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * f_mean
+        #advantages = rewards - baseline
+
+        # Compute advantage: 1 if reward in top 10%, else 0
+        reward_threshold = jnp.percentile(rewards, 90)
+        advantages = (rewards >= reward_threshold).astype(jnp.float32)
         
         f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 
