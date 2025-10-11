@@ -14,8 +14,9 @@ from crystalformer.src.transformer import make_transformer
 from crystalformer.src.sample import make_sample_crystal
 from crystalformer.src.formula import formula_string_to_composition_vector
 import crystalformer.src.checkpoint as checkpoint
-
 from crystalformer.reinforce.ppo import train, make_ppo_loss_fn
+
+from orb_models.forcefield import pretrained
 
 def main():
     import argparse
@@ -66,7 +67,7 @@ def main():
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
-    group.add_argument('--mlff_model', type=str, default='orb', choices=['mace', 'orb', 'matgl'], help='the model to use for RL reward')
+    group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
 
     group = parser.add_argument_group('property reward parameters')
@@ -106,7 +107,7 @@ def main():
 
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_ppo_%d_beta_%g_" % (args.formula, args.ppo_epochs, args.beta) \
+        output_path = args.folder + "%s_%s_ppo_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
                     + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
                     + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
@@ -157,12 +158,9 @@ def main():
                         default_dtype="float64",
                         device='cuda')
         
-    elif args.mlff_model == "orb":
-        from orb_models.forcefield import pretrained
+    elif args.mlff_model in pretrained.ORB_PRETRAINED_MODELS:
         from orb_models.forcefield.calculator import ORBCalculator
-
-        # Load the ORB forcefield model
-        orbff = pretrained.orb_v3_conservative_inf_omat(args.mlff_path, device='cuda', precision="float32-high") 
+        orbff = pretrained.ORB_PRETRAINED_MODELS[args.mlff_model](args.mlff_path, device='cuda')
         calc = ORBCalculator(orbff, device='cuda')
     
     elif args.mlff_model == "matgl":

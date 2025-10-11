@@ -31,7 +31,7 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 2000
+finetune_batchsize = 1000
 
 pretrain_epochs = 10000
 finetune_epochs = 5000 
@@ -62,20 +62,24 @@ else:
 ###############################
 
 reward='ehull'
-mlff_model='orb'
-beta = 0.1
+beta = 0.0
 formula = 'Ti13Al9Co8'
-spacegroup = 160
+spacegroup = None
 
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20/csp-6000f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-0d128/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0.1_0.1/'
 #restore_path = None
+
 #convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
-#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
-mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2'
+
+mlff_model='orb-v2'
+mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
+
+#mlff_model='orb-v3-conservative-inf-mpa'
+#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
 
 ###############################
 
@@ -100,7 +104,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 
     job += '''
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+#export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 cd /home/user_wanglei/private/homefile/crystal_gpt/
 echo Current working directory is `pwd`
