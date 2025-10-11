@@ -106,7 +106,15 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_min = jnp.min(rewards)
         f_max = jnp.max(rewards)
 
-        advantages = rewards - f_mean
+        # Set advantage to 1 for matched formulas with 10% lowest energy, 0 otherwise
+        advantages = jnp.zeros((batchsize,))
+        if jnp.sum(formula_match) > 0:
+            # Find the threshold for top 10% of rewards among matched formulas (lowest 10% energy)
+            k = jnp.maximum(1, jnp.int32(jnp.ceil(0.1 * jnp.sum(formula_match))))
+            threshold = jnp.partition(rewards_matched, -k)[-k]
+            # Set advantage to 1 for matched formulas with rewards >= threshold
+            top_10_percent = jnp.logical_and(formula_match, rewards >= threshold)
+            advantages = advantages.at[top_10_percent].set(1.0)
         
         f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 
