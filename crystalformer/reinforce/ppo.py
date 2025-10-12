@@ -106,9 +106,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_min = jnp.min(rewards)
         f_max = jnp.max(rewards)
 
-        # Compute advantage: 1 if reward in top 10% of matched formulas, else 0
-        threshold = jnp.percentile(rewards_matched, 90)
-        advantages = (rewards >= threshold).astype(jnp.float32)
+        advantages = rewards - f_mean
         
         f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 

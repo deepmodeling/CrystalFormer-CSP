@@ -107,10 +107,9 @@ def main():
 
     print("\n========== Prepare logs ==========")
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_%s_ppo_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
+        output_path = args.folder + "%s_%s_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
-                    + args.optimizer+"_bs_%d_lr_%g_decay_%g_clip_%g" % (args.batchsize, args.lr, args.lr_decay, args.clip_grad) \
-                    + '_A_%g_W_%g_N_%g'%(args.atom_types, args.wyck_types, args.n_max) \
+                    + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                     +  "_" + transformer_name 
 
