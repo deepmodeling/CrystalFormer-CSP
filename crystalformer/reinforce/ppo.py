@@ -107,6 +107,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_max = jnp.max(rewards)
 
         advantages = rewards - f_mean
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
         f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
 

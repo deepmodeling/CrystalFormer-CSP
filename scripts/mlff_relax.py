@@ -14,16 +14,15 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
 from ase.constraints import FixSymmetry
+from orb_models.forcefield import pretrained
 
 from symmetry import find_spg
 
-def make_orb_calc(model_path, device="cuda"):
-    from orb_models.forcefield import pretrained
+def make_orb_calc(orb_model, model_path, device="cuda"):
     from orb_models.forcefield.calculator import ORBCalculator
 
     # Load the ORB forcefield model
-    orbff = pretrained.orb_v3_conservative_inf_mpa(model_path, device=device,
-                                                    precision="float32-high")
+    orbff = pretrained.ORB_PRETRAINED_MODELS[orb_model](model_path, device=device)
     calc = ORBCalculator(orbff, device=device)
 
     return calc
@@ -143,8 +142,8 @@ def main(args):
         print("Fixing space group symmetry of the structures.")
 
     print(f"Using {args.model} model at {args.model_path}")
-    if args.model == "orb":
-        calc = make_orb_calc(args.model_path, args.device)
+    if args.model in pretrained.ORB_PRETRAINED_MODELS:
+        calc = make_orb_calc(args.model, args.model_path, args.device)
     elif args.model == "matgl":
         calc = make_matgl_calc(args.model_path, args.device)
     elif args.model == "mace":
@@ -186,7 +185,7 @@ if __name__ == "__main__":
     
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=["orb", "matgl", "mace", "dp"], default="orb", help="choose the MLFF model")
+    parser.add_argument("--model", type=str, default='orb-v2', choices=["orb-v3-conservative-inf-mpa", "orb-v2", "matgl", "mace", "dp"], help="choose the MLFF model")
     parser.add_argument("--device", type=str, default="cuda", help="choose the device to run the model on")
     parser.add_argument("--model_path", type=str, default="./data/orb-v2-20241011.ckpt", help="path to the model checkpoint")
     parser.add_argument("--restore_path", type=str, default="./experimental/", help="")
