@@ -23,8 +23,9 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
-
-        kl_loss = logp - pretrain_logp
+            
+        #http://joschu.net/blog/kl-approx.html k2 estimator for kl(p||p_pretrain) 
+        kl_loss = logp - pretrain_logp + jnp.exp(pretrain_logp - logp) - 1 
         advantages = advantages - beta * kl_loss
 
         # Finding the ratio (pi_theta / pi_theta__old)
