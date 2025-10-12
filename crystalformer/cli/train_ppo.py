@@ -106,8 +106,14 @@ def main():
     loss_fn, logp_fn = make_loss_fn(args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, transformer)
 
     print("\n========== Prepare logs ==========")
+
+    if args.K>0:
+        assert (args.batchsize % args.K == 0), \
+        f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
+
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_%s_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
+        output_path = args.folder + "%s_%s_ppo_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
+                    + ("K_%d_" % args.K if args.K > 0 else "") \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
                     + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
