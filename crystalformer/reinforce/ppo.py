@@ -24,7 +24,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
             
-        #http://joschu.net/blog/kl-approx.html k2 estimator for kl(p||p_pretrain) 
+        #http://joschu.net/blog/kl-approx.html k3 estimator for kl(p||p_pretrain) 
         kl_loss = logp - pretrain_logp + jnp.exp(pretrain_logp - logp) - 1 
         advantages = advantages - beta * kl_loss
 
@@ -99,7 +99,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
         rewards_matched = -batch_reward_fn(x_matched)
         
-        rewards = jnp.full((batchsize,), -10.0) # default reward for unmatched structure
+        rewards = jnp.full((batchsize,), -1.0) # default reward for unmatched structure
         rewards = rewards.at[formula_match].set(rewards_matched)
 
         f_mean = jnp.mean(rewards)
