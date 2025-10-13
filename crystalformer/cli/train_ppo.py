@@ -65,6 +65,7 @@ def main():
     group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
     parser.add_argument('--relaxation', action='store_true', help='whether to relax the structures')
     group.add_argument('--convex_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2')
+    group.add_argument('--alpha', type=float, default=0.1, help='weight for entropy regulalization')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
@@ -113,9 +114,10 @@ def main():
         f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
 
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_%s_ppo_%d_beta_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.beta) \
+        output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta) \
                     + ("K_%d_" % args.K if args.K > 0 else "") \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
+                    + ("relax_" if args.relaxation else "") \
                     + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                     +  "_" + transformer_name 
@@ -223,7 +225,7 @@ def main():
     sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature, args.K, args.spacegroup)
 
     print("\n========== Start RL training ==========")
-    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta)
+    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, alpha=args.alpha)
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,

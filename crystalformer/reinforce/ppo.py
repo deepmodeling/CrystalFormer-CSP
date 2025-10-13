@@ -10,7 +10,7 @@ from crystalformer.src.formula import find_composition_vector
 from crystalformer.src.lattice import norm_lattice
 
 
-def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
+def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0):
 
     """
     PPO clipped objective function with KL divergence regularization
@@ -26,7 +26,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1):
             
         #http://joschu.net/blog/kl-approx.html k3 estimator for kl(p||p_pretrain) 
         kl_loss = logp - pretrain_logp + jnp.exp(pretrain_logp - logp) - 1 
-        advantages = advantages - beta * kl_loss
+        advantages = advantages - beta * kl_loss - alpha * logp
 
         # Finding the ratio (pi_theta / pi_theta__old)
         ratios = jnp.exp(logp - old_logp)
@@ -99,7 +99,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
         rewards_matched = -batch_reward_fn(x_matched)
         
-        rewards = jnp.full((batchsize,), -10.0) # default reward for unmatched structure
+        rewards = jnp.full((batchsize,), -1.0) # default reward for unmatched structure
         rewards = rewards.at[formula_match].set(rewards_matched)
 
         f_mean = jnp.mean(rewards)

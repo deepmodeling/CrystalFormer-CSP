@@ -175,7 +175,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
                 e_above_hull = np.inf
 
         # clip e above hull to avoid too large or too small values
-        e_above_hull = np.clip(e_above_hull, -10.0, 10.0)
+        e_above_hull = np.clip(e_above_hull, -1.0, 1.0)
 
         return e_above_hull
     
