@@ -62,8 +62,8 @@ else:
 ###############################
 
 reward='ehull'
-alpha = 0.01
-beta = 0.0
+alpha = 0.0
+beta = 0.01
 formula = 'Ti13Al9Co8'
 spacegroup = 160
 K = 0
