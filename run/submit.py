@@ -76,6 +76,7 @@ if __name__=='__main__':
                         'restore_path': restore_path, 
                         'convex_path': convex_path, 
                         'mlff_path': mlff_path, 
+                        'relaxation':relaxation, 
                         'beta':beta, 
                         'K':K,
                         'dropout_rate' : finetune_dropout_rate

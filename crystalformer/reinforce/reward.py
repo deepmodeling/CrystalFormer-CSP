@@ -136,7 +136,7 @@ def make_force_reward_fn(calculator, weight=1.0):
     return reward_fn, batch_reward_fn
 
 
-def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
+def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=False):
     """
     Args:
         calculator: ase calculator object
@@ -175,7 +175,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
                 e_above_hull = np.inf
 
         # clip e above hull to avoid too large or too small values
-        e_above_hull = np.clip(e_above_hull, -1.0, 1.0)
+        e_above_hull = np.clip(e_above_hull, -10.0, 10.0)
 
         return e_above_hull
     
@@ -205,11 +205,12 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1):
         #structures, energies = zip(*map(energy_fn, zip(*x)))
 
         #batch relax 
+        steps = 500 if relaxation else 0
         structures = [get_atoms_from_GLXYZAW(*t) for t in zip(*x)]
         relaxer = BatchRelaxer(calculator.model,
                            device='cuda',
                            fmax=0.01,
-                           max_n_steps=500, 
+                           max_n_steps=steps, 
                            max_natoms_per_batch=1000,
                            filter="FRECHETCELLFILTER",
                            optimizer="FIRE")

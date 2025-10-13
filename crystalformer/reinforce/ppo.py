@@ -99,7 +99,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
         rewards_matched = -batch_reward_fn(x_matched)
         
-        rewards = jnp.full((batchsize,), -1.0) # default reward for unmatched structure
+        rewards = jnp.full((batchsize,), -10.0) # default reward for unmatched structure
         rewards = rewards.at[formula_match].set(rewards_matched)
 
         f_mean = jnp.mean(rewards)

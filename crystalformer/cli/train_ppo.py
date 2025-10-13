@@ -63,6 +63,7 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
+    parser.add_argument('--relaxation', action='store_true', help='whether to relax the structures')
     group.add_argument('--convex_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
@@ -203,7 +204,7 @@ def main():
             for entry in ref_data['entries']:
                 entry.pop('structure')
                 
-        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data, n_jobs=args.num_io_process)
+        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data, n_jobs=args.num_io_process, relaxation=args.relaxation)
     
     elif args.reward == "prop":
         from crystalformer.reinforce.reward import make_prop_reward_fn
