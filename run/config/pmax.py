@@ -63,7 +63,7 @@ else:
 
 reward='ehull'
 alpha = 0.01
-beta = 0.01
+beta = 0.0
 formula = 'Ti13Al9Co8'
 spacegroup = 160
 K = 0
@@ -73,6 +73,7 @@ relaxation=True
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-0d128/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0.1_0.1/'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-7c0a6/Ti13Al9Co8_orb-v2_ppo_5_a_0.01_b_0_spg_160_relax_adam_bs_1000_lr_1e-05_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0/'
 #restore_path = None
 
 #convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'

@@ -38,7 +38,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0):
         # Final loss of clipped objective PPO
         ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
 
-        return ppo_loss, (jnp.mean(kl_loss))
+        return ppo_loss, (jnp.mean(kl_loss), -jnp.mean(logp))
     
     return ppo_loss_fn
 
@@ -65,7 +65,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups\n")
+        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups kl entropy\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -108,9 +108,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_max = jnp.max(rewards)
 
         advantages = rewards - f_mean
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-        
-        f.write( ("%6d" + 5*"  %.6f" + "  %3d" + "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups))
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
@@ -131,8 +129,9 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
-            ppo_loss, (kl_loss) = value
-            #print(f"epoch {epoch}, loss {jnp.mean(ppo_loss):.6f} {jnp.mean(kl_loss):.6f}")
+            ppo_loss, (kl_loss, entropy) = value
+        
+        f.write( ("%6d" + 5*"  %.6f" + "  %3d" + 2*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, kl_loss[0], entropy[0]))
 
         if epoch % 10 == 0:
             ckpt = {"params": params,
