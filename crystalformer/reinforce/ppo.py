@@ -64,7 +64,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups kl entropy\n")
+        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups unique_wyckoff_sequences kl entropy\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -89,9 +89,11 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         
         # Compute fraction of formula matches
         formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
-        
+ 
         # Compute unique number of space groups (one-liner, JIT-friendly)
         unique_space_groups = jnp.sum(jnp.sum(jnp.arange(1, 231)[:, None] == G[None, :], axis=1) > 0)
+        # Number of unique wyckoff sequences for those matched formula
+        unique_wyckoff_sequences = jnp.unique(W[formula_match], axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
 
@@ -130,7 +132,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy) = value
         
-        f.write( ("%6d" + 5*"  %.6f" + "  %3d" + 2*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, kl_loss[0], entropy[0]))
+        f.write( ("%6d" + 5*"  %.6f" + 2*"  %3d" + 2*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, unique_wyckoff_sequences, kl_loss[0], entropy[0]))
 
         if epoch % 10 == 0:
             ckpt = {"params": params,
