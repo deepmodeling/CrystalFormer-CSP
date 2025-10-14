@@ -240,8 +240,7 @@ def main():
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path, 
-                               lamb_g = args.lamb_g, lamb_a = args.lamb_a, lamb_w = args.lamb_w, lamb_xyz = args.lamb_xyz, lamb_l = args.lamb_l
+                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path
                                )
 
 

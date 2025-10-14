@@ -42,7 +42,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xy
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, composition, params, epoch_finished, epochs, ppo_epochs, batchsize, path, lamb_g=1.0, lamb_xyz=1.0,lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
+def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, composition, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     num_devices = jax.local_device_count()
     batch_per_device = batchsize // num_devices
@@ -121,10 +121,10 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
-        old_logp = lamb_g*logp_g + lamb_w*logp_w + lamb_xyz *logp_xyz + lamb_a*logp_a + lamb_l*logp_l
+        old_logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(pretrain_params, subkey2, *x, False)
-        pretrain_logp = lamb_g*logp_g + lamb_w*logp_w + lamb_xyz *logp_xyz + lamb_a*logp_a + lamb_l*logp_l
+        pretrain_logp = logp_g + logp_w + logp_xyz + logp_a + logp_l
 
         x = jax.tree_util.tree_map(lambda _x: _x.reshape(shape_prefix + _x.shape[1:]), x)
         old_logp = old_logp.reshape(shape_prefix + old_logp.shape[1:])
