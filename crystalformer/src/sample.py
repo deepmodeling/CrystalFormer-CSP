@@ -60,7 +60,7 @@ def sample_x(key, h_x, Kx, top_p, temperature, batchsize):
     return key, x 
 
 
-def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature, K=0, g=None)
+def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature, K=0, g=None):
 
 
     @partial(jax.jit, static_argnums=2)
