@@ -37,7 +37,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xy
         # Final loss of clipped objective PPO
         ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
 
-        return ppo_loss, (jnp.mean(kl_loss), -jnp.mean(logp))
+        return ppo_loss, (jnp.mean(kl_loss), -jnp.mean(logp_g), -jnp.mean(logp_w), -jnp.mean(logp_a), -jnp.mean(logp_xyz), -jnp.mean(-logp_l))
     
     return ppo_loss_fn
 
@@ -64,7 +64,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups unique_wyckoff_sequences kl entropy\n")
+        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -90,10 +90,14 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         # Compute fraction of formula matches
         formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
  
-        # Compute unique number of space groups (one-liner, JIT-friendly)
-        unique_space_groups = jnp.sum(jnp.sum(jnp.arange(1, 231)[:, None] == G[None, :], axis=1) > 0)
+        # Compute unique number of space groups 
+        unique_space_groups = jnp.unique(G[formula_match], return_counts=False).shape[0]
         # Number of unique wyckoff sequences for those matched formula
         unique_wyckoff_sequences = jnp.unique(W[formula_match], axis=0, return_counts=False).shape[0]
+        unique_atom_sequences = jnp.unique(A[formula_match], axis=0, return_counts=False).shape[0]
+        # Number of unique (W, A) combinations
+        WA_combined = jnp.concatenate([W[formula_match], A[formula_match]], axis=1)
+        unique_WA_combinations = jnp.unique(WA_combined, axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
 
@@ -130,9 +134,10 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
-            ppo_loss, (kl_loss, entropy) = value
+            ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
-        f.write( ("%6d" + 5*"  %.6f" + 2*"  %3d" + 2*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, unique_wyckoff_sequences, kl_loss[0], entropy[0]))
+        f.write( ("%6d" + 5*"  %.6f" + 4*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
+            kl_loss[0], entropy_g[0], entropy_w[0], entropy_a[0], entropy_xyz[0], entropy_l[0]))
 
         if epoch % 10 == 0:
             ckpt = {"params": params,
