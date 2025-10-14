@@ -72,6 +72,14 @@ def main():
     group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
 
+
+    group = parser.add_argument_group('loss parameters')
+    group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part")
+    group.add_argument("--lamb_g", type=float, default=1.0, help="weight for the g partc")
+    group.add_argument("--lamb_xyz", type=float, default=1.0, help="weight for the xyz part")
+    group.add_argument("--lamb_w", type=float, default=1.0, help="weight for the w part")
+    group.add_argument("--lamb_l", type=float, default=1.0, help="weight for the lattice part")
+
     group = parser.add_argument_group('property reward parameters')
     group.add_argument('--target', type=float, default=-3, help='target property value to optimize')
     group.add_argument('--dummy_value', type=float, default=0, help='dummy value for the property')
@@ -118,6 +126,7 @@ def main():
                     + ("K_%d_" % args.K if args.K > 0 else "") \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
                     + ("relax_" if args.relaxation else "") \
+                    + ('g_%g_w_%g_a_%g_xyz_%g_l_%g_'%(args.lamb_g, args.lamb_w, args.lamb_a, args.lamb_xyz, args.lamb_l)) \
                     + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
                     +  "_" + transformer_name 
@@ -225,11 +234,15 @@ def main():
     sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature, args.K, args.spacegroup)
 
     print("\n========== Start RL training ==========")
-    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, alpha=args.alpha)
+    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, alpha=args.alpha, 
+                                   lamb_g = args.lamb_g, lamb_a = args.lamb_a, lamb_w = args.lamb_w, lamb_xyz = args.lamb_xyz, lamb_l = args.lamb_l
+                                   )
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path)
+                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path, 
+                               lamb_g = args.lamb_g, lamb_a = args.lamb_a, lamb_w = args.lamb_w, lamb_xyz = args.lamb_xyz, lamb_l = args.lamb_l
+                               )
 
 
 if __name__ == "__main__":

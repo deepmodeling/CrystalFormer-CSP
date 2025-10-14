@@ -80,6 +80,11 @@ if __name__=='__main__':
                         'alpha':alpha, 
                         'beta':beta, 
                         'K':K,
+                        'lamb_a': lamb_a,
+                        'lamb_w': lamb_w,
+                        'lamb_l': lamb_l,
+                        'lamb_g': lamb_g,
+                        'lamb_xyz': lamb_xyz,
                         'dropout_rate' : finetune_dropout_rate
                         })
 

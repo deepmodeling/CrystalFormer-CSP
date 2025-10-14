@@ -36,7 +36,11 @@ finetune_batchsize = 1000
 pretrain_epochs = 10000
 finetune_epochs = 5000 
 
-lamb_a, lamb_w, lamb_l = 1.0, 1.0, 1.0
+lamb_g = 0.0
+lamb_xyz = 1.0
+lamb_l = 1.0
+lamb_a = 2.0
+lamb_w = 2.0
 
 num_io_process = 20
 
@@ -62,8 +66,8 @@ else:
 ###############################
 
 reward='ehull'
-alpha = 0.0
-beta = 0.01
+alpha = 0.01
+beta = 0.0
 formula = 'Ti13Al9Co8'
 spacegroup = 160
 K = 0
