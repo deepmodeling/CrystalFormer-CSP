@@ -60,8 +60,7 @@ def sample_x(key, h_x, Kx, top_p, temperature, batchsize):
     return key, x 
 
 
-def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature, K=0, g=None,
-                        lamb_g=1.0, lamb_xyz=1.0,lamb_a=1.0, lamb_w=1.0, lamb_l=1.0): 
+def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_mask, top_p, temperature, K=0, g=None)
 
 
     @partial(jax.jit, static_argnums=2)
@@ -78,7 +77,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
             w_logit = w_logit[:, :wyck_types]
         
             key, subkey = jax.random.split(key)
-            w = sample_top_p(subkey, w_logit, top_p, temperature*lamb_w)
+            w = sample_top_p(subkey, w_logit, top_p, temperature)
             if w_mask is not None:
                 # replace w with the w_mask[i] if it is not None
                 w = w.at[:].set(w_mask[i])
@@ -90,7 +89,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         
             key, subkey = jax.random.split(key)
             a_logit = a_logit + jnp.where(atom_mask, 0.0, -1e10) # enhance the probability of masked atoms (do not need to normalize since we only use it for sampling, not computing logp)
-            a = sample_top_p(subkey, a_logit, top_p, temperature*lamb_a)
+            a = sample_top_p(subkey, a_logit, top_p, temperature)
             A = A.at[:, i].set(a)
         
             lattice_params = h_al[:, atom_types:atom_types+Kl+2*6*Kl]
@@ -98,7 +97,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         
             # (3) X
             h_x = inference(transformer, params, composition, G, W, A, X, Y, Z)[1][:, 5*i+2] # (batchsize, output_size)
-            key, x = sample_x(key, h_x, Kx, top_p, temperature*lamb_xyz, batchsize)
+            key, x = sample_x(key, h_x, Kx, top_p, temperature, batchsize)
         
             # project to the first WP
             xyz = jnp.concatenate([x[:, None], 
@@ -111,7 +110,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         
             # (4) Y
             h_y = inference(transformer, params, composition, G, W, A, X, Y, Z)[1][:, 5*i+3] # (batchsize, output_size)
-            key, y = sample_x(key, h_y, Kx, top_p, temperature*lamb_xyz, batchsize)
+            key, y = sample_x(key, h_y, Kx, top_p, temperature, batchsize)
             
             # project to the first WP
             xyz = jnp.concatenate([X[:, i][:, None], 
@@ -124,7 +123,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         
             # (5) Z
             h_z = inference(transformer, params, composition, G, W, A, X, Y, Z)[1][:, 5*i+4] # (batchsize, output_size)
-            key, z = sample_x(key, h_z, Kx, top_p, temperature*lamb_xyz, batchsize)
+            key, z = sample_x(key, h_z, Kx, top_p, temperature, batchsize)
             
             # project to the first WP
             xyz = jnp.concatenate([X[:, i][:, None], 
@@ -152,7 +151,7 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         if g is None: 
             if K == 0: 
                 key, subkey = jax.random.split(key)
-                G = sample_top_p(subkey, g_logit, top_p, temperature*lamb_g) + 1
+                G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
             else:
                 # select top K spacegroups
                 G = jnp.argsort(-g_logit[0])[:K] +1  # (K, ) 
@@ -174,13 +173,13 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
 
         key, key_k, key_l = jax.random.split(key, 3)
         # k is (batchsize, ) integer array whose value in [0, Kl) 
-        k = sample_top_p(key_k, l_logit, top_p, temperature*lamb_l)
+        k = sample_top_p(key_k, l_logit, top_p, temperature)
 
         mu = mu.reshape(batchsize, Kl, 6)
         mu = mu[jnp.arange(batchsize), k]       # (batchsize, 6)
         sigma = sigma.reshape(batchsize, Kl, 6)
         sigma = sigma[jnp.arange(batchsize), k] # (batchsize, 6)
-        L = jax.random.normal(key_l, (batchsize, 6)) * sigma*jnp.sqrt(temperature*lamb_l) + mu # (batchsize, 6)
+        L = jax.random.normal(key_l, (batchsize, 6)) * sigma*jnp.sqrt(temperature) + mu # (batchsize, 6)
         
         #scale length according to atom number since we did reverse of that when loading data
         length, angle = jnp.split(L, 2, axis=-1)
