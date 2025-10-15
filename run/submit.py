@@ -85,6 +85,8 @@ if __name__=='__main__':
                         'lamb_l': lamb_l,
                         'lamb_g': lamb_g,
                         'lamb_xyz': lamb_xyz,
+                        'ehull_clip': ehull_clip,
+                        'formula_clip': formula_clip,
                         'dropout_rate' : finetune_dropout_rate
                         })
 
