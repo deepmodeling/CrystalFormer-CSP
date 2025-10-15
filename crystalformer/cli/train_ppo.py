@@ -69,7 +69,6 @@ def main():
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ehull_clip', type=float, default=20, help='clip parameter for ehull value')
-    group.add_argument('--formula_clip', type=float, default=10, help='clip parameter matched formula')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
     group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
@@ -128,7 +127,7 @@ def main():
                     + ("K_%d_" % args.K if args.K > 0 else "") \
                     + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
                     + ("relax_" if args.relaxation else "") \
-                    + ("ehull_%g_formula_%g_"%(args.ehull_clip, args.formula_clip) ) \
+                    + ("eclip_%g_"%(args.ehull_clip) ) \
                     + ('g_%g_w_%g_a_%g_xyz_%g_l_%g_'%(args.lamb_g, args.lamb_w, args.lamb_a, args.lamb_xyz, args.lamb_l)) \
                     + args.optimizer+"_bs_%d_lr_%g" % (args.batchsize, args.lr) \
                     + ("_wd_%g"%(args.weight_decay) if args.optimizer == "adamw" else "") \
@@ -244,8 +243,7 @@ def main():
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path, 
-                               args.formula_clip
+                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path
                                )
 
 

@@ -42,7 +42,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xy
     return ppo_loss_fn
 
 
-def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, composition, params, epoch_finished, epochs, ppo_epochs, batchsize, path, clip_value):
+def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal, composition, params, epoch_finished, epochs, ppo_epochs, batchsize, path):
 
     num_devices = jax.local_device_count()
     batch_per_device = batchsize // num_devices
@@ -104,7 +104,8 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
         rewards_matched = -batch_reward_fn(x_matched)
         
-        rewards = jnp.full((batchsize,), -clip_value) # default reward for unmatched structure
+        clip_value = jnp.min(rewards_matched)  # the worse ehull 
+        rewards = jnp.full((batchsize,), clip_value) # default reward for unmatched structure
         rewards = rewards.at[formula_match].set(rewards_matched)
 
         f_mean = jnp.mean(rewards)
