@@ -113,8 +113,8 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         f_min = jnp.min(rewards)
         f_max = jnp.max(rewards)
 
-        advantages = rewards - f_mean
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
+        advantages = rewards - jnp.median(rewards)
+        #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
