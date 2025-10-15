@@ -215,7 +215,9 @@ def main():
             for entry in ref_data['entries']:
                 entry.pop('structure')
                 
-        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data, n_jobs=args.num_io_process, relaxation=args.relaxation)
+        clip_value = 1.0 if args.relaxation else 10.0
+        _, batch_reward_fn = make_ehull_reward_fn(calc, ref_data, n_jobs=args.num_io_process, 
+                                                  relaxation=args.relaxation, clip_value=clip_value)
     
     elif args.reward == "prop":
         from crystalformer.reinforce.reward import make_prop_reward_fn
@@ -240,7 +242,8 @@ def main():
 
     # PPO training
     params, opt_state = train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss_fn, sample_crystal,
-                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path
+                               composition, params, epoch_finished, args.epochs, args.ppo_epochs, args.batchsize, output_path, 
+                               clip_value
                                )
 
 

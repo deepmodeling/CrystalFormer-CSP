@@ -136,7 +136,7 @@ def make_force_reward_fn(calculator, weight=1.0):
     return reward_fn, batch_reward_fn
 
 
-def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=False):
+def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=False, clip_value=10.0):
     """
     Args:
         calculator: ase calculator object
@@ -175,7 +175,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
                 e_above_hull = np.inf
 
         # clip e above hull to avoid too large or too small values
-        e_above_hull = np.clip(e_above_hull, -1.0, 1.0)
+        e_above_hull = np.clip(e_above_hull, -clip_value, clip_value)
 
         return e_above_hull
     
