@@ -108,12 +108,12 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         rewards = jnp.full((batchsize,), clip_value) # default reward for unmatched structure
         rewards = rewards.at[formula_match].set(rewards_matched)
 
-        f_mean = jnp.mean(rewards)
-        f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
-        f_min = jnp.min(rewards)
-        f_max = jnp.max(rewards)
+        f_mean = jnp.mean(rewards_matched)
+        f_err = jnp.std(rewards_matched) / jnp.sqrt(1.0*len(rewards_matched))
+        f_min = jnp.min(rewards_matched)
+        f_max = jnp.max(rewards_matched)
 
-        advantages = rewards - jnp.median(rewards)
+        advantages = rewards - f_mean
         #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
         G, L, XYZ, A, W = x
