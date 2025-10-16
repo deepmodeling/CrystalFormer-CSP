@@ -236,7 +236,7 @@ fi
 # Construct full paths
 EPOCH_PATH="${RESTORE_PATH}/${EPOCH}"
 OUTPUT_STRUCT_FILE="output_${FORMULA}_struct.csv"
-RELAXED_STRUCT_FILE="relaxed_structures.csv"
+RELAXED_STRUCT_FILE="relaxed_structures_${FORMULA}.csv"
 
 echo "=== CrystalGPT Postprocessing Pipeline ==="
 echo "Restore path: $RESTORE_PATH"
@@ -319,6 +319,7 @@ if [[ "$SKIP_ENERGY" == false ]]; then
         --filename "$OUTPUT_STRUCT_FILE"
         --model orb-v3-conservative-inf-mpa
         --primitive
+        --label "$FORMULA"
         --model_path "$MODEL_PATH"
     )
     
@@ -353,6 +354,8 @@ if [[ "$SKIP_EHULL" == false ]]; then
     # Add label if provided
     if [[ -n "$LABEL" ]]; then
         EHULL_ARGS+=(--label "$LABEL")
+    else
+        EHULL_ARGS+=(--label "$FORMULA")
     fi
     
     # Add relaxation flag if enabled

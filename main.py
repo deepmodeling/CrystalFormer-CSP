@@ -17,7 +17,7 @@ from crystalformer.src.sample import make_sample_crystal
 from crystalformer.src.loss import make_loss_fn
 import crystalformer.src.checkpoint as checkpoint
 from crystalformer.src.wyckoff import mult_table
-from crystalformer.src.formula import formula_string_to_composition_vector
+from crystalformer.src.formula import formula_string_to_composition_vector, find_composition_vector
 
 import argparse
 parser = argparse.ArgumentParser(description='')
@@ -75,6 +75,7 @@ group.add_argument('--num_samples', type=int, default=10, help='number of sample
 group.add_argument('--num_io_process', type=int, default=40, help='number of process used in multiprocessing io')
 group.add_argument('--save_path', type=str, default=None, help='path to save the sampled structures')
 group.add_argument('--output_filename', type=str, default='output.csv', help='outfile to save sampled structures')
+group.add_argument('--verbose', type=int, default=0, help='verbose level')
 
 group = parser.add_argument_group('MCMC parameters')
 group.add_argument('--mcmc', action='store_true', help='use MCMC to sample')
@@ -213,20 +214,21 @@ else:
     for batch_idx in range(total_num_samples // args.batchsize):
         key, subkey = jax.random.split(key)
         G, XYZ, A, W, M, L = sample_crystal(subkey, params, args.batchsize, composition)
-
-        print ("G:\n", G)  # spacegroup
-        print ("XYZ:\n", XYZ)  # fractional coordinate 
-        print ("A:\n", A)  # element type
-        print ("W:\n")  # Wyckoff positions
-        for (g, w) in zip(G, W):
-            print (g, [_w.item() for _w in w])
-        print ("M:\n", M)  # multiplicity 
-        print ("N:\n", M.sum(axis=-1)) # total number of atoms
-        print ("L:\n")  # lattice
-        for g, l in zip(G, L):
-            print (g, l)
-        for g, a in zip(G, A):
-           print(g, [element_list[i] for i in a])
+        
+        if args.verbose>1:
+            print ("G:\n", G)  # spacegroup
+            print ("XYZ:\n", XYZ)  # fractional coordinate 
+            print ("A:\n", A)  # element type
+            print ("W:\n")  # Wyckoff positions
+            for (g, w) in zip(G, W):
+                print (g, [_w.item() for _w in w])
+            print ("M:\n", M)  # multiplicity 
+            print ("N:\n", M.sum(axis=-1)) # total number of atoms
+            print ("L:\n")  # lattice
+            for g, l in zip(G, L):
+                print (g, l)
+            for g, a in zip(G, A):
+                print(g, [element_list[i] for i in a])
 
         # output G, L, X, A, W, M, AW to csv file
         # output logp_g, logp_w, logp_xyz, logp_a, logp_l to csv file
@@ -243,9 +245,11 @@ else:
         length = length/num_atoms[:, None]**(1/3)
         angle = angle * (jnp.pi / 180) # to rad
         L = jnp.concatenate([length, angle], axis=-1)
-        print ("reduced L:\n")  # lattice
-        for g, l in zip(G, L):
-            print (g, l)
+
+        if args.verbose>1:
+            print ("reduced L:\n")  # lattice
+            for g, l in zip(G, L):
+                print (g, l)
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
 
@@ -254,7 +258,18 @@ else:
         data['logp_xyz'] = np.array(logp_xyz).tolist()
         data['logp_a'] = np.array(logp_a).tolist()
         data['logp_l'] = np.array(logp_l).tolist()
-        data['logp'] = np.array(logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l).tolist()
+
+        sample_logp = logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l
+        data['logp'] = np.array(sample_logp).tolist()
+
+        actual_compositions = jax.vmap(find_composition_vector)(A, M)
+        formula_match = jnp.all(actual_compositions == composition, axis=1)
+        sample_logp = sample_logp[formula_match]
+
+        if args.verbose>0:
+            print ('sample logp of matched formula:', sample_logp)
+            print ('W[formula_match]:\n', W[formula_match])
+            print ('A[formula_match]:\n', A[formula_match])
 
         data = data.sort_values(by='logp', ascending=False) # sort by logp
         
@@ -264,3 +279,11 @@ else:
         data.to_csv(filename, mode=write_mode, index=False, header=write_header)
 
         print ("Wrote samples to %s (batch %d/%d)"%(filename, batch_idx + 1, total_num_samples // args.batchsize))
+
+    if args.verbose>2:
+        example_data = GLXYZAW_from_file('Ti13Al9Co8', args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
+        G, L, XYZ, A, W = example_data
+        logp_g, logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
+
+        test_logp = logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l
+        print ('test logp', test_logp)
