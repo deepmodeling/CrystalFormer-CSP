@@ -153,9 +153,11 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
                 key, subkey = jax.random.split(key)
                 G = sample_top_p(subkey, g_logit, top_p, temperature) + 1
             else:
-                # select top K spacegroups
-                G = jnp.argsort(-g_logit[0])[:K] +1  # (K, ) 
-                G = G.repeat(batchsize//K) # (batchsize, )
+                # sample top K spacegroups uniformly
+                g_logits_topk = jnp.argsort(-g_logit[0])[:K]  # indices of top K spacegroups
+                key, subkey = jax.random.split(key)
+                sampled_indices = jax.random.randint(subkey, (batchsize,), 0, K)
+                G = g_logits_topk[sampled_indices] + 1  
         else: # one has specified the space group
             G = jnp.zeros((batchsize,), dtype=int) + g
 
