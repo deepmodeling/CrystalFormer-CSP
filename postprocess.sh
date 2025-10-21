@@ -319,7 +319,6 @@ if [[ "$SKIP_ENERGY" == false ]]; then
         --restore_path "$RESTORE_PATH/"
         --filename "$OUTPUT_STRUCT_FILE"
         --model orb-v3-conservative-inf-mpa
-        --primitive
         --label "$FORMULA"
         --model_path "$MODEL_PATH"
     )
