@@ -258,6 +258,7 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
         --optimizer none
         --restore_path "$EPOCH_PATH"
         --K "$K"
+        --verbose 1
         --batchsize "$BATCHSIZE"
         --num_samples "$NUM_SAMPLES"
         --formula "$FORMULA"

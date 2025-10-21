@@ -2,6 +2,7 @@ import warnings
 # To suppress warnings for clearer output
 warnings.simplefilter("ignore")
 
+import numpy as np
 import pandas as pd
 import os
 from time import time
@@ -26,11 +27,11 @@ def make_orb_calc(model_name, model_path, device="cuda"):
     return orbff
 
 
-def relax_structures(relaxer, structures):
+def relax_structures(relaxer, atoms_list):
     """
     Args:
         relaxer: BatchRelaxer object
-        structures: List of pymatgen Structure objects
+        atoms_list: List of ASE atoms
 
     Returns:
         initial_energies: List of initial energies
@@ -42,8 +43,6 @@ def relax_structures(relaxer, structures):
     """
 
     ase_adaptor = AseAtomsAdaptor()
-    atoms_list = [ase_adaptor.get_atoms(struct) for struct in structures]
-
     relaxation_trajectories = relaxer.relax(atoms_list)
 
     # Extract the initial structures and energies
@@ -54,15 +53,13 @@ def relax_structures(relaxer, structures):
     final_structures = [traj[-1] for traj in relaxation_trajectories.values()]
     final_energies = [structure.info['total_energy'] for structure in final_structures]
 
-    formula_list = [struct.composition.formula for struct in structures]
-
     final_structures = [ase_adaptor.get_structure(struct) for struct in final_structures]
     relaxed_cif_dicts = []
     for structure in final_structures:
         structure = structure.remove_site_property("forces")
         structure.properties = None
         relaxed_cif_dicts.append(structure.as_dict())
-
+    formula_list = [struct.composition.formula for struct in final_structures]
     return initial_energies, final_energies, relaxed_cif_dicts, formula_list
 
 
@@ -79,7 +76,6 @@ def main(args):
         print("Converting structures to primitive form...")
         structures = [struct.get_primitive_structure() for struct in structures]
 
-    print("Relaxing structures...")
     if args.relaxation:
         print("Relaxation is enabled. This may take a while.")
     else:
@@ -102,10 +98,24 @@ def main(args):
                            max_natoms_per_batch=args.max_natoms_per_batch,
                            filter="FRECHETCELLFILTER",
                            optimizer="FIRE")
+        
+    #prepare initial structures to be relaxed
+    from orb_models.forcefield.calculator import ORBCalculator
+    calc = ORBCalculator(potential, device=args.device)
+    ase_adaptor = AseAtomsAdaptor()
+    atoms_list = []
+    for s in structures:
+        a = ase_adaptor.get_atoms(s)
+        a.calc = calc
+        try: 
+            if not np.isnan(a.get_potential_energy()):
+                atoms_list.append(a)
+        except Exception:
+            pass
 
-    print("Calculating energies...")
+    print(f"Relax {len(atoms_list)} structures...")
     start_time = time()
-    results  = relax_structures(relaxer, structures)
+    results  = relax_structures(relaxer, atoms_list)
     end_time = time()
     print(f"Relaxation took {end_time - start_time:.2f} seconds")
 

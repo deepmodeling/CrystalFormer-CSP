@@ -257,9 +257,9 @@ else:
 
         actual_compositions = jax.vmap(find_composition_vector)(A, M)
         formula_match = jnp.all(actual_compositions == composition, axis=1)
-        sample_logp = sample_logp[formula_match]
 
         if args.verbose>0:
+            sample_logp = sample_logp[formula_match]
             print ('sample logp of matched formula:', sample_logp)
             print ('W[formula_match]:\n', W[formula_match])
             print ('A[formula_match]:\n', A[formula_match])
@@ -273,7 +273,7 @@ else:
 
         print ("Wrote samples to %s (batch %d/%d)"%(filename, batch_idx + 1, num_batches))
 
-    if args.verbose>2:
+    if args.verbose>0:
         example_data = GLXYZAW_from_file('Ti13Al9Co8', args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
         G, L, XYZ, A, W = example_data
         logp_g, logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
