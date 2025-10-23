@@ -142,7 +142,10 @@ else:
 
 
 print("\n========== Load checkpoint==========")
-ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or output_path) 
+try:
+    ckpt_filename, epoch_finished = checkpoint.find_ckpt_filename(args.restore_path or output_path) 
+except FileNotFoundError:
+    ckpt_filename, epoch_finished = None, 0
 if ckpt_filename is not None:
     print("Load checkpoint file: %s, epoch finished: %g" %(ckpt_filename, epoch_finished))
     ckpt = checkpoint.load_data(ckpt_filename)

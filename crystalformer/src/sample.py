@@ -147,6 +147,8 @@ def make_sample_crystal(transformer, n_max, atom_types, wyck_types, Kx, Kl, w_ma
         
         #start from sampling the space group
         g_logit = inference(transformer, params, composition, G, W, A, X, Y, Z)[0] # (batchsize, 230) actually should be same along batchsize axis 
+
+        #jax.debug.print("g_logit {g_logit}", g_logit=g_logit)
             
         if g is None: 
             if K == 0: 
