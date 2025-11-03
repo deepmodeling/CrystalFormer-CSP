@@ -262,12 +262,13 @@ else:
         formula_match = jnp.all(actual_compositions == composition, axis=1)
 
         if args.verbose>0:
-            sample_logp = sample_logp[formula_match]
-            print ('sample logp of matched formula:', sample_logp)
-            print ('W[formula_match]:\n', W[formula_match])
-            print ('A[formula_match]:\n', A[formula_match])
+            idx = jnp.argsort(G[formula_match])
+            print ('sample logp of matched formula:', sample_logp[formula_match][idx])
+            print ('G[formula_match]:\n', G[formula_match][idx])
+            print ('W[formula_match]:\n', W[formula_match][idx])
+            print ('A[formula_match]:\n', A[formula_match][idx])
 
-        data = data.sort_values(by='logp', ascending=False) # sort by logp
+        data = data.sort_values(by='G', ascending=True) 
         
         # Use write mode for first batch, append mode for subsequent batches
         write_mode = 'w' if batch_idx == 0 else 'a'

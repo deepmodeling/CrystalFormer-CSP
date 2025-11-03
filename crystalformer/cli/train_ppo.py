@@ -118,10 +118,6 @@ def main():
 
     print("\n========== Prepare logs ==========")
 
-    if args.K>0:
-        assert (args.batchsize % args.K == 0), \
-        f"Batch size ({args.batchsize}) must be divisible by K ({args.K})"
-
     if args.optimizer != "none" or args.restore_path is None:
         output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta) \
                     + ("K_%d_" % args.K if args.K > 0 else "") \

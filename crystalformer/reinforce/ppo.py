@@ -48,6 +48,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     batch_per_device = batchsize // num_devices
     shape_prefix = (num_devices, batch_per_device)
     print("num_devices: ", num_devices)
+    print("batchsize: ", batchsize)
     print("batch_per_device: ", batch_per_device)
     print("shape_prefix: ", shape_prefix)
 
@@ -64,7 +65,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max formula_match_fraction unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
+        f.write("epoch f_mean f_err f_min f_max attempt unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -72,46 +73,91 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
-        # Keep sampling until at least one crystal matches the formula
-        formula_match = jnp.array([False])
-        max_attempts = 100
+        # Accumulate samples until we have batchsize that match the formula
+        accumulated_G = []
+        accumulated_XYZ = []
+        accumulated_A = []
+        accumulated_W = []
+        accumulated_M = []
+        accumulated_L = []
+        
+        num_matched = 0
+        max_attempts = 1000
         attempt = 0
-        while not jnp.any(formula_match) and attempt < max_attempts:
+        
+        while num_matched < batchsize and attempt < max_attempts:
             key, subkey = jax.random.split(key)
-            G, XYZ, A, W, M, L = sample_crystal(subkey, params, batchsize, composition)
+            G, XYZ, A, W, M, L = sample_crystal(subkey, params, 10*batchsize, composition)
 
             actual_compositions = jax.vmap(find_composition_vector)(A, M)
             formula_match = jnp.all(actual_compositions == composition, axis=1)
+            
+            # Get number of matched samples
+            num_new_matched = int(jnp.sum(formula_match))
+            
+            if num_new_matched > 0:
+                # Calculate how many we still need
+                remaining = batchsize - num_matched
+                to_take = min(num_new_matched, remaining)
+                
+                # Extract matched samples using boolean indexing
+                G_matched = G[formula_match]
+                XYZ_matched = XYZ[formula_match]
+                A_matched = A[formula_match]
+                W_matched = W[formula_match]
+                M_matched = M[formula_match]
+                L_matched = L[formula_match]
+                
+                # Take only the number we need
+                accumulated_G.append(G_matched[:to_take])
+                accumulated_XYZ.append(XYZ_matched[:to_take])
+                accumulated_A.append(A_matched[:to_take])
+                accumulated_W.append(W_matched[:to_take])
+                accumulated_M.append(M_matched[:to_take])
+                accumulated_L.append(L_matched[:to_take])
+                
+                num_matched += to_take
+                print (f'collected {num_matched} samples with {attempt+1} attempts') 
+
             attempt += 1
         
-        if attempt >= max_attempts:
-            raise RuntimeError(f"Epoch {epoch} - Could not generate formula-matching crystals after {max_attempts} attempts. Stopping training.")
+        if num_matched < batchsize:
+            raise RuntimeError(f"Epoch {epoch} - Could only generate {num_matched} formula-matching crystals after {max_attempts} attempts, but needed {batchsize}. Stopping training.")
         
-        # Compute fraction of formula matches
-        formula_match_fraction = jnp.mean(formula_match.astype(jnp.float32))
- 
+        # Concatenate all accumulated samples
+        G = jnp.concatenate(accumulated_G, axis=0)
+        XYZ = jnp.concatenate(accumulated_XYZ, axis=0)
+        A = jnp.concatenate(accumulated_A, axis=0)
+        W = jnp.concatenate(accumulated_W, axis=0)
+        M = jnp.concatenate(accumulated_M, axis=0)
+        L = jnp.concatenate(accumulated_L, axis=0)
+        
+        # Truncate to exactly batchsize (should already be exact, but just in case)
+        G = G[:batchsize]
+        XYZ = XYZ[:batchsize]
+        A = A[:batchsize]
+        W = W[:batchsize]
+        M = M[:batchsize]
+        L = L[:batchsize]
+
+        print (f'sampling done, move on to ppo') 
+        
         # Compute unique number of space groups 
-        unique_space_groups = jnp.unique(G[formula_match], return_counts=False).shape[0]
+        unique_space_groups = jnp.unique(G, return_counts=False).shape[0]
         # Number of unique wyckoff sequences for those matched formula
-        unique_wyckoff_sequences = jnp.unique(W[formula_match], axis=0, return_counts=False).shape[0]
-        unique_atom_sequences = jnp.unique(A[formula_match], axis=0, return_counts=False).shape[0]
+        unique_wyckoff_sequences = jnp.unique(W, axis=0, return_counts=False).shape[0]
+        unique_atom_sequences = jnp.unique(A, axis=0, return_counts=False).shape[0]
         # Number of unique (W, A) combinations
-        WA_combined = jnp.concatenate([W[formula_match], A[formula_match]], axis=1)
+        WA_combined = jnp.concatenate([W, A], axis=1)
         unique_WA_combinations = jnp.unique(WA_combined, axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
+        rewards = -batch_reward_fn(x)
 
-        x_matched = jax.tree_util.tree_map(lambda arr: arr[formula_match], x)
-        rewards_matched = -batch_reward_fn(x_matched)
-        
-        clip_value = jnp.min(rewards_matched)  # the worse ehull 
-        rewards = jnp.full((batchsize,), clip_value) # default reward for unmatched structure
-        rewards = rewards.at[formula_match].set(rewards_matched)
-
-        f_mean = jnp.mean(rewards_matched)
-        f_err = jnp.std(rewards_matched) / jnp.sqrt(1.0*len(rewards_matched))
-        f_min = jnp.min(rewards_matched)
-        f_max = jnp.max(rewards_matched)
+        f_mean = jnp.mean(rewards)
+        f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
+        f_min = jnp.min(rewards)
+        f_max = jnp.max(rewards)
 
         advantages = rewards - f_mean
         #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
@@ -137,7 +183,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
-        f.write( ("%6d" + 5*"  %.6f" + 4*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, formula_match_fraction, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
+        f.write( ("%6d" + 4*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
             kl_loss[0], entropy_g[0], entropy_w[0], entropy_a[0], entropy_xyz[0], entropy_l[0]))
 
         if epoch % 10 == 0:

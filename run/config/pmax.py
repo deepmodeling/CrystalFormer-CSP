@@ -16,9 +16,9 @@ Kx, Kl = 16, 4
 h0_size = 256
 transformer_layers = 16
 num_heads = 8
-key_size = 16
-model_size = 128
-embed_size = 128
+key_size = 32
+model_size = 256
+embed_size = 256
 
 pretrain_dropout_rate = 0.1
 finetune_dropout_rate = 0.0
@@ -31,9 +31,9 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 1000
+finetune_batchsize = 500
 
-pretrain_epochs = 10000
+pretrain_epochs = 20000
 finetune_epochs = 5000 
 
 lamb_g = 0.0
@@ -69,9 +69,10 @@ else:
 reward='ehull'
 alpha = 0.01
 beta = 0.0
-formula = 'Ti13Al9Co8'
-spacegroup = 160
-K = 0
+#formula = 'Ti13Al9Co8'
+formula = 'K2ZrSi2O7'
+spacegroup = None
+K = 40
 relaxation = True
 ehull_clip = 10.0 
 
@@ -79,20 +80,23 @@ ehull_clip = 10.0
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-07d3f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-a20de/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_16_k_64_m_64_e_32_drop_0.1_0.1/'
 
-restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-0d128/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0.1_0.1/'
+#restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-0d128/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0.1_0.1/'
 
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-7c0a6/Ti13Al9Co8_orb-v2_ppo_5_a_0.01_b_0_spg_160_relax_adam_bs_1000_lr_1e-05_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-1e04e/Ti13Al9Co8_orb-v2_ppo_5_a_0.01_b_0_spg_160_relax_g_0_w_2_a_2_xyz_1_l_1_adam_bs_1000_lr_1e-05_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0/'
+#restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-f5171/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
+restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-b4a1a/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
+
 #restore_path = None
 
 #convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe_2023.12.29.json.bz2'
 convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2'
 
-mlff_model='orb-v2'
-mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
+#mlff_model='orb-v2'
+#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
 
-#mlff_model='orb-v3-conservative-inf-mpa'
-#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
+mlff_model='orb-v3-conservative-inf-mpa'
+mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
 
 ###############################
 
