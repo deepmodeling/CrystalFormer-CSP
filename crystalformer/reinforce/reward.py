@@ -10,6 +10,7 @@ from crystalformer.src.wyckoff import wmax_table, mult_table, symops
 from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 import pandas as pd
 
 from BatchRelaxer import BatchRelaxer
@@ -217,6 +218,25 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
                            filter="FRECHETCELLFILTER",
                            optimizer="FIRE")
         structures, energies = relax_structures(relaxer, structures)
+        
+        matcher = StructureMatcher(comparator=ElementComparator())
+
+        unique_structures = []   # representatives
+        counts = []              # count per representative
+        rep_idx = []             # representative index for each input structure
+        for s in structures:
+            for j, u in enumerate(unique_structures):
+                if matcher.fit(s, u):
+                    counts[j] += 1
+                    rep_idx.append(j)
+                    break
+            else:
+                unique_structures.append(s)
+                counts.append(1)
+                rep_idx.append(len(unique_structures) - 1)
+
+        # Per-structure duplication counts (same length as `structures`)
+        duplication_counts = jnp.array([counts[j] for j in rep_idx])
 
         output = map_reward_fn(structures, energies)
         output = jnp.array(output)
@@ -233,7 +253,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
         data.to_csv(os.path.join(path, f"relaxed_structures_ehull_{epoch}.csv"),
                            index=False)
 
-        return output
+        return output, duplication_counts
 
     return reward_fn, batch_reward_fn
 

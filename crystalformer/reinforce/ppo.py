@@ -65,12 +65,13 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch f_mean f_err f_min f_max attempt unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
+        f.write("epoch emax emin attempt unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
     loss_fn = jax.jit(loss_fn, static_argnums=7)
     
+    global_ehull_min = jnp.inf
     for epoch in range(epoch_finished+1, epoch_finished+epochs+1):
 
         # Accumulate samples until we have batchsize that match the formula
@@ -152,15 +153,15 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         unique_WA_combinations = jnp.unique(WA_combined, axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
-        rewards = -batch_reward_fn(x, path, epoch)
+        ehull, duplication_counts = batch_reward_fn(x, path, epoch)
 
-        f_mean = jnp.mean(rewards)
-        f_err = jnp.std(rewards) / jnp.sqrt(batchsize)
-        f_min = jnp.min(rewards)
-        f_max = jnp.max(rewards)
+        ehull_min = jnp.min(ehull)
+        ehull_max = jnp.max(ehull)
+        global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
+        rewards = jnp.exp(10.*(global_ehull_min - ehull)) 
 
-        advantages = rewards - f_mean
-        #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
+        advantages = rewards / duplication_counts
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
@@ -183,7 +184,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
-        f.write( ("%6d" + 4*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, f_mean, f_err, f_min, f_max, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
+        f.write( ("%6d" + 2*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, ehull_max, ehull_min, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
             kl_loss[0], entropy_g[0], entropy_w[0], entropy_a[0], entropy_xyz[0], entropy_l[0]))
 
         if epoch % 10 == 0:
