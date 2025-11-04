@@ -169,7 +169,7 @@ def main(args):
     print ("spacegroup of unrelaxed structures")
     print ([find_spg(structure, args.tol) for structure in structures])
 
-    if args.relaxation and (not args.fixsymmetry):
+    if args.relaxation:
         print ("spacegroup of relaxed structures")
         print ([find_spg(Structure.from_dict(structure, args.tol)) for structure in relaxed_cif_dicts])
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default='orb-v2', choices=["orb-v3-conservative-inf-mpa", "orb-v2", "matgl", "mace", "dp"], help="choose the MLFF model")
+    parser.add_argument("--model", type=str, default='orb-v2', choices=["orb-v3-conservative-inf-mpa", "orb-v3-conservative-inf-omat", "orb-v2", "matgl", "mace", "dp"], help="choose the MLFF model")
     parser.add_argument("--device", type=str, default="cuda", help="choose the device to run the model on")
     parser.add_argument("--model_path", type=str, default="./data/orb-v2-20241011.ckpt", help="path to the model checkpoint")
     parser.add_argument("--restore_path", type=str, default="./experimental/", help="")

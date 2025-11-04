@@ -1,3 +1,4 @@
+import os
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,6 +10,7 @@ from crystalformer.src.wyckoff import wmax_table, mult_table, symops
 from ase.optimize import FIRE
 from ase.filters import FrechetCellFilter
 from pymatgen.io.ase import AseAtomsAdaptor
+import pandas as pd
 
 from BatchRelaxer import BatchRelaxer
 
@@ -194,7 +196,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
 
         return output
 
-    def batch_reward_fn(x):
+    def batch_reward_fn(x, path, epoch):
         x = jax.tree_util.tree_map(lambda _x: jax.device_put(_x, jax.devices('cpu')[0]), x)
         G, L, XYZ, A, W = x
         G, L, XYZ, A, W = np.array(G), np.array(L), np.array(XYZ), np.array(A), np.array(W)
@@ -219,6 +221,17 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
         output = map_reward_fn(structures, energies)
         output = jnp.array(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
+
+        data = pd.DataFrame()
+        data['relaxed_ehull'] = output
+        relaxed_cif_dicts = []
+        for structure in structures:
+            structure = structure.remove_site_property("forces")
+            structure.properties = None
+            relaxed_cif_dicts.append(structure.as_dict())
+        data['relaxed_cif'] = relaxed_cif_dicts
+        data.to_csv(os.path.join(path, f"relaxed_structures_ehull_{epoch}.csv"),
+                           index=False)
 
         return output
 

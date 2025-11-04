@@ -152,7 +152,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         unique_WA_combinations = jnp.unique(WA_combined, axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
-        rewards = -batch_reward_fn(x)
+        rewards = -batch_reward_fn(x, path, epoch)
 
         f_mean = jnp.mean(rewards)
         f_err = jnp.std(rewards) / jnp.sqrt(batchsize)

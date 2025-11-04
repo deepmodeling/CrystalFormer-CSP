@@ -31,7 +31,7 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 500
+finetune_batchsize = 100
 
 pretrain_epochs = 20000
 finetune_epochs = 5000 
@@ -70,9 +70,11 @@ reward='ehull'
 alpha = 0.01
 beta = 0.0
 #formula = 'Ti13Al9Co8'
-formula = 'K2ZrSi2O7'
+#formula = 'K2ZrSi2O7'
+#formula = 'Cu3P8S6Cl3'
+formula = 'VCl5'
 spacegroup = None
-K = 40
+K = 0
 relaxation = True
 ehull_clip = 10.0 
 
