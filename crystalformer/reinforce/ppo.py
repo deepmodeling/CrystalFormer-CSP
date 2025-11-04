@@ -158,8 +158,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         ehull_min = jnp.min(ehull)
         ehull_max = jnp.max(ehull)
         global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
-        rewards = jnp.exp(10.*(global_ehull_min - ehull)) 
-
+        rewards = global_ehull_min - ehull
         advantages = rewards / duplication_counts
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
