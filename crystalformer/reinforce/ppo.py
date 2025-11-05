@@ -65,7 +65,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     log_filename = os.path.join(path, "data.txt")
     f = open(log_filename, "w" if epoch_finished == 0 else "a", buffering=1, newline="\n")
     if os.path.getsize(log_filename) == 0:
-        f.write("epoch emax emin attempt unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
+        f.write("epoch e_mean e_err e_max e_min attempt unique_space_groups unique_wyckoff_sequences unique_atom_sequences unique_WA_combinations kl g w a xyz l\n")
 
     pretrain_params = params
     logp_fn = jax.jit(logp_fn, static_argnums=7)
@@ -157,6 +157,9 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         ehull_min = jnp.min(ehull)
         ehull_max = jnp.max(ehull)
+        ehull_mean = jnp.mean(ehull)
+        ehull_err = jnp.std(ehull)/jnp.sqrt(batchsize)
+
         global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
         rewards = global_ehull_min - ehull
         advantages = rewards / duplication_counts
@@ -183,7 +186,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
             params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
-        f.write( ("%6d" + 2*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, ehull_max, ehull_min, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
+        f.write( ("%6d" + 4*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, ehull_mean, ehull_err, ehull_max, ehull_min, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
             kl_loss[0], entropy_g[0], entropy_w[0], entropy_a[0], entropy_xyz[0], entropy_l[0]))
 
         if epoch % 10 == 0:
