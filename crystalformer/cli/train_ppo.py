@@ -120,8 +120,7 @@ def main():
 
     if args.optimizer != "none" or args.restore_path is None:
         output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta) \
-                    + ("K_%d_" % args.K if args.K > 0 else "") \
-                    + ("spg_%d_" % args.spacegroup if args.spacegroup is not None else "") \
+                    + ("spg_%d_" %args.spacegroup if args.spacegroup is not None else "K_%d_"%args.K) \
                     + ("relax_" if args.relaxation else "") \
                     + ("eclip_%g_"%(args.ehull_clip) ) \
                     + ('g_%g_w_%g_a_%g_xyz_%g_l_%g_'%(args.lamb_g, args.lamb_w, args.lamb_a, args.lamb_xyz, args.lamb_l)) \
