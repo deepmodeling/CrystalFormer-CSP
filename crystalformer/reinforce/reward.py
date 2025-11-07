@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import joblib
+from collections import defaultdict
 from pymatgen.core import Structure, Lattice
 
 from crystalformer.reinforce import ehull
@@ -221,19 +222,32 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
         
         matcher = StructureMatcher(comparator=ElementComparator())
 
-        unique_structures = []   # representatives
-        counts = []              # count per representative
-        rep_idx = []             # representative index for each input structure
-        for s in structures:
-            for j, u in enumerate(unique_structures):
-                if matcher.fit(s, u):
+        tol = 0.01
+        bucket = defaultdict(list)  # key: round(e/tol), value: list of rep indices
+
+        unique_structures = []
+        unique_energies = []
+        counts = []
+        rep_idx = [None] * len(structures)
+
+        for i, (s, e) in enumerate(zip(structures, energies)):
+            b = round(e / tol)
+            # only check reps in the same / neighboring energy buckets
+            candidate_js = bucket.get(b, []) + bucket.get(b - 1, []) + bucket.get(b + 1, [])
+            found = False
+            for j in candidate_js:
+                if abs(e - unique_energies[j]) < tol and matcher.fit(s, unique_structures[j]):
                     counts[j] += 1
-                    rep_idx.append(j)
+                    rep_idx[i] = j
+                    found = True
                     break
-            else:
+            if not found:
                 unique_structures.append(s)
+                unique_energies.append(e)
                 counts.append(1)
-                rep_idx.append(len(unique_structures) - 1)
+                j_new = len(unique_structures) - 1
+                rep_idx[i] = j_new
+                bucket[b].append(j_new)
 
         # Per-structure duplication counts (same length as `structures`)
         duplication_counts = jnp.array([counts[j] for j in rep_idx])
