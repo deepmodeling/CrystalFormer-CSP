@@ -162,8 +162,8 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
         rewards = global_ehull_min - ehull
-        advantages = rewards / duplication_counts
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
+        baseline = rewards.mean() if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * rewards.mean()
+        advantages = (rewards - baseline)/ duplication_counts
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
