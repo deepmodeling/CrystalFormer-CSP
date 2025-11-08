@@ -220,38 +220,6 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
                            optimizer="FIRE")
         structures, energies = relax_structures(relaxer, structures)
         
-        matcher = StructureMatcher(comparator=ElementComparator())
-
-        tol = 0.01
-        bucket = defaultdict(list)  # key: round(e/tol), value: list of rep indices
-
-        unique_structures = []
-        unique_energies = []
-        counts = []
-        rep_idx = [None] * len(structures)
-
-        for i, (s, e) in enumerate(zip(structures, energies)):
-            b = round(e / tol)
-            # only check reps in the same / neighboring energy buckets
-            candidate_js = bucket.get(b, []) + bucket.get(b - 1, []) + bucket.get(b + 1, [])
-            found = False
-            for j in candidate_js:
-                if abs(e - unique_energies[j]) < tol and matcher.fit(s, unique_structures[j]):
-                    counts[j] += 1
-                    rep_idx[i] = j
-                    found = True
-                    break
-            if not found:
-                unique_structures.append(s)
-                unique_energies.append(e)
-                counts.append(1)
-                j_new = len(unique_structures) - 1
-                rep_idx[i] = j_new
-                bucket[b].append(j_new)
-
-        # Per-structure duplication counts (same length as `structures`)
-        duplication_counts = jnp.array([counts[j] for j in rep_idx])
-
         output = map_reward_fn(structures, energies)
         output = jnp.array(output)
         output = jax.device_put(output, jax.devices('gpu')[0]).block_until_ready()
@@ -267,7 +235,7 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
         data.to_csv(os.path.join(path, f"relaxed_structures_ehull_{epoch}.csv"),
                            index=False)
 
-        return output, duplication_counts
+        return output  
 
     return reward_fn, batch_reward_fn
 

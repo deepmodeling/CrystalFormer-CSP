@@ -153,7 +153,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         unique_WA_combinations = jnp.unique(WA_combined, axis=0, return_counts=False).shape[0]
 
         x = (G, L, XYZ, A, W)
-        ehull, duplication_counts = batch_reward_fn(x, path, epoch)
+        ehull = batch_reward_fn(x, path, epoch)
 
         ehull_min = jnp.min(ehull)
         ehull_max = jnp.max(ehull)
@@ -163,7 +163,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
         rewards = global_ehull_min - ehull
         baseline = rewards.mean() if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * rewards.mean()
-        advantages = (rewards - baseline)/ duplication_counts
+        advantages = rewards - baseline
 
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
