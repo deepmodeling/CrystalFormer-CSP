@@ -161,7 +161,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         ehull_err = jnp.std(ehull)/jnp.sqrt(batchsize)
 
         global_ehull_min = jnp.minimum(global_ehull_min, ehull_min)
-        rewards = jnp.exp(10.*(global_ehull_min - ehull))
+        rewards = global_ehull_min - ehull
         baseline = rewards.mean() if epoch == epoch_finished+1 else 0.95 * baseline + 0.05 * rewards.mean()
         advantages = rewards - baseline
 
