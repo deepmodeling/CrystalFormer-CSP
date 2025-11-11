@@ -31,9 +31,9 @@ lr_decay = 0.0
 clip_grad = 1.0
 
 pretrain_batchsize = 8000
-finetune_batchsize = 100
+finetune_batchsize = 500
 
-pretrain_epochs = 20000
+pretrain_epochs = 30000
 finetune_epochs = 5000 
 
 lamb_g = 0.0
@@ -67,14 +67,21 @@ else:
 ###############################
 
 reward='ehull'
-alpha = 0.01
+alpha = 0.1
 beta = 0.0
+temperature = 2.0
 #formula = 'Ti13Al9Co8'
 #formula = 'K2ZrSi2O7'
 #formula = 'Cu3P8S6Cl3'
-formula = 'VCl5'
-spacegroup = None
-K = 0
+formula = 'LiPH2O4'
+#formula = 'MgB7'
+#formula = 'VCl5'
+#formula = 'LiZr2P3O12'
+#formula = 'K5Ag2As3Se9'
+#formula = 'CoSb3'
+#formula = 'Cd3As2'
+spacegroup = 33
+K = 40
 relaxation = True
 ehull_clip = 10.0 
 
@@ -124,6 +131,8 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
     job += '''
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
 #export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+#export TF_GPU_ALLOCATOR=cuda_malloc_async 
+#export XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 
 
 cd /home/user_wanglei/private/homefile/crystal_gpt/
 echo Current working directory is `pwd`

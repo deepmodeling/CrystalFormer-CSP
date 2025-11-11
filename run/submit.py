@@ -79,6 +79,7 @@ if __name__=='__main__':
                         'relaxation':relaxation, 
                         'alpha':alpha, 
                         'beta':beta, 
+                        'temperature':temperature, 
                         'K':K,
                         'lamb_a': lamb_a,
                         'lamb_w': lamb_w,
@@ -126,12 +127,7 @@ if __name__=='__main__':
         if isinstance(value, bool):
             logname += ("%s_" % arg if value else "")
         elif not ('_path' in arg or 'folder' in arg):
-            if '_' in arg:
-                arg = "".join([s[0] for s in arg.split('_')])
-            elif arg == 'elements':
-                arg = ''
-                value = elements_str 
-            logname += "%s%s_" % (arg, value)
+            logname += "%s_" % (value)
     logname = logname[:-1] + '.log'
 
     jobname = os.path.basename(os.path.dirname(logname))

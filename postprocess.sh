@@ -320,6 +320,7 @@ if [[ "$SKIP_ENERGY" == false ]]; then
         --filename "$OUTPUT_STRUCT_FILE"
         --model orb-v3-conservative-inf-mpa
         --label "$FORMULA"
+        --max_natoms_per_batch 10000
         --model_path "$MODEL_PATH"
     )
     

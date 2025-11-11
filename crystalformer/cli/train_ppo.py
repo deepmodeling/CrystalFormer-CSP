@@ -119,7 +119,7 @@ def main():
     print("\n========== Prepare logs ==========")
 
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta) \
+        output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_T_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta, args.temperature) \
                     + ("spg_%d_" %args.spacegroup if args.spacegroup is not None else "K_%d_"%args.K) \
                     + ("relax_" if args.relaxation else "") \
                     + ("eclip_%g_"%(args.ehull_clip) ) \
