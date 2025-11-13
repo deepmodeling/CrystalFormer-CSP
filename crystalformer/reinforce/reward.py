@@ -13,6 +13,7 @@ from ase.filters import FrechetCellFilter
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 import pandas as pd
+import torch 
 
 from BatchRelaxer import BatchRelaxer
 
@@ -20,6 +21,9 @@ symops = np.array(symops)
 mult_table = np.array(mult_table)
 wmax_table = np.array(wmax_table)
 
+def all_nonzero_gpus():
+    n = torch.cuda.device_count()
+    return [f"cuda:{i}" for i in range(1, n)]
 
 def relax_structures(relaxer, atoms_list):
     """
@@ -210,15 +214,27 @@ def make_ehull_reward_fn(calculator, ref_data, batch=50, n_jobs=-1, relaxation=F
 
         #batch relax 
         steps = 500 if relaxation else 0
-        structures = [get_atoms_from_GLXYZAW(*t) for t in zip(*x)]
-        relaxer = BatchRelaxer(calculator.model,
-                           device='cuda',
-                           fmax=0.01,
-                           max_n_steps=steps, 
-                           max_natoms_per_batch=1000,
-                           filter="FRECHETCELLFILTER",
-                           optimizer="FIRE")
-        structures, energies = relax_structures(relaxer, structures)
+        atoms_list = [get_atoms_from_GLXYZAW(*t) for t in zip(*x)]
+        
+        if jax.local_device_count() > 1:
+            structures, energies = BatchRelaxer.relax_multi_gpu(
+                        potential=calculator.model,
+                        atoms_list=atoms_list,
+                        max_natoms_per_batch=1000, 
+                        fmax=0.01,
+                        max_n_steps=steps,
+                        filter="FRECHETCELLFILTER",
+                        optimizer="FIRE"
+                    )
+        else: 
+            relaxer = BatchRelaxer(calculator.model,
+                               device='cuda',
+                               fmax=0.01,
+                               max_n_steps=steps, 
+                               max_natoms_per_batch=1000,
+                               filter="FRECHETCELLFILTER",
+                               optimizer="FIRE")
+            structures, energies = relax_structures(relaxer, atoms_list)
         
         output = map_reward_fn(structures, energies)
         output = jnp.array(output)
