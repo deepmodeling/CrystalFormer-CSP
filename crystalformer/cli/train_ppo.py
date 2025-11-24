@@ -67,10 +67,11 @@ def main():
     group.add_argument('--convex_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2')
     group.add_argument('--alpha', type=float, default=0.1, help='weight for entropy regulalization')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
+    group.add_argument('--gamma', type=float, default=1.0, help='weight for experience buffer')
     group.add_argument('--eps_clip', type=float, default=0.2, help='clip parameter for PPO')
     group.add_argument('--ehull_clip', type=float, default=20, help='clip parameter for ehull value')
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
-    group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'matgl'], help='the model to use for RL reward')
+    group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'orb-v3-direct-20-mpa', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
 
 
@@ -119,7 +120,7 @@ def main():
     print("\n========== Prepare logs ==========")
 
     if args.optimizer != "none" or args.restore_path is None:
-        output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_T_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta, args.temperature) \
+        output_path = args.folder + "%s_%s_ppo_%d_a_%g_b_%g_c_%g_T_%g_" % (args.formula, args.mlff_model, args.ppo_epochs, args.alpha, args.beta, args.gamma, args.temperature) \
                     + ("spg_%d_" %args.spacegroup if args.spacegroup is not None else "K_%d_"%args.K) \
                     + ("relax_" if args.relaxation else "") \
                     + ("eclip_%g_"%(args.ehull_clip) ) \
@@ -232,7 +233,7 @@ def main():
     sample_crystal = make_sample_crystal(transformer, args.n_max, args.atom_types, args.wyck_types, args.Kx, args.Kl, None, args.top_p, args.temperature, K=args.K, g=args.spacegroup)
 
     print("\n========== Start RL training ==========")
-    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, alpha=args.alpha, 
+    ppo_loss_fn = make_ppo_loss_fn(logp_fn, args.eps_clip, beta=args.beta, alpha=args.alpha, gamma=args.gamma,
                                    lamb_g = args.lamb_g, lamb_a = args.lamb_a, lamb_w = args.lamb_w, lamb_xyz = args.lamb_xyz, lamb_l = args.lamb_l
                                    )
 

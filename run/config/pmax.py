@@ -33,10 +33,10 @@ clip_grad = 1.0
 pretrain_batchsize = 8000
 finetune_batchsize = 500
 
-pretrain_epochs = 30000
+pretrain_epochs = 50000
 finetune_epochs = 5000 
 
-lamb_g = 0.0
+lamb_g = 1.0
 lamb_xyz = 1.0
 lamb_l = 1.0
 lamb_a = 1.0
@@ -67,9 +67,10 @@ else:
 ###############################
 
 reward='ehull'
-alpha = 0.1
+alpha = 0.0
 beta = 0.0
-temperature = 2.0
+gamma = 1.0
+temperature = 1.0
 #formula = 'Ti13Al9Co8'
 #formula = 'K2ZrSi2O7'
 #formula = 'Cu3P8S6Cl3'
@@ -80,7 +81,7 @@ formula = 'LiPH2O4'
 #formula = 'K5Ag2As3Se9'
 #formula = 'CoSb3'
 #formula = 'Cd3As2'
-spacegroup = 33
+spacegroup = None
 K = 40
 relaxation = True
 ehull_clip = 10.0 
@@ -94,7 +95,9 @@ ehull_clip = 10.0
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-7c0a6/Ti13Al9Co8_orb-v2_ppo_5_a_0.01_b_0_spg_160_relax_adam_bs_1000_lr_1e-05_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0/'
 #restore_path='/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-1e04e/Ti13Al9Co8_orb-v2_ppo_5_a_0.01_b_0_spg_160_relax_g_0_w_2_a_2_xyz_1_l_1_adam_bs_1000_lr_1e-05_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_16_m_128_e_128_drop_0/'
 #restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-f5171/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
-restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-b4a1a/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
+#restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-b4a1a/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
+#restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-db11f/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
+restore_path = '/home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-99fcd/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/'
 
 #restore_path = None
 
@@ -103,6 +106,9 @@ convex_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/co
 
 #mlff_model='orb-v2'
 #mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v2-20241011.ckpt'
+
+#mlff_model='orb-v3-direct-20-mpa'
+#mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-direct-20-mpa-20250404.ckpt'
 
 mlff_model='orb-v3-conservative-inf-mpa'
 mlff_path='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt'
@@ -117,7 +123,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=%g
 #SBATCH --mem=32G
-#SBATCH --gres=gpu:A800:1
+#SBATCH --gres=gpu:A100_80G:1
 #SBATCH --time=168:00:00
 #SBATCH --job-name=%s
 #SBATCH --output=%s
@@ -132,7 +138,7 @@ def submitJob(bin,args,jobname,logname,run=False,wait=None):
 #export XLA_PYTHON_CLIENT_PREALLOCATE=false
 #export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 #export TF_GPU_ALLOCATOR=cuda_malloc_async 
-#export XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 
+#export XLA_PYTHON_CLIENT_MEM_FRACTION=0.4
 
 cd /home/user_wanglei/private/homefile/crystal_gpt/
 echo Current working directory is `pwd`

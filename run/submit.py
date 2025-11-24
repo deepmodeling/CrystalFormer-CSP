@@ -79,6 +79,7 @@ if __name__=='__main__':
                         'relaxation':relaxation, 
                         'alpha':alpha, 
                         'beta':beta, 
+                        'gamma':gamma, 
                         'temperature':temperature, 
                         'K':K,
                         'lamb_a': lamb_a,

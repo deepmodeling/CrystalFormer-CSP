@@ -10,7 +10,7 @@ from crystalformer.src.formula import find_composition_vector
 from crystalformer.src.lattice import norm_lattice
 
 
-def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xyz=1.0,lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
+def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, gamma=1.0, lamb_g=1.0, lamb_xyz=1.0,lamb_a=1.0, lamb_w=1.0, lamb_l=1.0):
 
     """
     PPO clipped objective function with KL divergence regularization
@@ -19,10 +19,13 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xy
     Note that we only consider the logp_xyz and logp_l in the logp_fn
     """
 
-    def ppo_loss_fn(params, key, x, old_logp, pretrain_logp, advantages):
+    def ppo_loss_fn(params, key, x, buffer, old_logp, pretrain_logp, advantages):
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = lamb_g*logp_g + lamb_w*logp_w + lamb_xyz *logp_xyz + lamb_a*logp_a + lamb_l*logp_l
+
+        logp_g_buffer, logp_w_buffer, logp_xyz_buffer, logp_a_buffer, logp_l_buffer = logp_fn(params, key, *buffer, False)
+        logp_buffer = lamb_g*logp_g_buffer + lamb_w*logp_w_buffer + lamb_xyz *logp_xyz_buffer + lamb_a*logp_a_buffer + lamb_l*logp_l_buffer
             
         kl_loss = logp - pretrain_logp  
         advantages = advantages - beta * kl_loss - alpha * logp
@@ -36,6 +39,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, lamb_g=1.0, lamb_xy
 
         # Final loss of clipped objective PPO
         ppo_loss = jnp.mean(jnp.minimum(surr1, surr2))
+        ppo_loss += gamma * jnp.mean(logp_buffer)
 
         return ppo_loss, (jnp.mean(kl_loss), -jnp.mean(logp_g), -jnp.mean(logp_w), -jnp.mean(logp_a), -jnp.mean(logp_xyz), -jnp.mean(-logp_l))
     
@@ -52,9 +56,9 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     print("batch_per_device: ", batch_per_device)
     print("shape_prefix: ", shape_prefix)
 
-    @partial(jax.pmap, axis_name="p", in_axes=(None, None, None, 0, 0, 0, 0), out_axes=(None, None, 0),)
-    def step(params, key, opt_state, x, old_logp, pretrain_logp, advantages):
-        value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, x, old_logp, pretrain_logp, advantages)
+    @partial(jax.pmap, axis_name="p", in_axes=(None, None, None, None, 0, 0, 0, 0), out_axes=(None, None, 0),)
+    def step(params, key, opt_state, x, buffer, old_logp, pretrain_logp, advantages):
+        value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, x, buffer, old_logp, pretrain_logp, advantages)
         grad = jax.lax.pmean(grad, axis_name="p")
         value = jax.lax.pmean(value, axis_name="p")
         grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
@@ -168,6 +172,38 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
         G, L, XYZ, A, W = x
         L = norm_lattice(G, W, L)
         x = (G, L, XYZ, A, W)
+        
+        if epoch == epoch_finished+1:
+            exp_buffer = (
+                jnp.empty_like(G[:0]),     # G
+                jnp.empty_like(L[:0]),     # L
+                jnp.empty_like(XYZ[:0]),   # XYZ
+                jnp.empty_like(A[:0]),     # A
+                jnp.empty_like(W[:0]),     # W
+                jnp.empty((0,))            # rewards
+            )
+
+        # Concatenate current batch with buffer for each component
+        G_combined     = jnp.concatenate([exp_buffer[0], G], axis=0)
+        L_combined     = jnp.concatenate([exp_buffer[1], L], axis=0)
+        XYZ_combined   = jnp.concatenate([exp_buffer[2], XYZ], axis=0)
+        A_combined     = jnp.concatenate([exp_buffer[3], A], axis=0)
+        W_combined     = jnp.concatenate([exp_buffer[4], W], axis=0)
+        rewards_combined = jnp.concatenate([exp_buffer[5], rewards], axis=0)
+
+        buffersize = batchsize//10
+        topk_idx = jnp.argsort(-rewards_combined)[:buffersize]  # descending sort
+
+        exp_buffer = (
+            G_combined[topk_idx],
+            L_combined[topk_idx],
+            XYZ_combined[topk_idx],
+            A_combined[topk_idx],
+            W_combined[topk_idx],
+            rewards_combined[topk_idx]
+        )
+
+        buffer = exp_buffer[:5]
 
         key, subkey1, subkey2 = jax.random.split(key, 3)
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, subkey1, *x, False)
@@ -183,7 +219,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
-            params, opt_state, value = step(params, subkey, opt_state, x, old_logp, pretrain_logp, advantages)
+            params, opt_state, value = step(params, subkey, opt_state, x, buffer, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
         f.write( ("%6d" + 4*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, ehull_mean, ehull_err, ehull_max, ehull_min, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 

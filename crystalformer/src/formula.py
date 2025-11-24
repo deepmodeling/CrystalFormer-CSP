@@ -125,22 +125,43 @@ def formula_string_to_composition_vector(formula_string):
     """
     import re
     
-    # Create composition vector
+    # --- Step 1: Expand bracketed groups ---
+    def expand_groups(s):
+        # Pattern: ( ... )n or [ ... ]n
+        # Example match: ("(WO3)9", "WO3", "9")
+        pattern = r'[\(\[]([A-Za-z0-9]+)[\)\]](\d*)'
+
+        while True:
+            m = re.search(pattern, s)
+            if not m:
+                break
+
+            inner = m.group(1)
+            mult  = int(m.group(2)) if m.group(2) else 1
+
+            # Expand: WO3 → WO3WO3WO3... (mult times)
+            expanded = inner * mult
+
+            # Replace "(WO3)9" with "WO3WO3WO3..."
+            s = s[:m.start()] + expanded + s[m.end():]
+
+        return s
+
+    formula_string = expand_groups(formula_string)
+
+    # --- Step 2: Parse a simple no-parentheses formula ---
     composition = jnp.zeros(119, dtype=jnp.int32)
-    
-    # Regular expression to match element symbols and their counts
-    # Matches: element symbol (1-2 letters) followed by optional count
+
+    # Example match: ("Na","3"), ("O","6"), ("W","1")
     pattern = r'([A-Z][a-z]?)(\d*)'
     matches = re.findall(pattern, formula_string)
-    
+
     for symbol, count_str in matches:
         if symbol in element_dict:
-            z = element_dict[symbol]
-            count = int(count_str) if count_str else 1  # Default count is 1
-            
-            # Add to composition vector
-            composition = composition.at[z].add(count)
-    
+            Z = element_dict[symbol]
+            count = int(count_str) if count_str else 1
+            composition = composition.at[Z].add(count)
+
     return composition
 
 if __name__=='__main__':
@@ -159,7 +180,7 @@ if __name__=='__main__':
     # Test formula string to composition vector conversion
     print("\n=== Testing formula string to composition vector ===")
     
-    test_formulas = ["H2O", "CO2", "Na3MnCoNiO6", "Fe2O3", "CaCO3"]
+    test_formulas = ["H2O", "CO2", "Na3MnCoNiO6", "Fe2O3", "CaCO3", "LiP(HO2)2"]
     
     for formula in test_formulas:
         comp_vec = formula_string_to_composition_vector(formula)
