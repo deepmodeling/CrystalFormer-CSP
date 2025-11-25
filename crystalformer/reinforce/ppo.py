@@ -19,7 +19,7 @@ def make_ppo_loss_fn(logp_fn, eps_clip, beta=0.1, alpha=0.0, gamma=1.0, lamb_g=1
     Note that we only consider the logp_xyz and logp_l in the logp_fn
     """
 
-    def ppo_loss_fn(params, key, x, buffer, old_logp, pretrain_logp, advantages):
+    def ppo_loss_fn(params, key, buffer, x, old_logp, pretrain_logp, advantages):
 
         logp_g, logp_w, logp_xyz, logp_a, logp_l = logp_fn(params, key, *x, False)
         logp = lamb_g*logp_g + lamb_w*logp_w + lamb_xyz *logp_xyz + lamb_a*logp_a + lamb_l*logp_l
@@ -57,8 +57,8 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
     print("shape_prefix: ", shape_prefix)
 
     @partial(jax.pmap, axis_name="p", in_axes=(None, None, None, None, 0, 0, 0, 0), out_axes=(None, None, 0),)
-    def step(params, key, opt_state, x, buffer, old_logp, pretrain_logp, advantages):
-        value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, x, buffer, old_logp, pretrain_logp, advantages)
+    def step(params, key, opt_state, buffer, x, old_logp, pretrain_logp, advantages):
+        value, grad = jax.value_and_grad(ppo_loss_fn, has_aux=True)(params, key, buffer, x, old_logp, pretrain_logp, advantages)
         grad = jax.lax.pmean(grad, axis_name="p")
         value = jax.lax.pmean(value, axis_name="p")
         grad = jax.tree_util.tree_map(lambda g_: g_ * -1.0, grad)  # invert gradient for maximization
@@ -219,7 +219,7 @@ def train(key, optimizer, opt_state, loss_fn, logp_fn, batch_reward_fn, ppo_loss
 
         for _ in range(ppo_epochs):
             key, subkey = jax.random.split(key)
-            params, opt_state, value = step(params, subkey, opt_state, x, buffer, old_logp, pretrain_logp, advantages)
+            params, opt_state, value = step(params, subkey, opt_state, buffer, x, old_logp, pretrain_logp, advantages)
             ppo_loss, (kl_loss, entropy_g, entropy_w, entropy_a, entropy_xyz, entropy_l) = value
         
         f.write( ("%6d" + 4*"  %.6f" + 5*"  %3d" + 6*"  %.6f"+ "\n") % (epoch, ehull_mean, ehull_err, ehull_max, ehull_min, attempt, unique_space_groups, unique_wyckoff_sequences, unique_atom_sequences, unique_WA_combinations, 
