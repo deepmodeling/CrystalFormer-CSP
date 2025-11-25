@@ -29,6 +29,7 @@ def generate_CSE(structure, m3gnet_energy):
     param["is_hubbard"] = (
         incar.get("LDAU", True) and sum(param["hubbards"].values()) > 0
     )
+    param["run_type"] = "GGA"
     if param["is_hubbard"]:
         param["run_type"] = "GGA+U"
 
