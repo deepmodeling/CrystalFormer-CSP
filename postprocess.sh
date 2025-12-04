@@ -108,6 +108,10 @@ while [[ $# -gt 0 ]]; do
             RESTORE_PATH="$2"
             shift 2
             ;;
+        -s|--save-path)
+            SAVE_PATH="$2"
+            shift 2
+            ;;
         -m|--model-path)
             MODEL_PATH="$2"
             shift 2
@@ -190,10 +194,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --spacegroup)
             SPACEGROUP="$2"
-            shift 2
-            ;;
-        --save-path)
-            SAVE_PATH="$2"
             shift 2
             ;;
         --skip-sample)
