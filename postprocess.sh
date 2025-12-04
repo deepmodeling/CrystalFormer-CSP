@@ -30,6 +30,7 @@ DEFAULT_EMBED_SIZE="256"
 DEFAULT_RELAXATION="true"
 DEFAULT_LABEL=""
 DEFAULT_SPACEGROUP=""
+DEFAULT_SAVE_PATH=""
 
 # Function to display usage
 usage() {
@@ -58,6 +59,7 @@ usage() {
     echo "  --relaxation RELAXATION     Enable/disable relaxation (default: $DEFAULT_RELAXATION)"
     echo "  --label LABEL               Label for the experiment (default: '')"
     echo "  --spacegroup ID             Spacegroup ID (default: None)"
+    echo "  --save-path PATH            Directory to save samples and postprocessed outputs (default: RESTORE_PATH)"
     echo "  --skip-sample               Skip the sampling step"
     echo "  --skip-convert              Skip the structure conversion step"
     echo "  --skip-energy               Skip the energy computation step"
@@ -94,6 +96,7 @@ EMBED_SIZE="$DEFAULT_EMBED_SIZE"
 RELAXATION="$DEFAULT_RELAXATION"
 LABEL="$DEFAULT_LABEL"
 SPACEGROUP="$DEFAULT_SPACEGROUP"
+SAVE_PATH="$DEFAULT_SAVE_PATH"
 SKIP_SAMPLE=false
 SKIP_CONVERT=false
 SKIP_ENERGY=false
@@ -189,6 +192,10 @@ while [[ $# -gt 0 ]]; do
             SPACEGROUP="$2"
             shift 2
             ;;
+        --save-path)
+            SAVE_PATH="$2"
+            shift 2
+            ;;
         --skip-sample)
             SKIP_SAMPLE=true
             shift
@@ -217,6 +224,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Determine save path for samples and postprocessed outputs
+if [[ -z "$SAVE_PATH" ]]; then
+    SAVE_PATH="$RESTORE_PATH"
+fi
+
 # Validate paths
 if [[ ! -d "$RESTORE_PATH" ]]; then
     echo "Error: Restore path does not exist: $RESTORE_PATH"
@@ -239,7 +251,8 @@ OUTPUT_STRUCT_FILE="output_${FORMULA}_struct.csv"
 RELAXED_STRUCT_FILE="relaxed_structures_${FORMULA}.csv"
 
 echo "=== CrystalGPT Postprocessing Pipeline ==="
-echo "Restore path: $RESTORE_PATH"
+echo "Restore path (checkpoint): $RESTORE_PATH"
+echo "Save/output path: $SAVE_PATH"
 echo "Model path: $MODEL_PATH"
 echo "Convex hull path: $CONVEX_HULL_PATH"
 echo "Formula: $FORMULA"
@@ -247,6 +260,9 @@ echo "Number of samples: $NUM_SAMPLES"
 echo "Temperature: $TEMPERATURE"
 echo "Epoch file: $EPOCH"
 echo "=========================================="
+
+# Ensure save path exists
+mkdir -p "$SAVE_PATH"
 
 # Step 1: Sample structures
 if [[ "$SKIP_SAMPLE" == false ]]; then
@@ -272,6 +288,7 @@ if [[ "$SKIP_SAMPLE" == false ]]; then
         --key_size "$KEY_SIZE"
         --model_size "$MODEL_SIZE"
         --embed_size "$EMBED_SIZE"
+        --save_path "$SAVE_PATH"
     )
     
     # Add spacegroup argument if specified
@@ -296,7 +313,7 @@ if [[ "$SKIP_CONVERT" == false ]]; then
     echo "Step 2: Converting structures..."
 
     python ./scripts/awl2struct.py \
-        --output_path "$RESTORE_PATH/" \
+        --output_path "$SAVE_PATH/" \
         --formula "$FORMULA" \
         --num_io_process "$NUM_IO_PROCESS"
     
@@ -316,7 +333,7 @@ if [[ "$SKIP_ENERGY" == false ]]; then
 
     # Build mlff_relax command arguments
     MLFF_ARGS=(
-        --restore_path "$RESTORE_PATH/"
+        --restore_path "$SAVE_PATH/"
         --filename "$OUTPUT_STRUCT_FILE"
         --model orb-v3-conservative-inf-mpa
         --label "$FORMULA"
@@ -348,7 +365,7 @@ if [[ "$SKIP_EHULL" == false ]]; then
     # Build e_above_hull_alex command arguments
     EHULL_ARGS=(
         --convex_path "$CONVEX_HULL_PATH"
-        --restore_path "$RESTORE_PATH/"
+        --restore_path "$SAVE_PATH/"
         --filename "$RELAXED_STRUCT_FILE"
     )
     
