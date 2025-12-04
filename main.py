@@ -202,8 +202,10 @@ else:
     num_batches = math.ceil(args.num_samples / args.batchsize)
 
     name, extension = args.output_filename.rsplit('.', 1)
-    filename = os.path.join(output_path, 
-                            f"{name}_{args.formula}.{extension}")
+    if args.save_path is not None:
+        filename = os.path.join(args.save_path, f"{name}_{args.formula}.{extension}")
+    else:
+        filename = os.path.join(output_path, f"{name}_{args.formula}.{extension}")
     for batch_idx in range(num_batches):
         start_idx = batch_idx * args.batchsize
         end_idx = min(start_idx + args.batchsize, args.num_samples)
