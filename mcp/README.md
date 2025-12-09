@@ -26,9 +26,15 @@ Create or edit `~/.cursor/mcp.json` or `~/claude_desktop_config.json` with the f
 }
 ```
 
-### 3. Restart Your MCP Client
+### 3. Edit the `.env` file
 
-After updating the configuration, restart your MCP client to load the CrystalFormer server.
+Edit the `.env` file with the following variables:
+```
+RESTORE_PATH=/path/to/model/checkpoint
+MODEL_PATH=/path/to/mlff_model.ckpt
+CONVEX_HULL_PATH=/path/to/convex_hull_pbe.json.bz2
+SAVE_PATH=/path/to/output
+```
 
 ## Available Tools
 
