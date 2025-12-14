@@ -1,6 +1,5 @@
 import jax
 jax.config.update("jax_enable_x64", True)
-import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 from functools import partial
 import os
@@ -8,7 +7,6 @@ import optax
 import warnings
 warnings.filterwarnings("ignore")
 
-from crystalformer.src.utils import GLXYZAW_from_file
 from crystalformer.src.loss import make_loss_fn
 from crystalformer.src.transformer import make_transformer
 from crystalformer.src.sample import make_sample_crystal
@@ -42,10 +40,10 @@ def main():
     group.add_argument('--Kl', type=int, default=4, help='number of modes in lattice')
     group.add_argument('--h0_size', type=int, default=256, help='hidden layer dimension for the first atom, 0 means we simply use a table for first aw_logit')
     group.add_argument('--transformer_layers', type=int, default=16, help='The number of layers in transformer')
-    group.add_argument('--num_heads', type=int, default=16, help='The number of heads')
-    group.add_argument('--key_size', type=int, default=64, help='The key size')
-    group.add_argument('--model_size', type=int, default=64, help='The model size')
-    group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
+    group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
+    group.add_argument('--key_size', type=int, default=32, help='The key size')
+    group.add_argument('--model_size', type=int, default=256, help='The model size')
+    group.add_argument('--embed_size', type=int, default=256, help='The enbedding size')
     group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate for MLP')
     group.add_argument('--attn_dropout', type=float, default=0.1, help='The dropout rate for attention')
 
@@ -63,7 +61,7 @@ def main():
 
     group = parser.add_argument_group('reinforcement learning parameters')
     group.add_argument('--reward', type=str, default='force', choices=['force', 'ehull', 'prop', 'dielectric'], help='reward function to use')
-    parser.add_argument('--relaxation', action='store_true', help='whether to relax the structures')
+    group.add_argument('--relaxation', action='store_true', help='whether to relax the structures')
     group.add_argument('--convex_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/convex_hull_pbe.json.bz2')
     group.add_argument('--alpha', type=float, default=0.1, help='weight for entropy regulalization')
     group.add_argument('--beta', type=float, default=0.1, help='weight for KL divergence')
@@ -73,7 +71,6 @@ def main():
     group.add_argument('--ppo_epochs', type=int, default=5, help='number of PPO epochs')
     group.add_argument('--mlff_model', type=str, default='orb-v3-conservative-inf-mpa', choices=['mace', 'orb-v2', 'orb-v3-conservative-inf-mpa', 'orb-v3-direct-20-mpa', 'matgl'], help='the model to use for RL reward')
     group.add_argument('--mlff_path', type=str, default='/home/user_wanglei/private/datafile/crystalgpt/checkpoint/alex20/orb-v3-conservative-inf-mpa-20250404.ckpt', help='path to the MLFF model')
-
 
     group = parser.add_argument_group('loss parameters')
     group.add_argument("--lamb_a", type=float, default=1.0, help="weight for the a part")

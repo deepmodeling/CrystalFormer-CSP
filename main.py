@@ -10,13 +10,12 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 
 from crystalformer.src.utils import GLXYZAW_from_file, letter_to_number
-from crystalformer.src.elements import element_dict, element_list
+from crystalformer.src.elements import element_list
 from crystalformer.src.transformer import make_transformer  
 from crystalformer.src.train import train
 from crystalformer.src.sample import make_sample_crystal
 from crystalformer.src.loss import make_loss_fn
 import crystalformer.src.checkpoint as checkpoint
-from crystalformer.src.wyckoff import mult_table
 from crystalformer.src.formula import formula_string_to_composition_vector, find_composition_vector
 
 import argparse
@@ -46,10 +45,10 @@ group.add_argument('--Kx', type=int, default=16, help='number of modes in x')
 group.add_argument('--Kl', type=int, default=4, help='number of modes in lattice')
 group.add_argument('--h0_size', type=int, default=256, help='hidden layer dimension for the g and w of first atom')
 group.add_argument('--transformer_layers', type=int, default=16, help='The number of layers in transformer')
-group.add_argument('--num_heads', type=int, default=16, help='The number of heads')
-group.add_argument('--key_size', type=int, default=64, help='The key size')
-group.add_argument('--model_size', type=int, default=64, help='The model size')
-group.add_argument('--embed_size', type=int, default=32, help='The enbedding size')
+group.add_argument('--num_heads', type=int, default=8, help='The number of heads')
+group.add_argument('--key_size', type=int, default=32, help='The key size')
+group.add_argument('--model_size', type=int, default=256, help='The model size')
+group.add_argument('--embed_size', type=int, default=256, help='The enbedding size')
 group.add_argument('--dropout_rate', type=float, default=0.1, help='The dropout rate for MLP')
 group.add_argument('--attn_dropout', type=float, default=0.1, help='The dropout rate for attention')
 
@@ -77,10 +76,6 @@ group.add_argument('--save_path', type=str, default=None, help='path to save the
 group.add_argument('--output_filename', type=str, default='output.csv', help='outfile to save sampled structures')
 group.add_argument('--verbose', type=int, default=0, help='verbose level')
 
-group = parser.add_argument_group('MCMC parameters')
-group.add_argument('--mcmc', action='store_true', help='use MCMC to sample')
-group.add_argument('--nsweeps', type=int, default=10, help='number of sweeps')
-group.add_argument('--mc_width', type=float, default=0.1, help='width of MCMC step')
 
 args = parser.parse_args()
 
