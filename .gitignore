@@ -7,3 +7,4 @@ experimental/
 *.ipynb
 *.egg-info/
 build/
+!imgs/*.png
