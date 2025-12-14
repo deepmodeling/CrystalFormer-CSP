@@ -161,10 +161,10 @@ Run sampling → CIF conversion → relaxation → Ehull ranking:
 ```bash
 ./postprocess.sh \
     -r RESTORE_PATH \
-    -k epoch_030000.pkl \
+    -k 40 \
     --relaxation true \ 
-    -n 1000 
-    -f Cu12Sb4S13 
+    -n 1000 \
+    -f Cu12Sb4S13 \ 
     -s SAVE_PATH
 ```
 

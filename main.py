@@ -270,11 +270,3 @@ else:
         data.to_csv(filename, mode=write_mode, index=False, header=write_header)
 
         print ("Wrote samples to %s (batch %d/%d)"%(filename, batch_idx + 1, num_batches))
-
-    if args.verbose>0:
-        example_data = GLXYZAW_from_file('Ti13Al9Co8', args.atom_types, args.wyck_types, args.n_max, args.num_io_process)
-        G, L, XYZ, A, W = example_data
-        logp_g, logp_w, logp_xyz, logp_a, logp_l = jax.jit(logp_fn, static_argnums=7)(params, key, G, L, XYZ, A, W, False)
-
-        test_logp = logp_g + logp_xyz + args.lamb_w*logp_w + args.lamb_a*logp_a + args.lamb_l*logp_l
-        print ('test logp', test_logp)
