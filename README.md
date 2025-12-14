@@ -1,12 +1,11 @@
 <div align="center">
-	<img align="middle" src="imgs/crystalformer.png" width="400" alt="logo"/>
-  <h2> Crystal Generation with Space Group Informed Transformer</h2> 
+	<img align="middle" src="imgs/csp.png" width="500" alt="logo"/>
+  <h2> Thinking fast and slow for crystal structure prediction</h2> 
 </div>
 
-[![arXiv](https://img.shields.io/badge/arXiv-2403.15734-b31b1b.svg)](https://arxiv.org/abs/2403.15734) [![arXiv](https://img.shields.io/badge/arXiv-2504.02367-b31b1b.svg)](https://arxiv.org/abs/2504.02367)
+[![arXiv](https://img.shields.io/badge/arXiv-2511.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2511.XXXXX) 
 
-_CrystalFormer_ is a transformer-based autoregressive model specifically designed for space group-controlled generation of crystalline materials. The space group symmetry significantly simplifies the
-crystal space, which is crucial for data and compute efficient generative modeling of crystalline materials.
+_CrystalFormer-CSP_ is an autoregressive transformer designed for crystal structure prediction.
 
 <div align="center">
   <img align="middle" src="imgs/output.gif" width="400">
@@ -16,7 +15,7 @@ crystal space, which is crucial for data and compute efficient generative modeli
 ## Contents
 
 - [Contents](#contents)
-- [Model card](#model-card)
+- [Model Card](#model-card)
 - [Status](#status)
 - [Get Started](#get-started)
 - [Installation](#installation)
@@ -25,47 +24,38 @@ crystal space, which is crucial for data and compute efficient generative modeli
   - [install required packages](#install-required-packages)
   - [command line tools](#command-line-tools)
 - [Available Weights](#available-weights)
-- [How to run](#how-to-run)
-  - [train](#train)
-  - [sample](#sample)
-  - [evaluate](#evaluate)
-- [Reinforcement Fine-tuning](#reinforcement-fine-tuning)
-  - [$E\_{hull}$ Reward](#e_hull-reward)
-  - [Dielectric FoM Reward](#dielectric-fom-reward)
+- [Crystal Structure Preduction](#crystal-structure-prediction)
+- [Advanced Usage](#advanced-usage)
+  - [Reinforcement Fine-tuning](#reinforcement-fine-tuning)
+  - [Pretrain](#pretrain)
 - [How to cite](#how-to-cite)
 
 ## Model card
 
-The model is an autoregressive transformer for the space group conditioned crystal probability distribution `P(C|g) = P (W_1 | ... ) P ( A_1 | ... ) P(X_1| ...) P(W_2|...) ... P(L| ...)`, where
+The model is an autoregressive transformer for the formula conditioned crystal probability distribution `P(C|f) = P(g|f) P (W_1 | ... ) P ( A_1 | ... ) P(X_1| ...) P(W_2|...) ... P(L| ...)`, where
 
+- `f`: chemical formula, e.g. `Cu12Sb4S13`
 - `g`: space group number 1-230
-- `W`: Wyckoff letter ('a', 'b',...,'A')
-- `A`: atom type ('H', 'He', ..., 'Og')
+- `W`: Wyckoff letter ('a', 'b', ...,'A')
+- `A`: atom type ('H', 'He', ..., 'Og') in the chemical formula
 - `X`: factional coordinates
-- `L`: lattice vector [a,b,c, alpha, beta, gamma]
-- `P(W_i| ...)` and `P(A_i| ...)`  are categorical distributuions.
+- `L`: lattice vector [a, b, c, alpha, beta, gamma]
+- `P(W_i| ...)` and `P(A_i| ...)` are categorical distributions.
 - `P(X_i| ...)` is the mixture of von Mises distribution.
-- `P(L| ...)`  is the mixture of Gaussian distribution.
+- `P(L| ...)` is the mixture of Gaussian distribution.
 
-We only consider symmetry inequivalent atoms. The remaining atoms are restored based on the space group and Wyckoff letter information. Note that there is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where discrete Wyckoff letters can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling.
+We only consider symmetry inequivalent atoms in the crystal representation. The remaining atoms are restored based on the information of space group and Wyckoff letters. There is a natural alphabetical ordering for the Wyckoff letters, starting with 'a' for a position with the site-symmetry group of maximal order and ending with the highest letter for the general position. The sampling procedure starts from higher symmetry sites (with smaller multiplicities) and then goes on to lower symmetry ones (with larger multiplicities). Only for the cases where the Wyckoff letter can not fully determine the structure, one needs to further consider factional coordinates in the loss or sampling. 
 
 ## Status
 
 Major milestones are summarized below.
-- v0.4.2 : Add implementation of direct preference optimization.
-- v0.4.1 : Replace the absolute positional embedding with the Rotary Positional Embedding (RoPE).
-- v0.4 : Add reinforcement learning (proximal policy optimization).
-- v0.3 : Add conditional generation in the plug-and-play manner.
-- v0.2 : Add Markov chain Monte Carlo (MCMC) sampling for template-based structure generation.
-- v0.1 : Initial implementations of crystalline material generation conditioned on the space group.
+- v0.1 : Initial release developed from _CrystalFormer_ v0.4.2
 
 ## Get Started
 
-**Notebooks**: The quickest way to get started with _CrystalFormer_ is our notebooks in the Google Colab and Bohrium (Chinese version) platforms:
+**Notebooks**: The quickest way to get started with _CrystalFormer-CSP_ is our notebooks in the Google Colab and Bohrium (Chinese version) platforms:
 
-- CrystalFormer Quickstart [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1IMQV6OQgIGORE8FmSTmZuC5KgQwGCnDx?usp=sharing) [![Open In Bohrium](https://cdn.dp.tech/bohrium/web/static/images/open-in-bohrium.svg)](https://nb.bohrium.dp.tech/detail/68177247598): GUI notebook demonstrating the conditional generation of crystalline materials with _CrystalFormer_
-- CrystalFormer Application [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1QdkELaQXAHR1zEu2fcdfgabuoP61_wbU?usp=sharing): Generating stable crystals with a given structure prototype. This workflow can be applied to tasks that are dominated by element substitution
-- CrystalFormer-RL [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ojSqMQzdnlWZRPOQP20nTvvIh67HXdwp#scrollTo=lKOZgUczOAxE) [![Open In Bohrium](https://cdn.dp.tech/bohrium/web/static/images/open-in-bohrium.svg)](https://bohrium.dp.tech/notebooks/52828216135): Reinforcement fine-tuning for materials design
+- ColabCSP [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ojSqMQzdnlWZRPOQP20nTvvIh67HXdwp#scrollTo=lKOZgUczOAxE) [![Open In Bohrium](https://cdn.dp.tech/bohrium/web/static/images/open-in-bohrium.svg)](https://www.bohrium.com/notebooks/65312554759): Running _CrystalFormer-CSP_ Seamlessly on Google Colab
 
 ## Installation
 
@@ -111,130 +101,126 @@ pip install .
 
 ## Available Weights
 
-We release the weights of the model trained on the MP-20 dataset and Alex-20 dataset. More details can be seen in the [model](./model/README.md) folder.
+We release the weights of the model trained on the [Alex20s](https://huggingface.co/datasets/zdcao/alex-20s) dataset. More details can be seen in the [model card](./MODEL_CARD.md).
 
-## How to run
-
-### train
-
-```bash
-python ./main.py --folder ./data/ --train_path YOUR_PATH/mp_20/train.csv --valid_path YOUR_PATH/mp_20/val.csv
-```
-
-- `folder`: the folder to save the model and logs
-- `train_path`: the path to the training dataset
-- `valid_path`: the path to the validation dataset
-- `test_path`: the path to the test dataset
+## Crystal Structure Prediction
 
 ### sample
 
 ```bash
-python ./main.py --optimizer none --restore_path YOUR_MODEL_PATH --spacegroup 160 --num_samples 1000  --batchsize 1000 --temperature 1.0
+python ./main.py --optimizer none --restore_path RESTORE_PATH --K 40 --num_samples 1000 --formula Cu12Sb4S13 --save_path SAVE_PATH
 ```
 
 - `optimizer`: the optimizer to use, `none` means no training, only sampling
 - `restore_path`: the path to the model weights
-- `spacegroup`: the space group number to sample
+- `K`: the top-K number of space groups will be sampled uniformly. 
 - `num_samples`: the number of samples to generate
-- `batchsize`: the batch size for sampling
-- `temperature`: the temperature for sampling
+- `formula`: the chemical formula 
+- `save_path`: [Optional] the path to save the generated structures, if not provided, the structures will be saved in the `RESTORE_PATH` folder.
 
-You can also use the `elements` to sample the specific element. For example, `--elements La Ni O` will sample the structure with La, Ni, and O atoms. The sampling results will be saved in the `output_LABEL.csv` file, where the `LABEL` is the space group number `g` specified in the command `--spacegroup`.
+Instead of providing `K` for top-K sampling, you may directly provide your favorite space group number
+- `spacegroup`: the space group number [1-230]
 
-The input for the `elements` can be also the `json` file which specifies the atom mask in each Wyckoff site and the constraints. An example `atoms.json` file can be seen in the [data](./data/atoms.json) folder. There are two keys in the `atoms.json` file:
-
-- `atom_mask`: set the atom list for each Wyckoff position, the element can only be selected from the list in the corresponding Wyckoff position
-- `constraints`: set the constraints for the Wyckoff sites in the sampling, you can specify the pair of Wyckoff sites that should have the same elements
-
-
-### evaluate
-
-Before evaluating the generated structures, you need to transform the generated `g, W, A, X, L` to the `cif` format. You can use the following command to transform the generated structures to the `cif` format and save as the `csv` file:
+The sampled structure will be saved in the `SAVE_PATH/output_Cu12Sb4S13.csv` file. To transform the generated structure from `g, W, A, X, L` to the `cif` format, you can use the following command
 
 ```bash
-python ./scripts/awl2struct.py --output_path YOUR_PATH --label SPACE_GROUP  --num_io_process 40
+python ./scripts/awl2struct.py --output_path SAVE_PATH --formula FORMULA 
 ```
 
 - `output_path`: the path to read the generated `L, W, A, X` and save the `cif` files
-- `label`: the label to save the `cif` files, which is the space group number `g`
-- `num_io_process`: the number of processes
+- `formula`: the chemical formula constrained in the structure
 
-> [!IMPORTANT]
-> The following evaluation script requires the [`SMACT`](https://github.com/WMD-group/SMACT), [`matminer`](https://github.com/hackingmaterials/matminer), and [`matbench-genmetrics`](https://github.com/sparks-baird/matbench-genmetrics) packages. We recommend installing them in a separate environment to avoid conflicts with other packages.
+This will save the generated structures in the `cif` format to a `output_Cu12Sb4S13_struct.csv` file. 
 
-Calculate the structure and composition validity of the generated structures:
+### Relax generated structures with MLFF:
 
 ```bash
-python ./scripts/compute_metrics.py --root_path YOUR_PATH --filename YOUR_FILE --num_io_process 40
+python scripts/mlff_relax.py \
+    --restore_path SAVE_PATH \
+    --filename output_Cu12Sb4S13_struct.csv \
+    --model orb-v3-conservative-inf-mpa \
+    --model_path path/to/orb-v3.ckpt \
+    --relaxation
 ```
+This will produce relaxed structure in `relaxed_structures` with predicted energies.
 
-- `root_path`: the path to the dataset
-- `filename`: the filename of the generated structures
-- `num_io_process`: the number of processes
+### Energy Above Hull (Ehull)
 
-Calculate the novelty and uniqueness of the generated structures:
+Compute Ehull for all relaxed structures:
 
 ```bash
-python ./scripts/compute_metrics_matbench.py --train_path TRAIN_PATH --test_path TEST_PATH --gen_path GEN_PATH --output_path OUTPUT_PATH --label SPACE_GROUP --num_io_process 40
+python scripts/e_above_hull_alex.py \
+    --convex_path convex_hull_pbe.json.bz2 \
+    --restore_path SAVE_PATH \
+    --filename relaxed_structures.csv
+```
+### End-to-End Pipeline
+
+Run sampling → CIF conversion → relaxation → Ehull ranking:
+
+```bash
+./postprocess.sh \
+    -r RESTORE_PATH \
+    -k epoch_030000.pkl \
+    --relaxation true \ 
+    -n 1000 
+    -f Cu12Sb4S13 
+    -s SAVE_PATH
 ```
 
-- `train_path`: the path to the training dataset
-- `test_path`: the path to the test dataset
-- `gen_path`: the path to the generated dataset
-- `output_path`: the path to save the metrics results
-- `label`: the label to save the metrics results, which is the space group number `g`
-- `num_io_process`: the number of processes
+In case you are curious about the parameters, run:
+```bash 
+./postprocess.sh -h 
+``` 
 
-Note that the training, test, and generated datasets should contain the structures within the **same** space group `g` which is specified in the command `--label`.
 
-More details about the post-processing can be seen in the [scripts](./scripts/README.md) folder.
+## Advanced usage
 
-## Reinforcement Fine-tuning
+### Reinforcement Fine-tuning
 
 > [!IMPORTANT]
-> Before running the reinforcement fine-tuning, please make sure you have installed the corresponding machine learning force field model or property prediction model. The `mlff_model` and `mlff_path` arguments in the command line should be set according to the model you are using. Now we support the[`orb`](https://github.com/orbital-materials/orb-models) and [`MACE`](https://github.com/ACEsuit/mace) models for the $E_{hull}$ reward, and the [`matgl`](https://github.com/materialsvirtuallab/matgl) model for the dielectric FoM reward.
+> Before running the reinforcement fine-tuning, please make sure you have installed the corresponding machine learning force field model or property prediction model. The `mlff_model` and `mlff_path` arguments in the command line should be set according to the model you are using. Now we only support the[`orb`](https://github.com/orbital-materials/orb-models) for the $E_{hull}$ reward. [`BatchRelaxer`](https://github.com/zdcao121/BatchRelaxer) is also needed for batch structure relaxation during the fine-tuning.
 
-### $E_{hull}$ Reward
 
 ```bash
 train_ppo --folder ./data/\
           --restore_path YOUR_PATH\
-          --valid_path YOUR_PATH/alex_20/val.csv\
-          --test_path YOUR_PATH/alex_20/train.csv\
           --reward ehull\
-          --convex_path YOUR_PATH/convex_hull_pbe_2023.12.29.json.bz2\
-          --mlff_model orb\
-          --mlff_path YOUR_PATH/orb-v2-20241011.ckpt
+          --convex_path YOUR_PATH/convex_hull_pbe.json.bz2\
+          --mlff_model orb-v3-conservative-inf-mpa\
+          --mlff_path YOUR_PATH/orb-v3-conservative-inf-mpa-20250404.ckpt \
+          --lr 1e-05 \
+          --dropout_rate 0.0 \
+          --K 40 \
+          --batchsize 500 \
+          --formula LiPH2O4 
 ```
 
+where
 - `folder`: the folder to save the model and logs
 - `restore_path`: the path to the pre-trained model weights
-- `valid_path`: the path to the validation dataset
-- `test_path`: the path to the test dataset. The space group distribution will be loaded from this dataset and used for the sampling in the reinforcement learning fine-tuning
 - `reward`: the reward function to use, `ehull` means the energy above the convex hull
 - `convex_path`: the path to the convex hull data, which is used to calculate the $E_{hull}$. Only used when the reward is `ehull`
-- `mlff_model`: the machine learning force field model to predict the total energy. We support [`orb`](https://github.com/orbital-materials/orb-models) and [`MACE`](https://github.com/ACEsuit/mace) models for the $E_{hull}$ reward
+- `mlff_model`: the machine learning force field model to predict the total energy. We support [`orb`](https://github.com/orbital-materials/orb-models) model for the $E_{hull}$ reward
 - `mlff_path`: the path to load the checkpoint of the machine learning force field model
 
-### Dielectric FoM Reward
+### pretrain
 
 ```bash
-train_ppo --folder ./data/\
-          --restore_path YOUR_PATH\
-          --valid_path YOUR_PATH/alex_20/val.csv\
-          --test_path YOUR_PATH/alex_20/train.csv\
-          --reward dielectric\
-          --mlff_model matgl\
-          --mlff_path YOUR_PATH/model1,YOUR_PATH/model2
+python ./main.py --folder ./data/ --train_path YOUR_PATH/alex20s/train.csv --valid_path YOUR_PATH/alx20s/val.csv 
 ```
-
+where 
 - `folder`: the folder to save the model and logs
-- `restore_path`: the path to the pre-trained model weights
+- `train_path`: the path to the training dataset
 - `valid_path`: the path to the validation dataset
-- `test_path`: the path to the test dataset. The space group distribution will be loaded from this dataset and used for the sampling in the reinforcement learning fine-tuning
-- `reward`: the reward function to use, `dielectric` means the dielectric figure of merit (FoM), which is the product of the total dielectric constant and the band gap
-- `mlff_model`: the machine learning force field model to predict the total energy. We only support models in [`matgl`](https://github.com/materialsvirtuallab/matgl) for the dielectric reward
-- `mlff_path`: the path to load the checkpoint of the machine learning force field model. Note that you need to provide the model paths for the total dielectric constant and band gap, separated by the `,`
+
+
+Test the prediction accuracy of space groups on the test dataset
+
+```bash 
+
+python scripts/predict_g.py --restore_path /home/user_wanglei/private/datafile/crystalgpt/csp/alex20s/csp-99fcd/adam_bs_8000_lr_0.0001_decay_0_clip_1_A_119_W_28_N_21_a_1_w_1_l_1_Nf_5_Kx_16_Kl_4_h0_256_l_16_H_8_k_32_m_256_e_256_drop_0.1_0.1/epoch_046000.pkl --valid_path /opt/data/bcmdata/ZONES/data/PROJECTS/datafile/PRIVATE/zdcao/crystal_gpt/dataset/alex/PBE_20241204/test.lmdb --Nf 5 --Kx 16 --Kl 4 --h0_size 256 --transformer_layers 16 --num_heads 8 --key_size 32 --model_size 256 --embed_size 256 --batchsize 1000s
+```
 
 
 ## How to cite
@@ -259,6 +245,16 @@ train_ppo --folder ./data/\
       archivePrefix={arXiv},
       primaryClass={cond-mat.mtrl-sci},
       url={https://arxiv.org/abs/2504.02367}, 
+}
+```
+
+```bibtex
+@article{cao2025crystalformercsp,
+  title={CrystalFormer-CSP: Thinking Fast and Slow for Crystal Structure Prediction},
+  author={Cao, Zhendong and Ou, Shigang and Wang, Lei},
+  year={2025},
+  archivePrefix={arXiv},
+  primaryClass={cond-mat.mtrl-sci},
 }
 ```
 

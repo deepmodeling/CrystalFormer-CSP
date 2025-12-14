@@ -1,4 +1,4 @@
-# CrystalFormer MCP Server
+# CrystalFormer-CSP MCP Server
 
 Model Context Protocol (MCP) server for Crystal Structure Prediction, enabling AI assistants to generate crystal structures.
 
@@ -55,6 +55,7 @@ Main tool for generating crystal structures with complete postprocessing pipelin
 ## Usage Examples
 
 ### Basic Crystal Generation
+After setting up the MCP server, you can use the following prompt in your LLM interface:
 
 ```
 Generate H2O crystal structures
