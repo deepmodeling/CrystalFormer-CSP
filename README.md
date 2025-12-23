@@ -3,7 +3,7 @@
   <h2> Thinking fast and slow for crystal structure prediction</h2> 
 </div>
 
-[![arXiv](https://img.shields.io/badge/arXiv-2511.XXXXX-b31b1b.svg)](https://arxiv.org/abs/2511.XXXXX) 
+[![arXiv](https://img.shields.io/badge/arXiv-2512.18251-b31b1b.svg)](https://arxiv.org/abs/2512.18251) 
 
 _CrystalFormer-CSP_ is an autoregressive transformer designed for crystal structure prediction.
 
@@ -53,9 +53,9 @@ Major milestones are summarized below.
 
 ## Get Started
 
-**Notebooks**: The quickest way to get started with _CrystalFormer-CSP_ is our notebooks in the Google Colab and Bohrium (Chinese version) platforms:
+**Notebooks**: The quickest way to get started with _CrystalFormer-CSP_ is our notebooks in the Google Colab platform:
 
-- ColabCSP [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ojSqMQzdnlWZRPOQP20nTvvIh67HXdwp#scrollTo=lKOZgUczOAxE) [![Open In Bohrium](https://cdn.dp.tech/bohrium/web/static/images/open-in-bohrium.svg)](https://www.bohrium.com/notebooks/65312554759): Running _CrystalFormer-CSP_ Seamlessly on Google Colab
+- ColabCSP [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ojSqMQzdnlWZRPOQP20nTvvIh67HXdwp#scrollTo=lKOZgUczOAxE): Running _CrystalFormer-CSP_ Seamlessly on Google Colab
 
 ## Installation
 
@@ -249,12 +249,14 @@ python scripts/predict_g.py --restore_path /home/user_wanglei/private/datafile/c
 ```
 
 ```bibtex
-@article{cao2025crystalformercsp,
-  title={CrystalFormer-CSP: Thinking Fast and Slow for Crystal Structure Prediction},
-  author={Cao, Zhendong and Ou, Shigang and Wang, Lei},
-  year={2025},
-  archivePrefix={arXiv},
-  primaryClass={cond-mat.mtrl-sci},
+@misc{cao2025crystalformercsp,
+      title={CrystalFormer-CSP: Thinking Fast and Slow for Crystal Structure Prediction}, 
+      author={Zhendong Cao and Shigang Ou and Lei Wang},
+      year={2025},
+      eprint={2512.18251},
+      archivePrefix={arXiv},
+      primaryClass={cond-mat.mtrl-sci},
+      url={https://arxiv.org/abs/2512.18251}, 
 }
 ```
 
