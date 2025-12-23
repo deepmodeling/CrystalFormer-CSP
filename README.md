@@ -55,7 +55,7 @@ Major milestones are summarized below.
 
 **Notebooks**: The quickest way to get started with _CrystalFormer-CSP_ is our notebooks in the Google Colab platform:
 
-- ColabCSP [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ojSqMQzdnlWZRPOQP20nTvvIh67HXdwp#scrollTo=lKOZgUczOAxE): Running _CrystalFormer-CSP_ Seamlessly on Google Colab
+- ColabCSP [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1I7b5exbB2oBjexFIEaeDQexmYRDgLHVk?authuser=0#scrollTo=kfu6Ez9e6Sp7): Running _CrystalFormer-CSP_ Seamlessly on Google Colab
 
 ## Installation
 
